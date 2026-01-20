@@ -1,0 +1,1355 @@
+
+<!DOCTYPE html>
+<html lang="en-NL">
+<head>
+    <meta charset="UTF-8" />
+    <title>Audio Events MIDI Manager</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; max-width: 850px; margin: 1rem auto; background: #f0f2f5; padding: 10px; }
+        .grid { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        
+        #playlist-ui { border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; overflow: hidden; }
+        .playlist-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.9rem; }
+        .playlist-item.active { background: #e7f3ff; border-left: 4px solid #007bff; font-weight: bold; }
+        .playlist-item .danger { margin-left: 10px; }
+
+        /* --- MIDI Panel --- */
+        .midi-panel {
+            background: #f7f9fa;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 1px 1px;
+            margin-bottom: 12px;
+        }
+        .midi-row { display: flex; align-items: center; gap: 10px; }
+        .midi-status {  
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1a73e8;
+            background: transparent;
+            border-radius: 6px;
+            padding: 2px 8px;
+            transition: background-color 200ms ease, color 200ms ease;
+        }
+        /* Flash style (activity indicator) */
+        .midi-status.cc-flash { background: #fff3cd !important; color: #7a5a00 !important; }
+
+        <!-- .midi-panel button { padding: 6px 12px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; } -->
+        <!-- .midi-panel button.primary { background: #007bff; color: #fff; border: none; } -->
+        
+        dialog { border: 1px solid #ccc; border-radius: 10px; padding: 12px; }
+        dialog h3 { margin: 0 0 .5rem; }
+        dialog .row { display: flex; align-items: center; gap: 8px; }
+        dialog label { display: flex; flex-direction: column; font-size: 0.9rem; }
+        dialog select { width: 100%; padding: 6px; font-size: 1rem; }
+
+        /* --- Playback Controls --- */
+        .controls-container {
+            background: #f1f3f4;
+            padding: 10px 15px;
+            border-radius: 30px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #F3F5F; /* harmless invalid hex (ignored) kept per original */
+            flex-wrap: nowrap; /* force one line */
+        }
+
+        .control-btn {
+            background: #F1F3F4;
+            color: black;
+            border: none;
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.2s;
+            font-size: 18px;
+            padding: 0;
+        }
+        .control-btn:hover { background: #E5E7E8; }
+        .control-btn.loop-active { background: #E5E7E8; box-shadow: 0 0 4px rgba(26, 115, 232, 0.4); }
+
+        .speed-wrapper { position: relative; }
+        .speed-btn-label { min-width: 50px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem; color: #5f6368; font-weight: 500; }
+        .speed-menu { position: absolute; background: white; border-radius: 12px; box-shadow: 0 10px 24px rgba(0,0,0,0.18); padding: 8px; display: none; z-index: 99; min-width: 180px; }
+        .speed-menu-title { font-size: 0.85rem; color: #5f6368; font-weight: 500; padding: 4px 8px 8px 8px; }
+        .speed-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.85rem; color: #5f6368; font-weight: 500; padding: 12px 14px; border-radius: 8px; border: none; background: #ffffff; width: 100%; cursor: pointer; }
+        .speed-option:hover { background: #f5f7f9; }
+        .speed-option.active { font-weight: 600; color: #1a73e8; background: #eef4ff; }
+
+        #vol-slider { 
+            -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; 
+            flex: 0 0 120px; /* shortened so it stays on one line */
+        }
+        #vol-slider::-webkit-slider-runnable-track { background: #B5B7B8; height: 4px; border-radius: 2px; }
+        #vol-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: #1a73e8; margin-top: -4px; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+        #vol-text { font-size: 0.85rem; color: #5f6368; width: 40px; font-weight: 500; text-align: right; flex: 0 0 auto; }
+
+        /* --- Markers list --- */
+        ul { list-style: none; padding: 0; margin-top: 10px; }
+        li { display: flex; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid #eee; transition: background 0.3s; }
+        li.active-event { background: #fff9c4; border-left: 4px solid #fbc02d; }
+        .marker-left   { flex: 1; }
+        .marker-middle { flex: 1; text-align: center; }
+        .marker-right  { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+        .preset-badge { font-size: 0.85rem; font-weight: 700; color: #333; background: inherit; border: none; border-radius: 6px; padding: 2px 8px; }
+
+        <!-- button { cursor: pointer; padding: 6px 12px; border-radius: 4px; border: 1px solid #ccc; background: white; } -->
+        .primary { background: #007bff; color: white; border: none; }
+        .danger { color: #dc3545; border-color: #dc3545; font-size: 0.8rem; }
+
+        audio { width: 100%; }
+        @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+
+        /* --- Progress bar --- */
+        .progress-container {
+            background: #f1f3f4;
+            border: 1px solid #F3F5F;
+            padding: 10px 20px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0 5px;
+            user-select: none;
+        }
+        .progress-track {
+            position: relative;
+            height: 10px;
+            background: #B5B7B8;
+            border-radius: 6px;
+            flex: 1;
+            cursor: pointer;
+            overflow: hidden;
+        }
+        .progress-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #1a73e8; z-index: 1; }
+
+        :root {
+            --ghost-fill-color: #1a73e8;
+            --ghost-fill-opacity: 0.35;
+            --ghost-line-color: #1a73e8;
+            --ghost-line-opacity: 0.9;
+        }
+        .progress-ghost-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: var(--ghost-fill-color); opacity: var(--ghost-fill-opacity); pointer-events: none; display: none; z-index: 1; }
+        .progress-ghost { position: absolute; top: 0; width: 2px; height: 100%; background: var(--ghost-line-color); opacity: var(--ghost-line-opacity); box-shadow: 0 0 6px rgba(0,0,0,0.35); pointer-events: none; transform: translateX(-1px); display: none; z-index: 4; }
+
+        .progress-ab {
+            position: absolute; top: 0; height: 100%; left: 0%; width: 0%;
+            background: rgba(251, 192, 45, 0.25); display: none; z-index: 2;
+        }
+        .progress-ab.enabled { background: rgba(251, 192, 45, 0.6); }
+        .ab-handle {
+            position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%;
+            background: #fbc02d; border: 2px solid #9c6f00; box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+            transform: translate(-50%, -50%); cursor: ew-resize;
+        }
+        .ab-handle.right { right: 0; left: auto; transform: translate(50%, -50%); }
+        .ab-drag { position: absolute; left: 0; right: 0; top: 0; bottom: 0; cursor: grab; }
+        .ab-drag.dragging { cursor: grabbing; }
+
+        .time-label { font-size: 0.85rem; color: #5f6368; flex-shrink: 0; min-width: 110px; text-align: right; }
+
+        .progress-tick {
+            position: absolute; top: 0; width: 2px; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 3; pointer-events: none; transform: translateX(-1px);
+        }
+        .progress-tick.fired { background: #1a73e8; opacity: 0.95; }
+        .progress-tick.current { background: #fbc02d; box-shadow: 0 0 6px rgba(251, 192, 45, 0.7); }
+
+        /* --- A/B controls --- */
+        #ab-controls { gap: 12px; } /* increased spacing between buttons */
+        .ab-btn {
+            border-radius: 16px;   /* pill-shaped for time labels */
+            font-size: 18px;       /* match .control-btn font-size */
+            padding: 6px 12px;     
+            line-height: 1.2;
+            width: auto; height: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="grid">
+    <div class="card">
+        <div class="midi-panel">
+            <button id="btnConnect" class="midi-status" style="width:100%; background:transparent; border: none">Connect</button>
+            <dialog id="usbDialog">
+                <form method="dialog">
+                    <h3>Select USB MIDI Output</h3>
+                    <div class="row">
+                        <label class="stretch">
+                            Output
+                            <select id="usbOutput" class="stretch"></select>
+                        </label>
+                    </div>
+                    <div class="row" style="margin-top:.75rem;">
+                        <button id="usbConnectBtn" type="button" class="primary">Connect</button>
+                        <span class="stretch"></span>
+                        <button id="usbCancelBtn">Cancel</button>
+                    </div>
+                </form>
+            </dialog>
+        </div>
+
+        <!-- <div style="display: flex; justify-content: space-between; align-items: center;"> -->
+            <!-- <h3 style="margin:0">Playlist</h3> -->
+            <!-- <input type="file" id="fileInput" accept="audio/*" multiple style="display:none"> -->
+            <!-- <button class="primary" onclick="document.getElementById('fileInput').click()">Add Audio</button> -->
+        <!-- </div> -->
+        
+        <h3>Playlist</h3>
+        <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
+        <button class="primary" style="width:100%" onclick="document.getElementById('fileInput').click()">Add Audio</button>
+        <div id="playlist-ui"></div>
+    </div>
+
+    <div class="card">
+        <h3 id="current-title" style="margin-top:0">Select a song</h3>
+        <audio id="audioTrack"></audio>
+
+        <!-- Progress bar -->
+        <div class="progress-container" aria-label="Audio progress">
+            <div id="progress-bar" class="progress-track" title="Drag to seek">
+                <div id="progress-fill" class="progress-fill"></div>
+                <div id="progress-ghost-fill" class="progress-ghost-fill"></div>
+                <div id="progress-ghost" class="progress-ghost"></div>
+                <div id="progress-ab" class="progress-ab">
+                    <div id="ab-drag" class="ab-drag" data-role="segment"></div>
+                    <div id="ab-handle-a" class="ab-handle left" data-role="handle-a" title="Drag to adjust A"></div>
+                    <div id="ab-handle-b" class="ab-handle right" data-role="handle-b" title="Drag to adjust B"></div>
+                </div>
+            </div>
+            <!-- Shows m:ss.S (currentTime deciseconds by default) -->
+            <span id="time-label" class="time-label">0:00.0 / 0:00</span>
+        </div>
+
+        <!-- Playback controls -->
+        <div class="controls-container">
+            <button class="control-btn" onclick="stopAudio()" title="Stop">■</button>
+            <button class="control-btn" onclick="seekRelative(-10)" title="Back 10s">↺</button>
+            <button id="playPauseBtn" class="control-btn" onclick="togglePlayPause()" title="Play/Pause">▶</button>
+            <button class="control-btn" onclick="seekRelative(10)" title="Forward 10s">↻</button>
+            <button id="loopBtn" class="control-btn" onclick="toggleLoop()" title="Toggle Loop">⇄</button>
+
+            <div class="speed-wrapper">
+                <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()" title="Playback Speed">1.00</button>
+                <div id="speedMenu" class="speed-menu" role="menu" aria-label="Playback speed">
+                    <div class="speed-menu-title">Playback Speed</div>
+                </div>
+            </div>
+
+            <button id="muteBtn" class="control-btn" onclick="toggleMute()" title="Mute/Unmute">🔇</button>
+            <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1">
+            <span id="vol-text">100%</span>
+        </div>
+        
+        <!-- A/B controls -->
+        <div class="controls-container" id="ab-controls">
+            <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABLoop()" title="Enable/Disable A–B Loop">A ⇄ B</button>
+
+            <button id="btnSetA" class="control-btn ab-btn" onclick="setLoopA()" title="Set start of loop (A)">
+                <span>A |→ —</span>
+            </button>
+
+            <!-- Visibility toggle for A–B segment -->
+            <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" title="Show/Hide A–B loop segment">✖</button>
+
+            <button id="btnSetB" class="control-btn ab-btn" onclick="setLoopB()" title="Set end of loop (B)">
+                <span>— ←| B</span>
+            </button>
+
+            <button class="control-btn ab-btn" onclick="rewindToA()" title="Rewind to beginning of loop (A)">↩A</button>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin:0">Markers</h4>
+            <button class="primary" onclick="setEvent()">Add Marker</button>
+        </div>
+        <ul id="event-list"></ul>
+    </div>
+</div>
+
+<script>
+/* ============================ Robust IndexedDB ============================ */
+const IDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
+let db = null;
+const DB_NAME = "AudioMasterDB_2026";
+const DB_VERSION = 1;
+const STORE_SONGS = "songs";
+
+function openDB() {
+    return new Promise((resolve) => {
+        if (!IDB) { console.warn("IndexedDB not available."); return resolve(null); }
+        const req = IDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+            const _db = e.target.result;
+            if (!_db.objectStoreNames.contains(STORE_SONGS)) {
+                _db.createObjectStore(STORE_SONGS, { keyPath: "name" });
+            }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror  = () => resolve(null);
+    });
+}
+function getAllSongs() {
+    return new Promise((resolve) => {
+        if (!db) return resolve([]);
+        const tx = db.transaction(STORE_SONGS, "readonly");
+        const store = tx.objectStore(STORE_SONGS);
+        const items = [];
+        if ("getAll" in store) {
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror   = () => resolve([]);
+        } else {
+            const req = store.openCursor();
+            req.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) { items.push(cursor.value); cursor.continue(); }
+                else resolve(items);
+            };
+            req.onerror = () => resolve([]);
+        }
+    });
+}
+function putSongs(files) {
+    return new Promise((resolve) => {
+        if (!db) return resolve(false);
+        const tx = db.transaction(STORE_SONGS, "readwrite");
+        const store = tx.objectStore(STORE_SONGS);
+        try {
+            files.forEach((file) => {
+                const blob = new Blob([file], { type: file.type || "audio/*" });
+                store.put({ name: file.name, type: file.type || "", lastModified: file.lastModified || Date.now(), data: blob });
+            });
+        } catch (err) { console.error("IDB put error", err); }
+        tx.oncomplete = () => resolve(true);
+        tx.onerror    = () => resolve(false);
+        tx.onabort    = () => resolve(false);
+    });
+}
+function getSongByName(name) {
+    return new Promise((resolve) => {
+        if (!db) return resolve(null);
+        const tx = db.transaction(STORE_SONGS, "readonly");
+        const store = tx.objectStore(STORE_SONGS);
+        const req = store.get(name);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror   = () => resolve(null);
+    });
+}
+function removeSongFromDB(name) {
+    return new Promise((resolve) => {
+        if (!db) return resolve(false);
+        const tx = db.transaction(STORE_SONGS, "readwrite");
+        tx.objectStore(STORE_SONGS).delete(name);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror    = () => resolve(false);
+        tx.onabort    = () => resolve(false);
+    });
+}
+
+/* ============================== App Constants ============================= */
+const EPS_RECONCILE = 0.05;
+const EPS_LOOP_B    = 0.02;
+const CC_FLASH_MS   = 350;
+
+const DEFAULT_DECIMALS = 1; // 1 => m:ss.S (e.g., 3:15.7). Use 2 for m:ss.SS.
+
+/* =============================== DOM refs ================================ */
+const audio = document.getElementById('audioTrack');
+const volSlider = document.getElementById('vol-slider');
+const volText = document.getElementById('vol-text');
+const loopBtn = document.getElementById('loopBtn');
+const playlistUI = document.getElementById('playlist-ui');
+const fileInput = document.getElementById('fileInput');
+
+const playPauseBtn = document.getElementById('playPauseBtn');
+const muteBtn = document.getElementById('muteBtn');
+const speedBtn = document.getElementById('speedBtn');
+const speedMenu = document.getElementById('speedMenu');
+
+const progressBar = document.getElementById('progress-bar');
+const progressFill = document.getElementById('progress-fill');
+const progressGhostFill = document.getElementById('progress-ghost-fill');
+const progressGhost = document.getElementById('progress-ghost');
+const progressAB = document.getElementById('progress-ab');
+const abDrag = document.getElementById('ab-drag');
+const abHandleA = document.getElementById('ab-handle-a');
+const abHandleB = document.getElementById('ab-handle-b');
+const timeLabel = document.getElementById('time-label');
+
+const btnSetA = document.getElementById('btnSetA');
+const btnSetB = document.getElementById('btnSetB');
+const abEnableBtn = document.getElementById('abEnableBtn');
+const abVisibleBtn = document.getElementById('abVisibleBtn');
+
+const EVENT_MAP_KEY = 'audio_events_map_2026';
+const VOLUME_MAP_KEY = 'audio_volume_map_2026';
+const AB_LOOP_MAP_KEY = 'audio_ab_loop_map_2026';
+const SPEED_MAP_KEY = 'audio_speed_map_2026';
+
+/* ================================ State ================================= */
+let currentFileName = "";
+let activeBlobUrl = null;
+let firedEvents = new Set();
+
+// Extended A/B loop state with `visible`
+let abLoop = { enabled: false, visible: true, a: null, b: null };
+
+let lastTriggeredMarkerTime = null;
+let lastTriggeredMarkerIndex = null;
+
+let isScrubbing = false;
+let wasPlaying = false;
+let dragMode = null;
+let pointerId = null;
+let segmentWidthPct = 0;
+let segmentLeftPct = 0;
+let pointerOffsetPct = 0;
+
+let scrubStartTime = null;
+let scrubTargetTime = null;
+
+const MIN_GAP_SEC = 0.05;
+const AVAILABLE_SPEEDS = [0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5, 1.75, 2.0];
+const ANCHOR_RATE = 0.9;
+
+/* =============================== Helpers ================================ */
+function configureGhostPreview({ fillColor, fillOpacity, lineColor, lineOpacity } = {}) {
+    const root = document.documentElement;
+    if (fillColor   !== undefined) root.style.setProperty('--ghost-fill-color', fillColor);
+    if (fillOpacity !== undefined) root.style.setProperty('--ghost-fill-opacity', String(fillOpacity));
+    if (lineColor   !== undefined) root.style.setProperty('--ghost-line-color', lineColor);
+    if (lineOpacity !== undefined) root.style.setProperty('--ghost-line-opacity', String(lineOpacity));
+}
+configureGhostPreview({ fillColor: '#4aa3f8', fillOpacity: 0.5, lineColor: '#1a73e8', lineOpacity: 0.9 });
+
+function safeRevoke(url) { if (url) { try { URL.revokeObjectURL(url); } catch {} } return null; }
+function clamp(val, min, max) { return Math.min(Math.max(val, min), max); }
+
+function formatClock(t, digits = DEFAULT_DECIMALS) {
+    if (!isFinite(t) || t < 0) t = 0;
+    const factor = Math.pow(10, digits);
+    const units = Math.round(t * factor);
+    const perMinute = 60 * factor;
+
+    const m = Math.floor(units / perMinute);
+    const sUnits = units % perMinute;
+    const s = Math.floor(sUnits / factor);
+    const frac = sUnits % factor;
+
+    const secStr = String(s).padStart(2, '0');
+    const fracStr = digits > 0 ? '.' + String(frac).padStart(digits, '0') : '';
+    return `${m}:${secStr}${fracStr}`;
+}
+
+/* ================================ MIDI ================================== */
+const btnConnect     = document.getElementById('btnConnect');
+const statusEl       = document.getElementById('btnConnect');
+const usbDialog      = document.getElementById('usbDialog');
+const usbOutputEl    = document.getElementById('usbOutput');
+const usbConnectBtn  = document.getElementById('usbConnectBtn');
+const usbCancelBtn   = document.getElementById('usbCancelBtn');
+
+const MIDI_SERVICE_UUID = '03b80e5a-ede8-4b33-a751-6ce34ec4c700';
+const MIDI_CHARACTERISTIC_UUID = '7772e5db-3868-4112-a1a9-f2669d106bf3';
+
+let currentTransport = null; // 'usb' | 'ble' | null
+let device = null, server = null, service = null, midiChar = null; // BLE
+let midiAccess = null, usbOutput = null; // USB Web MIDI
+
+/* Single status setter: set the label's text (no connected background class) */
+function setStatusText(text) { statusEl.textContent = text || ''; }
+
+/* Flash visual (activity indicator on CC/PC sends) */
+let ccFlashTimer = null;
+function flashCcStatus() {
+    statusEl.classList.remove('cc-flash');
+    void statusEl.offsetWidth; // reflow to restart flash
+    statusEl.classList.add('cc-flash');
+    if (ccFlashTimer) clearTimeout(ccFlashTimer);
+    ccFlashTimer = setTimeout(() => {
+        statusEl.classList.remove('cc-flash');
+        ccFlashTimer = null;
+    }, CC_FLASH_MS);
+}
+
+// --- BLE-MIDI Packet Helpers ---
+function buildBleMidiPacket(midiBytes, useZeroTimestamp = false) {
+    let tsHigh = 0x80, tsLow = 0x80;
+    if (!useZeroTimestamp) {
+        const ts = Math.floor(performance.now()) % 8192;
+        tsHigh = 0x80 | (ts >> 7);
+        tsLow  = 0x80 | (ts & 0x7F);
+    }
+    const packet = new Uint8Array(2 + midiBytes.length);
+    packet[0] = tsHigh;
+    packet[1] = tsLow;
+    packet.set(midiBytes, 2);
+    return packet;
+}
+async function writeBle(bytes, { forceResponse = false, useZeroTimestamp = false } = {}) {
+    if (!midiChar) throw new Error('Not connected');
+    const packet = buildBleMidiPacket(bytes, useZeroTimestamp);
+    if (!forceResponse && typeof midiChar.writeValueWithoutResponse === 'function') {
+        await midiChar.writeValueWithoutResponse(packet);
+    } else {
+        await midiChar.writeValue(packet);
+    }
+}
+let bleQueue = Promise.resolve();
+function enqueueBle(bytes, opts = {}) {
+    bleQueue = bleQueue.then(() => writeBle(bytes, opts)).catch(() => { /* swallow transient errors */ });
+    return bleQueue;
+}
+
+// USB Web MIDI helpers
+async function ensureMidiAccess() {
+    if (!navigator.requestMIDIAccess) return null;
+    if (!midiAccess) {
+        try { midiAccess = await navigator.requestMIDIAccess({ sysex: false }); }
+        catch { midiAccess = null; }
+    }
+    return midiAccess;
+}
+function listUsbOutputs() {
+    const outputs = [];
+    if (!midiAccess) return outputs;
+    for (const out of midiAccess.outputs.values()) outputs.push(out);
+    return outputs;
+}
+function writeUsb(bytes) {
+    if (!usbOutput) throw new Error('Not connected');
+    usbOutput.send(bytes);
+}
+
+// Helper: connected device name (for routing CC vs PC)
+function getConnectedDeviceName() {
+    if (currentTransport === 'usb') {
+        return (usbOutput && usbOutput.name) ? usbOutput.name : '';
+    } else if (currentTransport === 'ble') {
+        return (device && device.name) ? device.name : '';
+    }
+    return '';
+}
+
+// Map preset (1..100) → PC program (0..127)
+function presetToProgram(preset) { let p = parseInt(preset,10); if (isNaN(p)) p=1; return Math.max(0, Math.min(127, p-1)); }
+
+// --- Public APIs (flash on both CC and PC) ---
+async function sendCc(channel, ccNumber, ccValue) {
+    const ch  = Math.min(16, Math.max(1, Number(channel)  || 1));
+    const cc  = Math.min(127, Math.max(0, Number(ccNumber) || 0));
+    const val = Math.min(127, Math.max(0, Number(ccValue)  || 0));
+    const status = 0xB0 + (ch - 1);
+    const midiBytes = new Uint8Array([status, cc, val]);
+
+    try {
+        if (currentTransport === 'usb') {
+            writeUsb(midiBytes);
+            flashCcStatus();
+        } else if (currentTransport === 'ble') {
+            enqueueBle(midiBytes, { forceResponse: false, useZeroTimestamp: false })
+                .then(() => { flashCcStatus(); });
+        }
+    } catch { /* swallow transient errors */ }
+}
+window.sendCc = sendCc;
+
+async function sendPc(channel, program) {
+    const ch  = Math.min(16, Math.max(1, Number(channel)  || 1));
+    const pg  = Math.min(127, Math.max(0, Number(program) || 0));
+    const status = 0xC0 + (ch - 1);
+    const midiBytes = new Uint8Array([status, pg]);
+
+    try {
+        if (currentTransport === 'usb') {
+            writeUsb(midiBytes);
+            flashCcStatus();
+        } else if (currentTransport === 'ble') {
+            enqueueBle(midiBytes, { forceResponse: false, useZeroTimestamp: true })
+                .then(() => { flashCcStatus(); });
+        }
+    } catch { /* swallow transient errors */ }
+}
+window.sendPc = sendPc;
+
+let toDisconnect = 'x'; // Used to be visualized
+let toConnect = 'C'; // Used to be visualized
+let connectionStatus = toConnect;
+
+async function connectOrDisconnect() {
+    if (connectionStatus === toDisconnect) {
+        if (currentTransport === 'ble') {
+            try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch {}
+            device = server = service = midiChar = null;
+        } else if (currentTransport === 'usb') {
+            usbOutput = null;
+        }
+        currentTransport = null;
+        connectionStatus = toConnect;
+        setStatusText('Connect');
+        return;
+    }
+
+    const access = await ensureMidiAccess();
+    if (access) {
+        const outputs = listUsbOutputs();
+
+        if (outputs.length === 1) {
+            const candidate = outputs[0];
+            const ok = confirm(`Connect to USB MIDI output:\n\n${candidate.name || 'USB Output'}\n\nOK to connect, Cancel to choose BLE.`);
+            if (ok) {
+                usbOutput = candidate;
+                currentTransport = 'usb';
+                connectionStatus = toDisconnect;
+                setStatusText(usbOutput.name || 'USB Output');
+                return;
+            }
+        } else if (outputs.length > 1) {
+            usbOutputEl.innerHTML = '';
+            outputs.forEach(out => {
+                const opt = document.createElement('option');
+                opt.value = out.id;
+                opt.textContent = out.name || `Output ${out.id}`;
+                usbOutputEl.appendChild(opt);
+            });
+            usbDialog.showModal();
+
+            const onConnect = () => {
+                const id = usbOutputEl.value;
+                usbOutput = access.outputs.get(id);
+                usbDialog.close();
+                usbConnectBtn.removeEventListener('click', onConnect);
+                usbCancelBtn.removeEventListener('click', onCancel);
+                if (usbOutput) {
+                    currentTransport = 'usb';
+                    connectionStatus.textContent = toDisconnect;
+                    setStatusText(usbOutput.name || 'USB Output');
+                } else {
+                    connectBleFlow();
+                }
+            };
+            const onCancel = () => {
+                usbDialog.close();
+                usbConnectBtn.removeEventListener('click', onConnect);
+                usbCancelBtn.removeEventListener('click', onCancel);
+                connectBleFlow();
+            };
+            usbConnectBtn.addEventListener('click', onConnect, { once: true });
+            usbCancelBtn.addEventListener('click', onCancel,  { once: true });
+            return;
+        }
+    }
+    connectBleFlow();
+}
+
+async function connectBleFlow() {
+    if (!navigator.bluetooth) { setStatusText('Web Bluetooth unavailable'); return; }
+    try {
+        setStatusText('Requesting BLE device...');
+        device = await navigator.bluetooth.requestDevice({
+            filters: [{ services: [MIDI_SERVICE_UUID] }],
+            optionalServices: [MIDI_SERVICE_UUID]
+        });
+
+        device.addEventListener('gattserverdisconnected', () => {
+            connectionStatus = toConnect;
+            setStatusText('Connect');
+            device = server = service = midiChar = null;
+            currentTransport = null;
+        });
+
+        setStatusText('Connecting…');
+        server = await device.gatt.connect();
+        service = await server.getPrimaryService(MIDI_SERVICE_UUID);
+        midiChar = await service.getCharacteristic(MIDI_CHARACTERISTIC_UUID);
+
+        // Some devices require notifications enabled to open data path
+        try {
+            await midiChar.startNotifications();
+            midiChar.addEventListener('characteristicvaluechanged', () => { /* no-op */ });
+        } catch { /* continue */ }
+
+        currentTransport = 'ble';
+        connectionStatus = toDisconnect;
+        setStatusText(device.name || 'BLE Device');
+    } catch {
+        setStatusText('Error');
+    }
+}
+
+btnConnect.addEventListener('click', connectOrDisconnect);
+
+/* ============================== DB bootstrap ============================= */
+(async function init() {
+    db = await openDB();
+    await renderPlaylist();
+})();
+
+/* =============================== Controls ================================ */
+function togglePlayPause() {
+    if (!audio.src) return;
+    if (audio.paused) { audio.play(); } else { audio.pause(); }
+    updatePlayPauseUI();
+}
+function updatePlayPauseUI() { playPauseBtn.textContent = audio.paused ? '▶' : '⏸'; }
+audio.addEventListener('play', updatePlayPauseUI);
+audio.addEventListener('pause', updatePlayPauseUI);
+
+function toggleMute() {
+    if (!audio.src) return;
+    audio.muted = !audio.muted;
+    updateMuteUI();
+}
+function updateMuteUI() {
+    muteBtn.textContent = audio.muted ? '🔇' : '🔊';
+    muteBtn.classList.toggle('loop-active', audio.muted);
+    const volPct = Math.round((audio.volume || 0) * 100);
+    volText.textContent = audio.muted ? 'Muted' : `${volPct}%`;
+}
+
+function toggleSpeedMenu() {
+    if (!audio.src) return;
+    const isOpen = speedMenu.style.display === 'block';
+    if (isOpen) speedMenu.style.display = 'none';
+    else { buildSpeedMenu(); speedMenu.style.display = 'block'; positionSpeedMenuToAnchor(ANCHOR_RATE); }
+}
+function buildSpeedMenu() {
+    speedMenu.querySelectorAll('.speed-option').forEach(el => el.remove());
+    AVAILABLE_SPEEDS.forEach(rate => {
+        const btn = document.createElement('button');
+        btn.className = 'speed-option';
+        btn.innerHTML = `${rate.toFixed(2)}`;
+        if (audio.playbackRate === rate) btn.classList.add('active');
+        btn.onclick = () => setPlaybackRate(rate);
+        speedMenu.appendChild(btn);
+    });
+}
+function positionSpeedMenuToAnchor(anchorRate) {
+    const wrapper = speedBtn.closest('.speed-wrapper'); if (!wrapper) return;
+    const wRect = wrapper.getBoundingClientRect();
+    const bRect = speedBtn.getBoundingClientRect();
+    const mRect = speedMenu.getBoundingClientRect();
+    const options = Array.from(speedMenu.querySelectorAll('.speed-option'));
+    let anchorEl = options.find(el => parseFloat(el.textContent) === anchorRate) ||
+                   options.find(el => el.classList.contains('active')) ||
+                   options[Math.floor(options.length/2)];
+    if (!anchorEl) return;
+    const oRect = anchorEl.getBoundingClientRect();
+    const buttonCenterX = (bRect.left - wRect.left) + bRect.width / 2;
+    const buttonCenterY = (bRect.top  - wRect.top)  + bRect.height / 2;
+    const optionCenterY = (oRect.top  - mRect.top)  + oRect.height / 2;
+    const menuLeft = buttonCenterX - (mRect.width / 2);
+    const menuTop  = buttonCenterY - optionCenterY;
+    speedMenu.style.left = `${menuLeft}px`;
+    speedMenu.style.top  = `${menuTop}px`;
+}
+function setPlaybackRate(rate) {
+    audio.playbackRate = rate;
+    speedBtn.innerHTML = `${rate.toFixed(2)}`;
+    speedMenu.style.display = 'none';
+    if (currentFileName) {
+        const map = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
+        map[currentFileName] = rate;
+        localStorage.setItem(SPEED_MAP_KEY, JSON.stringify(map));
+    }
+}
+document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.speed-wrapper')) speedMenu.style.display = 'none'; });
+
+function seekRelative(seconds) {
+    const prev = audio.currentTime;
+    const dur = audio.duration || prev;
+    const target = Math.min(Math.max(0, prev + seconds), dur);
+    if (seconds < 0 && target < prev) { reconcileMarkersOnBackwardJump(target, prev); }
+    else if (seconds > 0 && target > prev) { reconcileMarkersOnForwardJump(prev, target); }
+    audio.currentTime = target;
+}
+function stopAudio() {
+    audio.pause();
+    audio.currentTime = 0;
+    firedEvents.clear();
+    lastTriggeredMarkerTime = null;
+    lastTriggeredMarkerIndex = null;
+    activeBlobUrl = safeRevoke(activeBlobUrl);
+    document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
+    updateMarkerTicks();
+    updatePlayPauseUI();
+}
+function toggleLoop() { audio.loop = !audio.loop; loopBtn.classList.toggle('loop-active', audio.loop); }
+
+/* ============================ A/B Loop Controls ========================== */
+function isABValid() { return abLoop.a !== null && abLoop.b !== null && abLoop.b > abLoop.a; }
+function renderABButtons() {
+    const aStr = (abLoop.a === null) ? '—' : formatClock(abLoop.a);
+    const bStr = (abLoop.b === null) ? '—' : formatClock(abLoop.b);
+    btnSetA.innerHTML = `A |→ ${aStr}`;
+    btnSetB.innerHTML = `${bStr} ←| B`;
+    abVisibleBtn.classList.toggle('loop-active', !!abLoop.visible);
+}
+function updateABUI() {
+    const valid = isABValid();
+    abEnableBtn.classList.toggle('loop-active', abLoop.enabled && valid);
+    renderABButtons();
+}
+function toggleABLoop() {
+    abLoop.enabled = !abLoop.enabled;
+    if (abLoop.enabled) abLoop.visible = true; // enabling forces visible
+    saveABLoop();
+}
+function toggleABVisibility() {
+    abLoop.visible = !abLoop.visible;
+    saveABLoop();
+}
+function setLoopA() {
+    abLoop.a = audio.currentTime;
+    if (abLoop.b !== null && abLoop.b <= abLoop.a + MIN_GAP_SEC) {
+        abLoop.b = Math.min(audio.duration || abLoop.a + MIN_GAP_SEC, abLoop.a + MIN_GAP_SEC);
+    }
+    saveABLoop();
+}
+function setLoopB() {
+    abLoop.b = audio.currentTime;
+    if (abLoop.a !== null && abLoop.b <= abLoop.a + MIN_GAP_SEC) {
+        abLoop.a = Math.max(0, abLoop.b - MIN_GAP_SEC);
+    }
+    saveABLoop();
+}
+function rewindToA() {
+    const a = (abLoop.a !== null) ? abLoop.a : 0;
+    reconcileMarkersOnBackwardJump(a, audio.currentTime);
+    audio.currentTime = Math.min(Math.max(0, a), audio.duration || a);
+}
+function loadABLoop() {
+    const map = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
+    const entry = map[currentFileName];
+    abLoop = entry ? {
+        enabled: !!entry.enabled,
+        visible: entry.visible === undefined ? true : !!entry.visible,
+        a: entry.a ?? null,
+        b: entry.b ?? null
+    } : { enabled: false, visible: true, a: null, b: null };
+    updateABUI();
+    updateABOverlay();
+}
+function saveABLoop() {
+    if (!currentFileName) return;
+    const map = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
+    map[currentFileName] = abLoop;
+    localStorage.setItem(AB_LOOP_MAP_KEY, JSON.stringify(map));
+    updateABUI();
+    updateABOverlay();
+}
+
+/* =========================== Progress / Overlay ========================== */
+function renderTimeLabel(currentTime) {
+    const dur = audio.duration || 0;
+    timeLabel.textContent = `${formatClock(currentTime)} / ${formatClock(dur, 0)}`;
+}
+function updateProgressUI() {
+    const dur = audio.duration || 0;
+    const pct = dur ? (audio.currentTime / dur) * 100 : 0;
+    progressFill.style.width = `${pct}%`;
+    renderTimeLabel(audio.currentTime);
+    updateABOverlay();
+}
+function updateABOverlay() {
+    const dur = audio.duration;
+    const show = abLoop.visible && isABValid() && dur && isFinite(dur);
+    progressAB.style.display = show ? 'block' : 'none';
+    if (!show) return;
+    const aPct = (abLoop.a / dur) * 100;
+    const bPct = (abLoop.b / dur) * 100;
+    progressAB.style.left = `${aPct}%`;
+    progressAB.style.width = `${Math.max(0, bPct - aPct)}%`;
+    progressAB.classList.toggle('enabled', !!abLoop.enabled && !!abLoop.visible);
+}
+function xToTime(clientX) {
+    const rect = progressBar.getBoundingClientRect();
+    const ratio = (clientX - rect.left) / rect.width;
+    const dur = audio.duration || 0;
+    return Math.min(Math.max(0, ratio * dur), dur);
+}
+function showGhostPreview(targetTime) {
+    const dur = audio.duration || 0;
+    if (!dur || !isFinite(dur)) return;
+    const pct = (targetTime / dur) * 100;
+    progressGhostFill.style.width = `${pct}%`;
+    progressGhostFill.style.display = 'block';
+    progressGhost.style.left = `${pct}%`;
+    progressGhost.style.display = 'block';
+}
+function hideGhostPreview() { progressGhostFill.style.display = 'none'; progressGhost.style.display = 'none'; }
+
+/* ====================== Markers (with MIDI dispatch) ===================== */
+function fireMarkerByIndex(i, evt, opts) {
+    const forceSend = (opts && opts.forceCc) ? true : false;
+    const firedBefore = firedEvents.has(evt.time);
+
+    firedEvents.add(evt.time);
+    lastTriggeredMarkerTime = evt.time;
+    lastTriggeredMarkerIndex = i;
+
+    setActiveMarkerUIByIndex(i);
+    updateTickFiredClassByIndex(i, true);
+
+    const name = getConnectedDeviceName();
+    const isPocketMaster = (name || '').toLowerCase().includes('pocket master');
+
+    if (currentTransport) {
+        if (forceSend || !firedBefore) {
+            try {
+                if (isPocketMaster) window.sendCc(1, 1, evt.preset);
+                else window.sendPc(1, presetToProgram(evt.preset));
+            } catch {}
+        }
+    }
+}
+
+/* =========================== Pointer handlers ============================ */
+function onPointerDown(e) {
+    if (!audio.src) return;
+    pointerId = e.pointerId;
+    progressBar.setPointerCapture(pointerId);
+    wasPlaying = !audio.paused;
+    if (wasPlaying) audio.pause();
+
+    const role = e.target.dataset.role || null;
+    const dur = audio.duration || 0;
+    const rect = progressBar.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+
+    if (role === 'handle-a') {
+        dragMode = 'handle-a';
+    } else if (role === 'handle-b') {
+        dragMode = 'handle-b';
+    } else if (role === 'segment') {
+        dragMode = 'segment';
+        const aPct = (abLoop.a / dur);
+        const bPct = (abLoop.b / dur);
+        segmentLeftPct = aPct;
+        segmentWidthPct = Math.max(0, bPct - aPct);
+        pointerOffsetPct = clamp(ratio - segmentLeftPct, 0, segmentWidthPct);
+        abDrag.classList.add('dragging');
+    } else {
+        dragMode = 'scrub';
+        isScrubbing = true;
+        scrubStartTime = audio.currentTime;
+        scrubTargetTime = xToTime(e.clientX);
+        showGhostPreview(scrubTargetTime);
+        renderTimeLabel(scrubTargetTime);
+    }
+    e.preventDefault();
+}
+function onPointerMove(e) {
+    if (!dragMode) return;
+    const dur = audio.duration || 0;
+    if (dur <= 0) return;
+
+    if (dragMode === 'scrub') {
+        scrubTargetTime = xToTime(e.clientX);
+        showGhostPreview(scrubTargetTime);
+        renderTimeLabel(scrubTargetTime);
+        return;
+    }
+    const rect = progressBar.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    const time = clamp(ratio * dur, 0, dur);
+
+    if (dragMode === 'handle-a') {
+        const maxA = (abLoop.b !== null) ? (abLoop.b - MIN_GAP_SEC) : dur - MIN_GAP_SEC;
+        abLoop.a = clamp(time, 0, Math.max(0, maxA));
+        updateABOverlay(); updateABUI();
+    } else if (dragMode === 'handle-b') {
+        const minB = (abLoop.a !== null) ? (abLoop.a + MIN_GAP_SEC) : MIN_GAP_SEC;
+        abLoop.b = clamp(time, minB, dur);
+        updateABOverlay(); updateABUI();
+    } else if (dragMode === 'segment') {
+        const newLeftPct = clamp(ratio - pointerOffsetPct, 0, 1 - segmentWidthPct);
+        abLoop.a = newLeftPct * dur;
+        abLoop.b = (newLeftPct + segmentWidthPct) * dur;
+        updateABOverlay(); updateABUI();
+    }
+}
+function onPointerUp(e) {
+    if (pointerId !== null) { try { progressBar.releasePointerCapture(pointerId); } catch {} }
+    pointerId = null;
+
+    if (dragMode === 'scrub') {
+        const start = scrubStartTime ?? audio.currentTime;
+        const target = clamp(scrubTargetTime ?? audio.currentTime, 0, audio.duration || audio.currentTime);
+        hideGhostPreview();
+
+        if (target < start) { reconcileMarkersOnBackwardJump(target, start); }
+        else if (target > start) { reconcileMarkersOnForwardJump(start, target); }
+
+        audio.currentTime = target;
+        isScrubbing = false; scrubStartTime = null; scrubTargetTime = null;
+
+        if (wasPlaying) audio.play();
+        updatePlayPauseUI(); updateProgressUI();
+    } else if (dragMode) {
+        saveABLoop();
+        abDrag.classList.remove('dragging');
+    }
+    dragMode = null;
+}
+function onPointerCancel(e) {
+    hideGhostPreview();
+    updateProgressUI();
+    if (wasPlaying && audio.paused) { audio.play(); updatePlayPauseUI(); }
+    dragMode = null; isScrubbing = false; scrubStartTime = null; scrubTargetTime = null; pointerId = null;
+}
+progressBar.addEventListener('pointerdown', onPointerDown);
+window.addEventListener('pointermove', onPointerMove);
+window.addEventListener('pointerup', onPointerUp);
+window.addEventListener('pointercancel', onPointerCancel);
+
+/* ========================== File Management (IDB) ======================== */
+fileInput.addEventListener('click', () => { fileInput.value = ''; });
+fileInput.onchange = async () => {
+    const files = Array.from(fileInput.files || []);
+    fileInput.value = '';
+    if (!files.length || !db) return;
+
+    await putSongs(files);
+    await renderPlaylist();
+};
+
+async function renderPlaylist() {
+    if (!db) {
+        playlistUI.innerHTML = "<div style='padding:10px'>Storage unavailable</div>";
+        return;
+    }
+    const songs = await getAllSongs();
+    playlistUI.innerHTML = songs.length ? "" : "<div style='padding:10px'>Empty</div>";
+    songs.forEach(song => {
+        const row = document.createElement('div');
+        row.className = `playlist-item ${song.name === currentFileName ? 'active' : ''}`;
+        const label = document.createElement('span');
+        label.textContent = song.name;
+
+        const del = document.createElement('button');
+        del.className = 'danger';
+        del.textContent = '×';
+        del.title = 'Remove';
+        del.onclick = async (e) => {
+            e.stopPropagation();
+            if (confirm(`Remove ${song.name}?`)) {
+                const ok = await removeSongFromDB(song.name);
+                if (ok) {
+                    if (currentFileName === song.name) {
+                        audio.src = "";
+                        currentFileName = "";
+                        firedEvents.clear();
+                        lastTriggeredMarkerTime = null;
+                        lastTriggeredMarkerIndex = null;
+                        activeBlobUrl = safeRevoke(activeBlobUrl);
+                        updateMarkerTicks();
+                    }
+                    await renderPlaylist();
+                }
+            }
+        };
+
+        row.onclick = () => playSong(song.name);
+        row.appendChild(label);
+        row.appendChild(del);
+        playlistUI.appendChild(row);
+    });
+}
+
+async function playSong(name) {
+    const song = await getSongByName(name);
+    if (!song) return;
+
+    currentFileName = name;
+    document.getElementById('current-title').textContent = name;
+    activeBlobUrl = safeRevoke(activeBlobUrl);
+    activeBlobUrl = URL.createObjectURL(song.data);
+    audio.src = activeBlobUrl;
+
+    const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
+    const savedVol = volMap[name] !== undefined ? volMap[name] : 1.0;
+    audio.volume = savedVol;
+    audio.muted = false;
+    volSlider.value = savedVol;
+    volText.textContent = `${Math.round(savedVol * 100)}%`;
+
+    const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
+    const savedRate = speedMap[name] !== undefined ? speedMap[name] : 1.0;
+    audio.playbackRate = savedRate;
+    speedBtn.innerHTML = `${savedRate.toFixed(2)}`;
+
+    firedEvents.clear();
+    lastTriggeredMarkerTime = null;
+    lastTriggeredMarkerIndex = null;
+
+    await refreshEventUI();
+    loadABLoop();
+    updateMarkerTicks();
+    updatePlayPauseUI();
+    updateMuteUI();
+    audio.play();
+
+    await renderPlaylist();
+}
+
+/* -------------------------------- VOLUME -------------------------------- */
+volSlider.oninput = (e) => { audio.volume = e.target.value; };
+audio.addEventListener('volumechange', () => {
+    const vol = audio.volume;
+    volSlider.value = vol;
+    updateMuteUI();
+    if (currentFileName) {
+        const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
+        volMap[currentFileName] = vol;
+        localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap));
+    }
+});
+
+/* -------------------------- Markers (with preset) ------------------------ */
+function getEvents() {
+    const map = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
+    const raw = map[currentFileName] || [];
+    if (raw.length && typeof raw[0] === 'number') {
+        const migrated = raw.map(t => ({ time: t, preset: 1 }));
+        map[currentFileName] = migrated;
+        localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
+        return migrated;
+    }
+    return raw;
+}
+function saveEvents(list) {
+    const map = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
+    map[currentFileName] = list.slice().sort((a,b) => a.time - b.time);
+    localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
+}
+function formatPreset(preset) {
+    let n = parseInt(preset, 10);
+    if (isNaN(n)) n = 1;
+    n = Math.min(100, Math.max(1, n));
+    if (n <= 50) { return `P${String(n).padStart(2, '0')}`; }
+    return `F${String(n - 50).padStart(2, '0')}`;
+}
+async function refreshEventUI() {
+    const events = getEvents();
+    const list = document.getElementById('event-list');
+    list.innerHTML = events.length ? "" : "<li>No markers.</li>";
+    events.forEach((evt, i) => {
+        const li = document.createElement('li');
+        li.id = `row-${i}`;
+        li.innerHTML = `
+            <span class="marker-left"><b>${formatClock(evt.time)}</b></span>
+            <span class="marker-middle"><span class="preset-badge">${formatPreset(evt.preset)}</span></span>
+            <span class="marker-right">
+                <button onclick="toggleEdit(${i})">Edit</button>
+                <button class="danger" onclick="deleteEvent(${i})">×</button>
+            </span>`;
+        list.appendChild(li);
+    });
+    updateMarkerTicks();
+}
+function toggleEdit(idx) {
+    const evt = getEvents()[idx];
+    const li = document.getElementById(`row-${idx}`);
+    li.innerHTML = `
+        <input type="number" step="0.1" class="time-input" id="edit-time-${idx}" value="${evt.time}">
+        <input type="number" min="1" max="100" step="1" class="preset-input" id="edit-preset-${idx}" value="${evt.preset}">
+        <button onclick="saveEdit(${idx})">Save</button>
+        <button onclick="refreshEventUI()">Cancel</button>`;
+}
+function saveEdit(idx) {
+    const events = getEvents();
+    const old = events[idx];
+    const newTime = parseFloat(document.getElementById(`edit-time-${idx}`).value);
+    let newPreset = parseInt(document.getElementById(`edit-preset-${idx}`).value, 10);
+    if (isNaN(newTime)) return;
+    if (isNaN(newPreset)) newPreset = 1;
+    newPreset = Math.min(100, Math.max(1, newPreset));
+
+    const updated = events.slice();
+    updated[idx] = { time: newTime, preset: newPreset };
+    saveEvents(updated);
+
+    firedEvents.delete(old.time);
+    if (lastTriggeredMarkerIndex === idx || lastTriggeredMarkerTime === old.time) {
+        lastTriggeredMarkerIndex = null;
+        lastTriggeredMarkerTime = null;
+    }
+    refreshEventUI();
+    updateMarkerTicks();
+}
+function setEvent() {
+    if (!currentFileName) return;
+    const events = getEvents();
+    const now = parseFloat(audio.currentTime.toFixed(1)); // align with deciseconds display
+    if (!events.some(e => e.time === now)) {
+        saveEvents([...events, { time: now, preset: 1 }]);
+        refreshEventUI();
+        updateMarkerTicks();
+    }
+}
+function deleteEvent(idx) {
+    const events = getEvents();
+    const t = (events[idx] && events[idx].time) ?? null;
+    const updated = events.filter((_, i) => i !== idx);
+    saveEvents(updated);
+    if (t !== null) {
+        firedEvents.delete(t);
+        if (lastTriggeredMarkerIndex === idx || lastTriggeredMarkerTime === t) {
+            lastTriggeredMarkerIndex = null;
+            lastTriggeredMarkerTime = null;
+        }
+    }
+    refreshEventUI();
+    updateMarkerTicks();
+}
+function updateMarkerTicks() {
+    progressBar.querySelectorAll('.progress-tick').forEach(el => el.remove());
+    const dur = audio.duration;
+    const events = getEvents();
+    if (!dur || !isFinite(dur) || !events.length) return;
+
+    events.forEach((evt, i) => {
+        const pct = (evt.time / dur) * 100;
+        const tick = document.createElement('div');
+        tick.className = 'progress-tick';
+        tick.id = `tick-${i}`;
+        tick.style.left = `${pct}%`;
+        tick.title = `${formatClock(evt.time)} • ${formatPreset(evt.preset)}`;
+        if (firedEvents.has(evt.time)) tick.classList.add('fired');
+        if (lastTriggeredMarkerIndex === i) tick.classList.add('current');
+        progressBar.appendChild(tick);
+    });
+}
+function setActiveMarkerUIByIndex(i) {
+    document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
+    const li = document.getElementById(`row-${i}`); if (li) li.classList.add('active-event');
+    progressBar.querySelectorAll('.progress-tick').forEach(el => el.classList.remove('current'));
+    const tick = document.getElementById(`tick-${i}`); if (tick) tick.classList.add('current');
+}
+function updateTickFiredClassByIndex(i, fired) {
+    const tick = document.getElementById(`tick-${i}`);
+    if (tick) tick.classList.toggle('fired', !!fired);
+}
+function nearestMarkerAtOrBefore(time, epsilon = EPS_RECONCILE) {
+    const events = getEvents();
+    if (!events.length) return null;
+    const candidates = events.map((evt, i) => ({ ...evt, i })).filter(e => e.time <= time + epsilon);
+    if (!candidates.length) return null;
+    return candidates.reduce((best, e) =>
+        Math.abs(e.time - time) < Math.abs(best.time - time) ? e : best
+    );
+}
+
+/* =================== Reconciliation (scrub/rewind/forward) ================== */
+function reconcileMarkersOnBackwardJump(targetTime, prevTime) {
+    const events = getEvents();
+    if (!events.length) return;
+
+    events.forEach((evt, i) => {
+        const t = evt.time;
+        if (t > targetTime && t <= prevTime) {
+            firedEvents.delete(t);
+            updateTickFiredClassByIndex(i, false);
+        }
+    });
+
+    const nearest = nearestMarkerAtOrBefore(targetTime, EPS_RECONCILE);
+    if (nearest) {
+        fireMarkerByIndex(nearest.i, nearest, { forceCc: true });
+    } else {
+        lastTriggeredMarkerTime = null;
+        lastTriggeredMarkerIndex = null;
+        progressBar.querySelectorAll('.progress-tick').forEach(el => el.classList.remove('current'));
+        document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
+    }
+}
+function reconcileMarkersOnForwardJump(prevTime, targetTime) {
+    const events = getEvents();
+    if (!events.length) return;
+
+    events.forEach((evt, i) => {
+        const t = evt.time;
+        if (t > prevTime && t <= targetTime) {
+            firedEvents.add(t);
+            updateTickFiredClassByIndex(i, true);
+        }
+    });
+
+    const nearest = nearestMarkerAtOrBefore(targetTime, EPS_RECONCILE);
+    if (nearest) {
+        fireMarkerByIndex(nearest.i, nearest, { forceCc: true });
+    } else {
+        lastTriggeredMarkerTime = null;
+        lastTriggeredMarkerIndex = null;
+        progressBar.querySelectorAll('.progress-tick').forEach(el => el.classList.remove('current'));
+        document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
+    }
+}
+function reconcileMarkersOnLoopRewind(loopStartA, loopEndB) {
+    reconcileMarkersOnBackwardJump(loopStartA, loopEndB);
+}
+
+/* =================== Trigger logic + AB guard with visibility ============== */
+audio.addEventListener('timeupdate', () => {
+    const now = audio.currentTime;
+
+    let fireNow = now;
+    if (abLoop.enabled && abLoop.visible && isABValid()) {
+        fireNow = Math.min(now, abLoop.b);
+    }
+
+    getEvents().forEach((evt, i) => {
+        const t = evt.time;
+        if (!firedEvents.has(t) && fireNow >= t) {
+            fireMarkerByIndex(i, evt, { forceCc: false });
+        }
+        if (now < t - 0.5) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
+        if (now === 0.0 && t === 0.0) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
+    });
+
+    updateProgressUI();
+
+    if (abLoop.enabled && abLoop.visible && isABValid()) {
+        if (now >= (abLoop.b - EPS_LOOP_B)) {
+            reconcileMarkersOnLoopRewind(abLoop.a, abLoop.b);
+            audio.currentTime = abLoop.a;
+            if (audio.paused) audio.play();
+            updatePlayPauseUI();
+        }
+    }
+});
+
+audio.addEventListener('loadedmetadata', () => {
+    updateProgressUI();
+    updateABOverlay();
+    updateMarkerTicks();
+    updatePlayPauseUI();
+    updateMuteUI();
+
+    const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
+    const savedRate = currentFileName ? (speedMap[currentFileName] ?? audio.playbackRate) : audio.playbackRate;
+    audio.playbackRate = savedRate;
+    speedBtn.innerHTML = `${savedRate.toFixed(2)}`;
+
+    renderABButtons();
+});
+audio.addEventListener('seeked', updateProgressUI);
+
+/* ============================== Initialize DB ============================= */
+(async function init() {
+    db = await openDB();
+    await renderPlaylist();
+})();
+</script>
+</body>
+</html>
