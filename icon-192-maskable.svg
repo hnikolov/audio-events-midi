@@ -1,0 +1,20 @@
+<svg viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <!-- Maskable icon (safe zone in center) -->
+  <!-- Audio waveform only (no background, will use system theme) -->
+  <g fill="#1a73e8">
+    <!-- Left bar -->
+    <rect x="45" y="60" width="12" height="72" rx="6"/>
+    <!-- Center-left bar -->
+    <rect x="65" y="45" width="12" height="102" rx="6"/>
+    <!-- Center bar -->
+    <rect x="85" y="35" width="12" height="122" rx="6"/>
+    <!-- Center-right bar -->
+    <rect x="105" y="45" width="12" height="102" rx="6"/>
+    <!-- Right bar -->
+    <rect x="125" y="60" width="12" height="72" rx="6"/>
+  </g>
+  
+  <!-- Music note accent -->
+  <circle cx="155" cy="50" r="14" fill="#1a73e8" opacity="0.8"/>
+  <rect x="153" y="40" width="4" height="24" fill="#1a73e8" opacity="0.8"/>
+</svg>

@@ -2,7 +2,17 @@
 <!DOCTYPE html>
 <html lang="en-NL">
 <head>
-    <meta charset="UTF-8" />
+    /* To be able to save it on desktop and run as PWA (full screen...), */
+    /* then run it via python -m http.server 8000 -> http://localhost:8000/audio-events-midi.html */    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a73e8" />
+    <meta name="description" content="Manage and control the playback of audio files with MIDI events. Switch device presets during backing tracks playback." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Audio MIDI" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="icon-192.svg" />
+    <link rel="apple-touch-icon" href="icon-192.svg" />
     <title>Audio Events MIDI Manager</title>
     <style>
         body { font-family: -apple-system, system-ui, sans-serif; max-width: 850px; margin: 1rem auto; background: #f0f2f5; padding: 10px; }
@@ -53,7 +63,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            border: 1px solid #F3F5F; /* harmless invalid hex (ignored) kept per original */
+            border: 1px solid #ddd; /* harmless invalid hex (ignored) kept per original */
             flex-wrap: nowrap; /* force one line */
         }
 
@@ -110,7 +120,7 @@
         /* --- Progress bar --- */
         .progress-container {
             background: #f1f3f4;
-            border: 1px solid #F3F5F;
+            border: 1px solid #ddd;
             padding: 10px 20px;
             border-radius: 30px;
             display: flex;
@@ -1350,6 +1360,22 @@ audio.addEventListener('seeked', updateProgressUI);
     db = await openDB();
     await renderPlaylist();
 })();
+
+/* ====================== Install Prompt (Add to Home Screen) =============== */
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing
+    e.preventDefault();
+    // Store the event for later use
+    deferredPrompt = e;
+    console.log('PWA install prompt available');
+    // You can show a custom "Install" button here if desired
+});
+
+window.addEventListener('appinstalled', () => {
+    console.log('PWA was installed');
+    deferredPrompt = null;
+});
 </script>
 </body>
 </html>
