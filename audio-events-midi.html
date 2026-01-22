@@ -3,7 +3,8 @@
 <html lang="en-NL">
 <head>
     <meta charset="UTF-8" />
-    <title>Audio Manager 2026 - Loop & Seek Controls</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Audio Events MIDI 2026</title>
     <style>
         body { font-family: -apple-system, system-ui, sans-serif; max-width: 850px; margin: 1rem auto; background: #f0f2f5; padding: 10px; }
         .grid { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
@@ -53,7 +54,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            border: 1px solid #F3F5F; /* harmless invalid hex (ignored) kept per original */
+            border: 1px solid #ddd; /* harmless invalid hex (ignored) kept per original */
             flex-wrap: nowrap; /* force one line */
         }
 
@@ -105,12 +106,12 @@
         .danger { color: #dc3545; border-color: #dc3545; font-size: 0.8rem; }
 
         audio { width: 100%; }
-        @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+        /* @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } } */
 
         /* --- Progress bar --- */
         .progress-container {
             background: #f1f3f4;
-            border: 1px solid #F3F5F;
+            border: 1px solid #ddd;
             padding: 10px 20px;
             border-radius: 30px;
             display: flex;
@@ -163,7 +164,20 @@
         .progress-tick.current { background: #fbc02d; box-shadow: 0 0 6px rgba(251, 192, 45, 0.7); }
 
         /* --- A/B controls --- */
-        #ab-controls { gap: 12px; } /* increased spacing between buttons */
+        /* #ab-controls { gap: 12px; } increased spacing between buttons */
+
+        /* A–B loop controls must never internally compress */
+        #ab-controls {
+            flex-wrap: wrap;
+            row-gap: 10px;
+        }
+
+        #ab-controls .ab-btn {
+            white-space: nowrap;      /* CRITICAL */
+            flex: 0 0 auto;           /* opt out of shrinking */
+            min-width: fit-content;
+        }
+        
         .ab-btn {
             border-radius: 16px;   /* pill-shaped for time labels */
             font-size: 18px;       /* match .control-btn font-size */
@@ -171,109 +185,273 @@
             line-height: 1.2;
             width: auto; height: auto;
         }
+
+        /* ===========================================================
+        MOBILE TABS & LAYOUT (Iteration 1)
+        =========================================================== */
+
+        /* Hide tab bar by default (desktop) */
+        .tab-bar {
+        display: none;
+        }
+
+        
+        @media (pointer: coarse) and (orientation: portrait) {
+            .tab-bar .tab {
+                font-size: 1.15rem;
+            }
+
+            h3, h4 {
+                font-size: 1.2rem;
+            }
+
+            .playlist-item {
+                font-size: 1rem;
+            }
+
+            .time-label,
+            #vol-text {
+                font-size: 0.95rem;
+            }
+        }
+
+        @media (pointer: coarse), (hover: none) {
+            
+            .ab-handle {
+                width: 18px;
+                height: 18px;
+            }
+
+            button:not(.control-btn) {
+                font-size: 1rem;
+                padding: 10px 14px;
+                min-height: 44px;         /* Apple HIG minimum */
+                border-radius: 12px;
+            }
+            .primary {
+                font-weight: 600;
+            }
+
+            /* Specific: MIDI Connect pill should be tappable */
+            .midi-status {
+                font-size: 1rem;
+                padding: 10px 12px;
+                min-height: 44px;
+            }
+
+            html {
+                font-size: 18px;
+                -webkit-text-size-adjust: 100%;
+                text-size-adjust: 100%;
+            }
+
+            body {
+                max-width: none;
+                margin: 0;
+                padding: 0;
+                background: #f0f2f5;
+            }
+
+            .mobile-tabs-container {
+                padding-bottom: 56px; /* space for tab bar */
+            }
+
+            .grid {
+                display: block;
+            }
+
+            .card {
+                border-radius: 0;
+                margin: 0;
+                box-shadow: none;
+                min-height: calc(100vh - 56px);
+            }
+
+            /* --- Tab visibility logic (CSS-only) --- */
+            .card-playlist,
+            .card-player {
+                display: none;
+            }
+
+            #tab-playlist:checked ~ .mobile-tabs-container .card-playlist {
+                display: block;
+            }
+
+            #tab-player:checked ~ .mobile-tabs-container .card-player {
+                display: block;
+            }
+
+            /* --- Bottom tab bar --- */
+            .tab-bar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 56px; /* iOS standard */
+                display: flex;
+                background: #ffffff;
+                border-top: 1px solid #ddd;
+                z-index: 999;
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+
+            .mobile-tabs-container {
+                padding-bottom: calc(56px + env(safe-area-inset-bottom));
+            }
+
+            .tab-bar .tab {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: clamp(1.05rem, 3vw, 1.25rem);
+                font-weight: 500;
+                color: #5f6368;
+                cursor: pointer;
+                user-select: none;
+                min-height: 44px;
+                touch-action: manipulation
+            }
+
+            #tab-playlist:checked ~ .tab-bar label[for="tab-playlist"],
+            #tab-player:checked ~ .tab-bar label[for="tab-player"] {
+                color: #1a73e8;
+                font-weight: 600;
+            }
+
+            /* --- Touch-friendly controls --- */
+            .control-btn {
+                width: 44px;
+                height: 44px;
+                font-size: 20px;
+            }
+
+            .controls-container {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            /* Volume slider */
+            #vol-slider { height: 38px; } /* gives room for the thumb on Firefox */
+            #vol-slider::-webkit-slider-runnable-track { height: 6px; }
+            #vol-slider::-webkit-slider-thumb {
+                height: 18px; width: 18px;
+                margin-top: -6px; /* centers 18px thumb on 6px track */
+            }
+            #vol-slider::-moz-range-track { height: 6px; }
+            #vol-slider::-moz-range-thumb { height: 18px; width: 18px; }
+
+            /* Progress bar */
+            .progress-track { height: 14px; }
+
+        }
+
     </style>
 </head>
 <body>
 
-<div class="grid">
-    <div class="card">
-        <div class="midi-panel">
-            <button id="btnConnect" class="midi-status" style="width:100%; background:transparent; border: none">Connect</button>
-            <dialog id="usbDialog">
-                <form method="dialog">
-                    <h3>Select USB MIDI Output</h3>
-                    <div class="row">
-                        <label class="stretch">
-                            Output
-                            <select id="usbOutput" class="stretch"></select>
-                        </label>
-                    </div>
-                    <div class="row" style="margin-top:.75rem;">
-                        <button id="usbConnectBtn" type="button" class="primary">Connect</button>
-                        <span class="stretch"></span>
-                        <button id="usbCancelBtn">Cancel</button>
-                    </div>
-                </form>
-            </dialog>
-        </div>
+<!-- Mobile tab state (CSS-only) -->
+<input type="radio" name="mobile-tab" id="tab-playlist" checked hidden>
+<input type="radio" name="mobile-tab" id="tab-player" hidden>
 
-        <!-- <div style="display: flex; justify-content: space-between; align-items: center;"> -->
-            <!-- <h3 style="margin:0">Playlist</h3> -->
-            <!-- <input type="file" id="fileInput" accept="audio/*" multiple style="display:none"> -->
-            <!-- <button class="primary" onclick="document.getElementById('fileInput').click()">Add Audio</button> -->
-        <!-- </div> -->
-        
-        <h3>Playlist</h3>
-        <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
-        <button class="primary" style="width:100%" onclick="document.getElementById('fileInput').click()">Add Audio</button>
-        <div id="playlist-ui"></div>
-    </div>
+<div class="mobile-tabs-container">
+    <div class="grid">
 
-    <div class="card">
-        <h3 id="current-title" style="margin-top:0">Select a song</h3>
-        <audio id="audioTrack"></audio>
+        <!-- PLAYLIST CARD -->
+        <div class="card card-playlist">
+            <div class="midi-panel">
+                <button id="btnConnect" class="midi-status" style="width:100%; background:transparent; border: none">
+                    Connect
+                </button>
 
-        <!-- Progress bar -->
-        <div class="progress-container" aria-label="Audio progress">
-            <div id="progress-bar" class="progress-track" title="Drag to seek">
-                <div id="progress-fill" class="progress-fill"></div>
-                <div id="progress-ghost-fill" class="progress-ghost-fill"></div>
-                <div id="progress-ghost" class="progress-ghost"></div>
-                <div id="progress-ab" class="progress-ab">
-                    <div id="ab-drag" class="ab-drag" data-role="segment"></div>
-                    <div id="ab-handle-a" class="ab-handle left" data-role="handle-a" title="Drag to adjust A"></div>
-                    <div id="ab-handle-b" class="ab-handle right" data-role="handle-b" title="Drag to adjust B"></div>
-                </div>
-            </div>
-            <!-- Shows m:ss.S (currentTime deciseconds by default) -->
-            <span id="time-label" class="time-label">0:00.0 / 0:00</span>
-        </div>
-
-        <!-- Playback controls -->
-        <div class="controls-container">
-            <button class="control-btn" onclick="stopAudio()" title="Stop">■</button>
-            <button class="control-btn" onclick="seekRelative(-10)" title="Back 10s">↺</button>
-            <button id="playPauseBtn" class="control-btn" onclick="togglePlayPause()" title="Play/Pause">▶</button>
-            <button class="control-btn" onclick="seekRelative(10)" title="Forward 10s">↻</button>
-            <button id="loopBtn" class="control-btn" onclick="toggleLoop()" title="Toggle Loop">⇄</button>
-
-            <div class="speed-wrapper">
-                <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()" title="Playback Speed">1.00</button>
-                <div id="speedMenu" class="speed-menu" role="menu" aria-label="Playback speed">
-                    <div class="speed-menu-title">Playback Speed</div>
-                </div>
+                <dialog id="usbDialog">
+                    <form method="dialog">
+                        <h3>Select USB MIDI Output</h3>
+                        <div class="row">
+                            <label class="stretch">
+                                Output
+                                <select id="usbOutput" class="stretch"></select>
+                            </label>
+                        </div>
+                        <div class="row" style="margin-top:.75rem;">
+                            <button id="usbConnectBtn" type="button" class="primary">Connect</button>
+                            <span class="stretch"></span>
+                            <button id="usbCancelBtn">Cancel</button>
+                        </div>
+                    </form>
+                </dialog>
             </div>
 
-            <button id="muteBtn" class="control-btn" onclick="toggleMute()" title="Mute/Unmute">🔇</button>
-            <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1">
-            <span id="vol-text">100%</span>
-        </div>
-        
-        <!-- A/B controls -->
-        <div class="controls-container" id="ab-controls">
-            <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABLoop()" title="Enable/Disable A–B Loop">A ⇄ B</button>
-
-            <button id="btnSetA" class="control-btn ab-btn" onclick="setLoopA()" title="Set start of loop (A)">
-                <span>A |→ —</span>
+            <h3>Playlist</h3>
+            <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
+            <button class="primary" style="width:100%" onclick="document.getElementById('fileInput').click()">
+                Add Audio
             </button>
 
-            <!-- Visibility toggle for A–B segment -->
-            <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" title="Show/Hide A–B loop segment">✖</button>
-
-            <button id="btnSetB" class="control-btn ab-btn" onclick="setLoopB()" title="Set end of loop (B)">
-                <span>— ←| B</span>
-            </button>
-
-            <button class="control-btn ab-btn" onclick="rewindToA()" title="Rewind to beginning of loop (A)">↩A</button>
+            <div id="playlist-ui"></div>
         </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h4 style="margin:0">Markers</h4>
-            <button class="primary" onclick="setEvent()">Add Marker</button>
+
+        <!-- PLAYER CARD -->
+        <div class="card card-player">
+            <h3 id="current-title" style="margin-top:0">Select a song</h3>
+            <audio id="audioTrack"></audio>
+
+            <!-- (Everything below here is unchanged from your original code) -->
+
+            <!-- Progress bar -->
+            <div class="progress-container">
+                <div id="progress-bar" class="progress-track">
+                    <div id="progress-fill" class="progress-fill"></div>
+                    <div id="progress-ghost-fill" class="progress-ghost-fill"></div>
+                    <div id="progress-ghost" class="progress-ghost"></div>
+                    <div id="progress-ab" class="progress-ab">
+                        <div id="ab-drag" class="ab-drag"></div>
+                        <div id="ab-handle-a" class="ab-handle left"></div>
+                        <div id="ab-handle-b" class="ab-handle right"></div>
+                    </div>
+                </div>
+                <span id="time-label" class="time-label">0:00.0 / 0:00</span>
+            </div>
+
+            <!-- Playback controls -->
+            <div class="controls-container">
+                <button class="control-btn" onclick="stopAudio()">■</button>
+                <button class="control-btn" onclick="seekRelative(-10)">↺</button>
+                <button id="playPauseBtn" class="control-btn" onclick="togglePlayPause()">▶</button>
+                <button class="control-btn" onclick="seekRelative(10)">↻</button>
+                <button id="loopBtn" class="control-btn" onclick="toggleLoop()">⇄</button>
+
+                <div class="speed-wrapper">
+                    <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()">1.00</button>
+                    <div id="speedMenu" class="speed-menu"></div>
+                </div>
+
+                <button id="muteBtn" class="control-btn" onclick="toggleMute()">🔇</button>
+                <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1">
+                <span id="vol-text">100%</span>
+            </div>
+
+            <!-- A/B controls -->
+            <div class="controls-container" id="ab-controls">
+                <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABLoop()">A ⇄ B</button>
+                <button id="btnSetA" class="control-btn ab-btn" onclick="setLoopA()">A |→ —</button>
+                <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()">✖</button>
+                <button id="btnSetB" class="control-btn ab-btn" onclick="setLoopB()">— ←| B</button>
+                <button class="control-btn ab-btn" onclick="rewindToA()">↩A</button>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h4 style="margin:0">Markers</h4>
+                <button class="primary" onclick="setEvent()">Add Marker</button>
+            </div>
+
+            <ul id="event-list"></ul>
         </div>
-        <ul id="event-list"></ul>
+
     </div>
 </div>
+
+
 
 <script>
 /* ============================ Robust IndexedDB ============================ */
@@ -390,10 +568,10 @@ const btnSetB = document.getElementById('btnSetB');
 const abEnableBtn = document.getElementById('abEnableBtn');
 const abVisibleBtn = document.getElementById('abVisibleBtn');
 
-const EVENT_MAP_KEY = 'audio_events_map_2026';
-const VOLUME_MAP_KEY = 'audio_volume_map_2026';
-const AB_LOOP_MAP_KEY = 'audio_ab_loop_map_2026';
-const SPEED_MAP_KEY = 'audio_speed_map_2026';
+const EVENT_MAP_KEY = 'audio_events_map_v1';
+const VOLUME_MAP_KEY = 'audio_volume_map_v1';
+const AB_LOOP_MAP_KEY = 'audio_ab_loop_map_v1';
+const SPEED_MAP_KEY = 'audio_speed_map_v1';
 
 /* ================================ State ================================= */
 let currentFileName = "";
@@ -1351,5 +1529,13 @@ audio.addEventListener('seeked', updateProgressUI);
     await renderPlaylist();
 })();
 </script>
+
+<!-- Mobile bottom tab bar -->
+<nav class="tab-bar">
+    <label for="tab-playlist" class="tab">Playlist</label>
+    <label for="tab-player" class="tab">Player</label>
+</nav>
+
+
 </body>
 </html>
