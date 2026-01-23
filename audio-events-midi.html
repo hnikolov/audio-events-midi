@@ -77,8 +77,10 @@
         /* ===== PLAYBACK CONTROLS COMPONENT ===== */
         .controls-container {
             background: var(--color-bg-panel);
-            padding: 10px 15px;
-            border-radius: 30px;
+            padding: 5px 0px;
+            border-radius: 0px;
+            /* padding: 10px 15px; */
+            /* border-radius: 30px; */
             margin: 15px 0;
             display: flex;
             align-items: center;
@@ -127,7 +129,7 @@
         /* ===== MARKERS LIST COMPONENT ===== */
         .header-row { display: flex; justify-content: space-between; align-items: center; }
         .header-row h3 { margin: 0; }
-        .markers-header { display: flex; justify-content: space-between; align-items: center; }
+        .markers-header { display: flex; justify-content: space-between; align-items: center; padding:0 10px}
         .markers-header h4 { margin: 0; }
         ul { list-style: none; padding: 0; margin-top: 10px; }
         li { display: flex; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid var(--color-border-light); transition: background 0.3s; }
@@ -141,8 +143,10 @@
         .progress-container {
             background: var(--color-bg-panel);
             border: 1px solid var(--color-border);
-            padding: 10px 20px;
-            border-radius: 30px;
+            padding: 5px 10px;
+            border-radius: 0px;
+            /* padding: 10px 20px;
+            border-radius: 30px; */
             display: flex;
             align-items: center;
             gap: 10px;
@@ -181,7 +185,7 @@
         .ab-drag { position: absolute; left: 0; right: 0; top: 0; bottom: 0; cursor: grab; }
         .ab-drag.dragging { cursor: grabbing; }
 
-        .time-label { font-size: 0.85rem; color: var(--color-text-secondary); flex-shrink: 0; min-width: 110px; text-align: right; }
+        .time-label { font-size: 0.85rem; color: var(--color-text-secondary); flex-shrink: 0; min-width: 74px; text-align: right; }
 
         /* Marker tick indicators on progress bar */
         .progress-tick {
@@ -412,8 +416,8 @@
         </div>
 
         <!-- PLAYER CARD -->
-        <div class="card card-player">
-            <h2 id="current-title">Select a song</h2>
+        <div class="card card-player" style="padding:0px">
+            <h2 id="current-title" style="padding:0px 10px">Select a song</h2>
             <audio id="audioTrack"></audio>
 
             <!-- (Everything below here is unchanged from your original code) -->
