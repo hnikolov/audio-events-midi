@@ -116,15 +116,29 @@
         .speed-option.active { font-weight: 600; color: var(--color-primary); background: #eef4ff; }
 
         /* ===== VOLUME SLIDER COMPONENT ===== */
-        #vol-slider { 
-            -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; 
-            flex: 0 0 120px; /* shortened so it stays on one line */
+        .volume-control { position: relative; display: inline-block; }
+
+        .volume-control #vol-slider {
+            position: absolute;
+            bottom: 100%;
+            display: none;
+            padding: 8px;
+            z-index: 1000;
         }
-        #vol-slider::-webkit-slider-runnable-track { background: #B5B7B8; height: 4px; border-radius: 2px; }
-        #vol-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: var(--color-primary); margin-top: -4px; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
-        #vol-slider::-moz-range-track { background: #B5B7B8; height: 4px; border-radius: 2px; }
-        #vol-slider::-moz-range-thumb { height: 12px; width: 12px; border-radius: 50%; background: var(--color-primary); border: none; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
-        #vol-text { font-size: 0.85rem; color: var(--color-text-secondary); width: 40px; font-weight: 500; text-align: right; flex: 0 0 auto; }
+        .volume-control.expanded #vol-slider { display: block; }
+
+        #vol-slider { 
+            appearance: slider-vertical;
+            -webkit-appearance: slider-vertical;
+            writing-mode: bt-lr;
+            width: 4px;
+            height: 100px;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        #vol-text { font-size: 0.85rem; color: var(--color-text-secondary); min-width: 45px; font-weight: 500; text-align: center; cursor: pointer; user-select: none; transition: color 200ms ease; }
+        #vol-text:hover { color: var(--color-primary); }
 
         /* ===== MARKERS LIST COMPONENT ===== */
         .header-row { display: flex; justify-content: space-between; align-items: center; }
@@ -450,9 +464,11 @@
                     <div id="speedMenu" class="speed-menu" role="menu"></div>
                 </div>
 
-                <button id="muteBtn" class="control-btn" onclick="toggleMute()" aria-label="Mute or unmute">🔇</button>
-                <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume">
-                <span id="vol-text" aria-live="polite">100%</span>
+                <!-- Volume control (toggleable with auto-hide) -->
+                <div class="volume-control" id="volumeControl">
+                    <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume (vertical slider)">
+                    <span id="vol-text" aria-live="polite" aria-label="Click to show volume slider">100%</span>
+                </div>
             </div>
 
             <!-- A/B loop controls -->
@@ -908,14 +924,20 @@ audio.addEventListener('pause', updatePlayPauseUI);
 
 function toggleMute() {
     if (!audio.src) return;
-    audio.muted = !audio.muted;
+    // Store previous volume for mute toggle
+    if (!window.prevVolume) window.prevVolume = 0.5;
+    if (audio.volume === 0) {
+        audio.volume = window.prevVolume;
+    } else {
+        window.prevVolume = audio.volume;
+        audio.volume = 0;
+    }
     updateMuteUI();
 }
 function updateMuteUI() {
-    muteBtn.textContent = audio.muted ? '🔇' : '🔊';
-    muteBtn.classList.toggle('loop-active', audio.muted);
-    const volPct = Math.round((audio.volume || 0) * 100);
-    volText.textContent = audio.muted ? 'Muted' : `${volPct}%`;
+    const vol = audio.volume;
+    const volPct = Math.round(vol * 100);
+    volText.textContent = vol === 0 ? 'Muted' : `${volPct}%`;
 }
 
 function toggleSpeedMenu() {
@@ -1305,7 +1327,14 @@ async function playSong(name) {
 }
 
 /* -------------------------------- VOLUME -------------------------------- */
-volSlider.oninput = (e) => { audio.volume = e.target.value; };
+const volumeControl = document.getElementById('volumeControl');
+let volumeHideTimer = null;
+
+volSlider.oninput = (e) => {
+    audio.volume = e.target.value;
+    resetVolumeHideTimer();
+};
+
 audio.addEventListener('volumechange', () => {
     const vol = audio.volume;
     volSlider.value = vol;
@@ -1314,6 +1343,38 @@ audio.addEventListener('volumechange', () => {
         const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
         volMap[currentFileName] = vol;
         localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap));
+    }
+});
+
+/* Volume control toggle and auto-hide */
+function resetVolumeHideTimer() {
+    if (volumeHideTimer) clearTimeout(volumeHideTimer);
+    volumeControl.classList.add('expanded');
+    volumeHideTimer = setTimeout(() => {
+        volumeControl.classList.remove('expanded');
+        volumeHideTimer = null;
+    }, 1500);
+}
+
+volText.addEventListener('click', (e) => {
+    e.stopPropagation();
+    resetVolumeHideTimer();
+    volSlider.focus();
+});
+
+/* Collapse volume control when clicking outside */
+document.addEventListener('pointerdown', (e) => {
+    if (!volumeControl.contains(e.target) && volumeControl.classList.contains('expanded')) {
+        volumeControl.classList.remove('expanded');
+        if (volumeHideTimer) clearTimeout(volumeHideTimer);
+    }
+});
+
+/* Collapse when pressing Escape */
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && volumeControl.classList.contains('expanded')) {
+        volumeControl.classList.remove('expanded');
+        if (volumeHideTimer) clearTimeout(volumeHideTimer);
     }
 });
 
