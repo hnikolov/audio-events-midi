@@ -382,11 +382,15 @@
                 </dialog>
             </div>
 
-            <h3>Playlist</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin:0">Playlist</h3>
+                <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
+                <button class="primary" onclick="document.getElementById('fileInput').click()">Add Audio</button>
+            </div>
+
+            <!-- <h3>Playlist</h3>
             <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
-            <button class="primary" style="width:100%" onclick="document.getElementById('fileInput').click()">
-                Add Audio
-            </button>
+            <button class="primary" style="width:100%" onclick="document.getElementById('fileInput').click()">Add Audio</button> -->
 
             <div id="playlist-ui"></div>
         </div>
