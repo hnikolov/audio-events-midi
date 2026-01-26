@@ -23,18 +23,41 @@
             --color-text-muted: #7a5a00;
             --color-highlight: #fff9c4;
             --color-warning-bg: #fff3cd;
+
+            /* === Layout variables === */
+            --mobile-tab-height: 56px;         /* default; will be 0 in landscape */
+            --mobile-playerbar-height: 132px;  /* measured at runtime */
+            --mobile-topbar-height: 0px;       /* measured at runtime */
+
+            /* === Split ratio (left column) – tweakable === */
+            --split-left: 35%;
         }
 
         /* ===== LAYOUT & GLOBAL ===== */
-        body { font-family: -apple-system, system-ui, sans-serif; max-width: 850px; margin: 1rem auto; background: var(--color-bg-light); padding: 10px; }
-        .grid { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            max-width: 850px;
+            margin: 1rem auto;
+            background: var(--color-bg-light);
+            padding: 10px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: minmax(240px, var(--split-left)) 1fr; /* Landscape default; portrait overrides to block */
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
         audio { width: 100%; }
 
         /* ===== BUTTONS & FORM ELEMENTS ===== */
         .primary { background: var(--color-primary); color: white; border: none; }
         .danger { color: var(--color-danger); border-color: var(--color-danger); font-size: 0.8rem; }
-        
+
         /* ===== PLAYLIST COMPONENT ===== */
         #playlist-ui { border: 1px solid var(--color-border); border-radius: 8px; margin-top: 10px; overflow: hidden; }
         .playlist-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--color-border-light); cursor: pointer; font-size: 0.9rem; }
@@ -49,12 +72,8 @@
             padding: 1px 1px;
             margin-bottom: 12px;
         }
-        .btn-connect {
-            width: 100%;
-            background: transparent;
-            border: none;
-        }
-        .midi-status {  
+        .btn-connect { width: 100%; background: transparent; border: none; }
+        .midi-status {
             font-size: 0.9rem;
             font-weight: 600;
             color: var(--color-primary);
@@ -65,7 +84,7 @@
         }
         /* Flash style (activity indicator) */
         .midi-status.cc-flash { background: var(--color-warning-bg) !important; color: var(--color-text-muted) !important; }
-        
+
         /* ===== DIALOG & FORMS ===== */
         dialog { border: 1px solid var(--color-border); border-radius: 10px; padding: 12px; }
         dialog h3 { margin: 0 0 .5rem; }
@@ -79,8 +98,6 @@
             background: var(--color-bg-panel);
             padding: 5px 0px;
             border-radius: 0px;
-            /* padding: 10px 15px; */
-            /* border-radius: 30px; */
             margin: 15px 0;
             display: flex;
             align-items: center;
@@ -110,14 +127,13 @@
         /* ===== SPEED MENU COMPONENT ===== */
         .speed-wrapper { position: relative; }
         .speed-btn-label { min-width: 50px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem; color: var(--color-text-secondary); font-weight: 500; }
-        .speed-menu { position: absolute; background: white; border-radius: 12px; box-shadow: 0 10px 24px rgba(0,0,0,0.18); padding: 8px; display: none; z-index: 99; min-width: 180px; }
+        .speed-menu { position: absolute; background: white; border-radius: 12px; box-shadow: 0 10px 24px rgba(0,0,0,0.18); padding: 8px; display: none; z-index: 2000; min-width: 180px; }
         .speed-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.85rem; color: var(--color-text-secondary); font-weight: 500; padding: 12px 14px; border-radius: 8px; border: none; background: #ffffff; width: 100%; cursor: pointer; }
         .speed-option:hover { background: #f5f7f9; }
         .speed-option.active { font-weight: 600; color: var(--color-primary); background: #eef4ff; }
 
         /* ===== VOLUME SLIDER COMPONENT ===== */
         .volume-control { position: relative; display: inline-block; }
-
         .volume-control #vol-slider {
             position: absolute;
             bottom: 100%;
@@ -126,8 +142,7 @@
             z-index: 1000;
         }
         .volume-control.expanded #vol-slider { display: block; }
-
-        #vol-slider { 
+        #vol-slider {
             appearance: slider-vertical;
             -webkit-appearance: slider-vertical;
             writing-mode: bt-lr;
@@ -156,8 +171,6 @@
             border: 1px solid var(--color-border);
             padding: 5px 10px;
             border-radius: 0px;
-            /* padding: 10px 20px;
-            border-radius: 30px; */
             display: flex;
             align-items: center;
             gap: 10px;
@@ -172,6 +185,7 @@
             flex: 1;
             cursor: pointer;
             overflow: hidden;
+            touch-action: pan-y; /* allow vertical page scroll while supporting horizontal scrubs */
         }
         .progress-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: var(--color-primary); z-index: 1; }
 
@@ -207,122 +221,70 @@
         .progress-tick.current { background: var(--color-accent); box-shadow: 0 0 6px rgba(251, 192, 45, 0.7); }
 
         /* ===== A/B LOOP CONTROLS COMPONENT ===== */
-        #ab-controls {
-            flex-wrap: wrap;
-            row-gap: 10px;
+        #ab-controls { flex-wrap: wrap; row-gap: 10px; }
+        #ab-controls .ab-btn { white-space: nowrap; flex: 0 0 auto; min-width: fit-content; }
+        .ab-btn { border-radius: 16px; font-size: 18px; padding: 6px 12px; line-height: 1.2; width: auto; height: auto; }
+
+        /* ===== TAB BAR (hidden by default; visible in portrait) ===== */
+        .tab-bar { display: none; }
+        .tab-bar .tab {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            color: #5f6368;
+            cursor: pointer;
+            user-select: none;
+            min-height: 44px;
+            touch-action: manipulation;
+            font-size: clamp(1.05rem, 3vw, 1.25rem);
         }
 
-        #ab-controls .ab-btn {
-            white-space: nowrap;      /* CRITICAL: prevent text wrapping */
-            flex: 0 0 auto;           /* opt out of flex shrinking */
-            min-width: fit-content;
+        /* ===== FIXED BARS (global: both orientations & desktop) ===== */
+        .mobile-midi-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1000;
+            background: #ffffff;
+            border-bottom: 1px solid var(--color-border);
+            padding-top: env(safe-area-inset-top);
         }
-        
-        .ab-btn {
-            border-radius: 16px;   /* pill-shaped for time labels */
-            font-size: 18px;       /* match .control-btn font-size */
-            padding: 6px 12px;     
-            line-height: 1.2;
-            width: auto; height: auto;
-        }
-
-        /* ===== RESPONSIVE & MOBILE LAYOUT ===== */
-
-        /* Hide tab bar by default (desktop) */
-        .tab-bar {
-            display: none;
+        .mobile-midi-bar .midi-panel {
+            background: transparent;
+            border: none;
+            padding: 6px 10px;
+            margin: 0;
         }
 
-        
-        @media (pointer: coarse) and (orientation: portrait) {
-            .tab-bar .tab {
-                font-size: 1.15rem;
-            }
-
-            h3, h4 {
-                font-size: 1.2rem;
-            }
-
-            .playlist-item {
-                font-size: 1rem;
-            }
-
-            /* .time-label,
-            #vol-text {
-                font-size: 0.95rem;
-            } */
+        .mobile-player-bar {
+            position: fixed;
+            left: 0; right: 0;
+            background: var(--color-bg-panel);
+            border-top: 1px solid var(--color-border);
+            padding: 0px 0px;
+            display: grid;             /* stack: progress over controls */
+            grid-template-columns: 1fr;
+            gap: 0px;
+            z-index: 998;              /* tabs are 999 (portrait) */
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
         }
+        /* Use drop-up for menus inside the fixed bottom bar */
+        .mobile-player-bar .speed-wrapper .speed-menu {
+            top: auto;
+            bottom: calc(100% + 6px);
+        }
+        /* Remove extra margins inside the bar */
+        .mobile-player-bar .progress-container,
+        .mobile-player-bar .controls-container { margin: 0; }
 
-        /* Touch devices or devices without hover support */
-        @media (pointer: coarse), (hover: none) {
-            
-            .ab-handle {
-                width: 18px;
-                height: 18px;
-            }
-
-            button:not(.control-btn) {
-                font-size: 1rem;
-                padding: 10px 14px;
-                min-height: 44px;         /* Apple HIG minimum touch target */
-                border-radius: 12px;
-            }
-            .primary {
-                font-weight: 600;
-            }
-            .btn-connect {
-                min-height: 44px;
-            }
-
-            html {
-                font-size: 18px;
-                -webkit-text-size-adjust: 100%;
-                text-size-adjust: 100%;
-            }
-
-            body {
-                max-width: none;
-                margin: 0;
-                padding: 0;
-                background: #f0f2f5;
-            }
-
-            .mobile-tabs-container {
-                padding-bottom: 56px; /* space for tab bar */
-            }
-
-            .grid {
-                display: block;
-            }
-
-            .card {
-                border-radius: 0;
-                margin: 0;
-                box-shadow: none;
-                min-height: calc(100vh - 56px);
-            }
-
-            /* --- Tab visibility logic (CSS-only) --- */
-            .card-playlist,
-            .card-player {
-                display: none;
-            }
-
-            #tab-playlist:checked ~ .mobile-tabs-container .card-playlist {
-                display: block;
-            }
-
-            #tab-player:checked ~ .mobile-tabs-container .card-player {
-                display: block;
-            }
-
-            /* --- Bottom tab bar --- */
+        /* ===== ORIENTATION: PORTRAIT ===== */
+        @media (orientation: portrait) {
+            /* Show tab bar in portrait */
             .tab-bar {
                 position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 56px; /* iOS standard */
+                bottom: 0; left: 0; right: 0;
+                height: var(--mobile-tab-height);
                 display: flex;
                 background: #ffffff;
                 border-top: 1px solid #ddd;
@@ -330,179 +292,91 @@
                 padding-bottom: env(safe-area-inset-bottom);
             }
 
+            /* Single-pane with tabs */
+            .grid { display: block; }
+            .card { border-radius: 0; margin: 0; box-shadow: none; }
+            .card.card-player h2 { margin-top: 0; }
+
+            .card-playlist, .card-player { display: none; }
+            #tab-playlist:checked ~ .mobile-tabs-container .card-playlist { display: block; }
+            #tab-player:checked   ~ .mobile-tabs-container .card-player   { display: block; }
+
+            /* Keep mini-player above the tab bar */
+            .mobile-player-bar {
+                bottom: calc(var(--mobile-tab-height) + env(safe-area-inset-bottom));
+            }
+
+            /* Container paddings so content doesn't go under fixed bars */
             .mobile-tabs-container {
-                padding-bottom: calc(56px + env(safe-area-inset-bottom));
-            }
-
-            .tab-bar .tab {
-                flex: 1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: clamp(1.05rem, 3vw, 1.25rem);
-                font-weight: 500;
-                color: #5f6368;
-                cursor: pointer;
-                user-select: none;
-                min-height: 44px;
-                touch-action: manipulation
-            }
-
-            #tab-playlist:checked ~ .tab-bar label[for="tab-playlist"],
-            #tab-player:checked ~ .tab-bar label[for="tab-player"] {
-                color: #1a73e8;
-                font-weight: 600;
-            }
-
-            /* --- Touch-friendly controls --- */
-            .control-btn {
-                width: 44px;
-                height: 44px;
-                font-size: 20px;
-            }
-
-            .controls-container {
-                flex-wrap: wrap;
-                gap: 10px;
-            }
-
-            /* Touch-friendly volume slider */
-            #vol-slider { height: 88px; } /* gives room for the thumb on Firefox */
-            #vol-slider::-webkit-slider-runnable-track { height: 6px; }
-            #vol-slider::-webkit-slider-thumb {
-                height: 18px; width: 18px;
-                margin-top: -6px; /* centers 18px thumb on 6px track */
-            }
-            #vol-slider::-moz-range-track { height: 6px; }
-            #vol-slider::-moz-range-thumb { height: 18px; width: 18px; border: none; }
-
-            /* Progress bar */
-            .progress-track { height: 14px; }
-
-        }
-/*===================================================================================*/
-
-        /* === New variables for mobile layout === */
-        :root {
-        --mobile-tab-height: 56px;            /* tab bar height (without safe area) */
-        --mobile-playerbar-height: 132px;     /* will be measured at runtime */
-        }
-
-
-        /* Desktop/default: show the bar in normal flow */
-        .mobile-player-bar {
-        display: grid;                 /* was 'none' */
-        grid-template-columns: 1fr;
-        gap: 8px;
-        position: static;              /* not fixed on desktop */
-        background: transparent;
-        border: 0;
-        padding: 0;
-        box-shadow: none;
-        margin: 12px 0;                /* some spacing on desktop */
-        }
-
-
-        /* Optional: Raise menus inside the bar above everything */
-        .speed-menu {
-        z-index: 2000; /* ensure menus show above the bar and content */
-        }
-
-        @media (pointer: coarse), (hover: none) {
-            /* Make room for both the fixed player bar AND the tab bar */
-            .mobile-tabs-container {
+                padding-top: var(--mobile-topbar-height);
                 padding-bottom: calc(
-                var(--mobile-tab-height)
-                + var(--mobile-playerbar-height)
-                + env(safe-area-inset-bottom)
+                    var(--mobile-playerbar-height)
+                    + var(--mobile-tab-height)
+                    + env(safe-area-inset-bottom)
                 );
             }
 
-            /* Fixed mini-player visible on both tabs */
-            .mobile-player-bar {
-                position: fixed;
-                left: 0;
-                right: 0;
-                bottom: calc(var(--mobile-tab-height) + env(safe-area-inset-bottom));
-                background: var(--color-bg-panel);
-                border-top: 1px solid var(--color-border);
-                padding: 0px 0px; /* 8px 10px; */
-                display: grid;             /* stack: progress over controls */
-                grid-template-columns: 1fr;
-                gap: 0px; /* 8px; */
-                z-index: 998;              /* tabs are 999 */
-                /* Nice subtle elevation */
-                box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
-            }
-
-            /* Use the same visual styles, but remove extra margins in the bar */
-            .mobile-player-bar .progress-container,
-            .mobile-player-bar .controls-container { margin: 0; }
-
-            /* In the fixed bar, make speed menu drop-up so it doesn't clash with tabs */
-            .mobile-player-bar .speed-wrapper .speed-menu {
-                top: auto;
-                bottom: calc(100% + 6px);
-                display: none; /* your JS toggles this to block */
-            }
-
-            /* Progress: allow vertical page scroll while supporting horizontal scrubs */
-            .progress-track {
-                touch-action: pan-y;
-            }
-
-            /* If you keep the original progress/controls in the Player card by mistake,
-                hide them on mobile to avoid duplicates. (Safe guard) */
-            .card-player .progress-container,
-            .card-player .controls-container:not(#ab-controls) {
-                display: none;
+            /* Tab selected style */
+            #tab-playlist:checked ~ .tab-bar label[for="tab-playlist"],
+            #tab-player:checked   ~ .tab-bar label[for="tab-player"] {
+                color: #1a73e8; font-weight: 600;
             }
         }
-/*===================================================================================*/
-        /* === Top MIDI bar height variable (measured at runtime) === */
-        :root {
-        --mobile-topbar-height: 0px;
-        }
 
-        /* Default (desktop): render in normal flow at the top of the Playlist card */
-        .mobile-midi-bar {
-        position: static;
-        margin: 0 0 12px;
-        z-index: auto;
-        }
+        /* ===== ORIENTATION: LANDSCAPE ===== */
+        @media (orientation: landscape) {
+            /* Hide tab bar */
+            .tab-bar { display: none; }
 
-        /* Keep your existing midi-panel look on desktop */
-        /* .mobile-midi-bar .midi-panel { */
-        /* reuses your original styles */
-        /* } */
-
-        /* Mobile behavior: fixed at top, visible on both tabs */
-        @media (pointer: coarse), (hover: none) {
-            .mobile-midi-bar {
-                position: fixed;
-                top: 0;
-                left: 0; right: 0;
-                z-index: 1000; /* above content */
-                background: #ffffff; /* keep it clean on top */
-                border-bottom: 1px solid var(--color-border);
-                /* Safe area: ensure we don't collide with notches/home indicators */
-                padding-top: env(safe-area-inset-top);
+            /* Two-pane layout */
+            .grid {
+                display: grid;
+                grid-template-columns: minmax(240px, var(--split-left)) 1fr; /* 35% / 65% by default */
+                gap: 20px;
             }
+            .card-playlist, .card-player { display: block; }
 
-            /* Tighten the inner panel when fixed to top */
-            .mobile-midi-bar .midi-panel {
-                background: transparent;
-                border: none;
-                padding: 6px 10px;
-                margin: 0;
-            }
+            /* Mini-player sits at the bottom edge */
+            .mobile-player-bar { bottom: env(safe-area-inset-bottom); }
 
-            /* Push page content down so it doesn't go under the fixed top bar */
+            /* Container paddings (no tab bar here) */
             .mobile-tabs-container {
                 padding-top: var(--mobile-topbar-height);
+                padding-bottom: calc(
+                    var(--mobile-playerbar-height)
+                    + env(safe-area-inset-bottom)
+                );
             }
         }
 
+        /* ===== Touch-friendly adjustments (keep, independent of layout) ===== */
+        @media (pointer: coarse) and (orientation: portrait) {
+            .tab-bar .tab { font-size: 1.15rem; }
+            h3, h4 { font-size: 1.2rem; }
+            .playlist-item { font-size: 1rem; }
+        }
+        @media (pointer: coarse), (hover: none) {
+            .ab-handle { width: 18px; height: 18px; }
+            button:not(.control-btn) { font-size: 1rem; padding: 10px 14px; min-height: 44px; border-radius: 12px; }
+            .primary { font-weight: 600; }
+            .btn-connect { min-height: 44px; }
+            html { font-size: 18px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+            body { max-width: none; margin: 0; padding: 0; background: #f0f2f5; }
+
+            /* Larger thumb/track for vertical volume slider */
+            #vol-slider { height: 88px; }
+            #vol-slider::-webkit-slider-runnable-track { height: 6px; }
+            #vol-slider::-webkit-slider-thumb { height: 18px; width: 18px; margin-top: -6px; }
+            #vol-slider::-moz-range-track { height: 6px; }
+            #vol-slider::-moz-range-thumb { height: 18px; width: 18px; border: none; }
+
+            /* Progress bar height bump */
+            .progress-track { height: 14px; }
+
+            /* Touch-friendly control sizes */
+            .control-btn { width: 44px; height: 44px; font-size: 20px; }
+            .controls-container { flex-wrap: wrap; gap: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -511,8 +385,7 @@
 <input type="radio" name="mobile-tab" id="tab-playlist" checked hidden>
 <input type="radio" name="mobile-tab" id="tab-player" hidden>
 
-
-<!-- Shared MIDI Top Bar: visible on both tabs (fixed on mobile, in-card on desktop) -->
+<!-- Fixed Top MIDI Bar (visible in both orientations) -->
 <div id="mobileMidiBar" class="mobile-midi-bar" role="region" aria-label="MIDI connection">
   <div class="midi-panel">
     <button id="btnConnect" class="midi-status btn-connect" aria-label="Connect to MIDI device">
@@ -521,7 +394,7 @@
   </div>
 </div>
 
-<!-- Move the USB dialog to body level so it overlays regardless of tab/bar position -->
+<!-- USB dialog remains at body level -->
 <dialog id="usbDialog">
   <form method="dialog">
     <h3>Select USB MIDI Output</h3>
@@ -554,7 +427,7 @@
         </div>
 
         <!-- PLAYER CARD -->
-        <div class="card card-player" style="padding:0px">
+        <div class="card card-player">
             <h2 id="current-title" style="padding:0px 10px">Select a song</h2>
             <audio id="audioTrack"></audio>
 
@@ -576,47 +449,45 @@
         </div>
 
     </div>
-    
-    <!-- Fixed mini-player visible on both tabs (mobile only) -->
+
+    <!-- Fixed Mini-player (bottom) -->
     <div id="mobilePlayerBar" class="mobile-player-bar" role="region" aria-label="Mini player">
-    <!-- Progress bar -->
-    <div class="progress-container">
-        <div id="progress-bar" class="progress-track">
-        <div id="progress-fill" class="progress-fill"></div>
-        <div id="progress-ghost-fill" class="progress-ghost-fill"></div>
-        <div id="progress-ghost" class="progress-ghost"></div>
-        <div id="progress-ab" class="progress-ab">
-            <div id="ab-drag" class="ab-drag"></div>
-            <div id="ab-handle-a" class="ab-handle left"></div>
-            <div id="ab-handle-b" class="ab-handle right"></div>
+        <!-- Progress bar -->
+        <div class="progress-container">
+            <div id="progress-bar" class="progress-track">
+                <div id="progress-fill" class="progress-fill"></div>
+                <div id="progress-ghost-fill" class="progress-ghost-fill"></div>
+                <div id="progress-ghost" class="progress-ghost"></div>
+                <div id="progress-ab" class="progress-ab">
+                    <div id="ab-drag" class="ab-drag"></div>
+                    <div id="ab-handle-a" class="ab-handle left"></div>
+                    <div id="ab-handle-b" class="ab-handle right"></div>
+                </div>
+            </div>
+            <span id="time-label" class="time-label">0:00.0 / 0:00</span>
         </div>
+
+        <!-- Playback controls -->
+        <div class="controls-container" role="group" aria-label="Playback controls">
+            <button class="control-btn" onclick="stopAudio()" aria-label="Stop">■</button>
+            <button class="control-btn" onclick="seekRelative(-10)" aria-label="Rewind 10 seconds">↺</button>
+            <button id="playPauseBtn" class="control-btn" onclick="togglePlayPause()" aria-label="Play or pause">▶</button>
+            <button class="control-btn" onclick="seekRelative(10)" aria-label="Fast forward 10 seconds">↻</button>
+            <button id="loopBtn" class="control-btn" onclick="toggleLoop()" aria-label="Toggle loop">⇄</button>
+
+            <div class="speed-wrapper">
+                <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()" aria-label="Playback speed">1.00</button>
+                <div id="speedMenu" class="speed-menu" role="menu"></div>
+            </div>
+
+            <!-- Volume control (drop-up) -->
+            <div class="volume-control" id="volumeControl">
+                <button id="volBtn" class="control-btn speed-btn-label" aria-label="Volume">100%</button>
+                <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume (vertical slider)">
+            </div>
         </div>
-        <span id="time-label" class="time-label">0:00.0 / 0:00</span>
     </div>
-
-    <!-- Playback controls -->
-    <div class="controls-container" role="group" aria-label="Playback controls">
-        <button class="control-btn" onclick="stopAudio()" aria-label="Stop">■</button>
-        <button class="control-btn" onclick="seekRelative(-10)" aria-label="Rewind 10 seconds">↺</button>
-        <button id="playPauseBtn" class="control-btn" onclick="togglePlayPause()" aria-label="Play or pause">▶</button>
-        <button class="control-btn" onclick="seekRelative(10)" aria-label="Fast forward 10 seconds">↻</button>
-        <button id="loopBtn" class="control-btn" onclick="toggleLoop()" aria-label="Toggle loop">⇄</button>
-
-        <div class="speed-wrapper">
-        <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()" aria-label="Playback speed">1.00</button>
-        <div id="speedMenu" class="speed-menu" role="menu"></div>
-        </div>
-
-        <!-- Volume control (drop-up) -->
-        <div class="volume-control" id="volumeControl">
-        <button id="volBtn" class="control-btn speed-btn-label" aria-label="Volume">100%</button>
-        <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume (vertical slider)">
-        </div>
-    </div>
-    </div>    
 </div>
-
-
 
 <script>
 /* ============================ Robust IndexedDB ============================ */
@@ -703,7 +574,7 @@ const EPS_RECONCILE = 0.05;
 const EPS_LOOP_B    = 0.02;
 const CC_FLASH_MS   = 350;
 
-const DEFAULT_DECIMALS = 1; // 1 => m:ss.S (e.g., 3:15.7). Use 2 for m:ss.SS.
+const DEFAULT_DECIMALS = 1; // 1 => m:ss.S
 
 /* =============================== DOM refs ================================ */
 const audio = document.getElementById('audioTrack');
@@ -713,7 +584,6 @@ const playlistUI = document.getElementById('playlist-ui');
 const fileInput = document.getElementById('fileInput');
 
 const playPauseBtn = document.getElementById('playPauseBtn');
-const muteBtn = document.getElementById('muteBtn');
 const speedBtn = document.getElementById('speedBtn');
 const speedMenu = document.getElementById('speedMenu');
 
@@ -814,7 +684,7 @@ function setStatusText(text) { statusEl.textContent = text || ''; }
 let ccFlashTimer = null;
 function flashCcStatus() {
     statusEl.classList.remove('cc-flash');
-    void statusEl.offsetWidth; // reflow to restart flash
+    void statusEl.offsetWidth;
     statusEl.classList.add('cc-flash');
     if (ccFlashTimer) clearTimeout(ccFlashTimer);
     ccFlashTimer = setTimeout(() => {
@@ -923,8 +793,8 @@ async function sendPc(channel, program) {
 }
 window.sendPc = sendPc;
 
-let toDisconnect = 'x'; // Used to be visualized
-let toConnect = 'C'; // Used to be visualized
+let toDisconnect = 'x';
+let toConnect = 'C';
 let connectionStatus = toConnect;
 
 async function connectOrDisconnect() {
@@ -992,7 +862,6 @@ async function connectOrDisconnect() {
     }
     connectBleFlow();
 }
-
 async function connectBleFlow() {
     if (!navigator.bluetooth) { setStatusText('Web Bluetooth unavailable'); return; }
     try {
@@ -1027,14 +896,7 @@ async function connectBleFlow() {
         setStatusText('Error');
     }
 }
-
 btnConnect.addEventListener('click', connectOrDisconnect);
-
-/* ============================== DB bootstrap ============================= */
-(async function init() {
-    db = await openDB();
-    await renderPlaylist();
-})();
 
 /* =============================== Controls ================================ */
 function togglePlayPause() {
@@ -1046,29 +908,12 @@ function updatePlayPauseUI() { playPauseBtn.textContent = audio.paused ? '▶' :
 audio.addEventListener('play', updatePlayPauseUI);
 audio.addEventListener('pause', updatePlayPauseUI);
 
-function toggleMute() {
-    if (!audio.src) return;
-    // Store previous volume for mute toggle
-    if (!window.prevVolume) window.prevVolume = 0.5;
-    if (audio.volume === 0) {
-        audio.volume = window.prevVolume;
-    } else {
-        window.prevVolume = audio.volume;
-        audio.volume = 0;
-    }
-    updateMuteUI();
-}
-function updateMuteUI() {
-    const vol = audio.volume;
-    const volPct = Math.round(vol * 100);
-    volBtn.textContent = vol === 0 ? 'Muted' : `${volPct}%`;
-}
-
 function toggleSpeedMenu() {
     if (!audio.src) return;
     const isOpen = speedMenu.style.display === 'block';
     if (isOpen) speedMenu.style.display = 'none';
-    else { buildSpeedMenu(); speedMenu.style.display = 'block'; positionSpeedMenuToAnchor(ANCHOR_RATE); }
+    // else { buildSpeedMenu(); speedMenu.style.display = 'block'; positionSpeedMenuToAnchor(ANCHOR_RATE); }
+    else { buildSpeedMenu(); speedMenu.style.display = 'block'; }
 }
 function buildSpeedMenu() {
     speedMenu.querySelectorAll('.speed-option').forEach(el => el.remove());
@@ -1081,25 +926,25 @@ function buildSpeedMenu() {
         speedMenu.appendChild(btn);
     });
 }
-function positionSpeedMenuToAnchor(anchorRate) {
-    const wrapper = speedBtn.closest('.speed-wrapper'); if (!wrapper) return;
-    const wRect = wrapper.getBoundingClientRect();
-    const bRect = speedBtn.getBoundingClientRect();
-    const mRect = speedMenu.getBoundingClientRect();
-    const options = Array.from(speedMenu.querySelectorAll('.speed-option'));
-    let anchorEl = options.find(el => parseFloat(el.textContent) === anchorRate) ||
-                   options.find(el => el.classList.contains('active')) ||
-                   options[Math.floor(options.length/2)];
-    if (!anchorEl) return;
-    const oRect = anchorEl.getBoundingClientRect();
-    const buttonCenterX = (bRect.left - wRect.left) + bRect.width / 2;
-    const buttonCenterY = (bRect.top  - wRect.top)  + bRect.height / 2;
-    const optionCenterY = (oRect.top  - mRect.top)  + oRect.height / 2;
-    const menuLeft = buttonCenterX - (mRect.width / 2);
-    const menuTop  = buttonCenterY - optionCenterY;
-    speedMenu.style.left = `${menuLeft}px`;
-    speedMenu.style.top  = `${menuTop}px`;
-}
+// function positionSpeedMenuToAnchor(anchorRate) {
+//     const wrapper = speedBtn.closest('.speed-wrapper'); if (!wrapper) return;
+//     const wRect = wrapper.getBoundingClientRect();
+//     const bRect = speedBtn.getBoundingClientRect();
+//     const mRect = speedMenu.getBoundingClientRect();
+//     const options = Array.from(speedMenu.querySelectorAll('.speed-option'));
+//     let anchorEl = options.find(el => parseFloat(el.textContent) === anchorRate) ||
+//                    options.find(el => el.classList.contains('active')) ||
+//                    options[Math.floor(options.length/2)];
+//     if (!anchorEl) return;
+//     const oRect = anchorEl.getBoundingClientRect();
+//     const buttonCenterX = (bRect.left - wRect.left) + bRect.width / 2;
+//     const buttonCenterY = (bRect.top  - wRect.top)  + bRect.height / 2;
+//     const optionCenterY = (oRect.top  - mRect.top)  + oRect.height / 2;
+//     const menuLeft = buttonCenterX - (mRect.width / 2);
+//     const menuTop  = buttonCenterY - optionCenterY;
+//     speedMenu.style.left = `${menuLeft}px`;
+//     speedMenu.style.top  = `${menuTop}px`;
+// }
 function setPlaybackRate(rate) {
     audio.playbackRate = rate;
     speedBtn.innerHTML = `${rate.toFixed(2)}`;
@@ -1147,15 +992,8 @@ function updateABUI() {
     abEnableBtn.classList.toggle('loop-active', abLoop.enabled && valid);
     renderABButtons();
 }
-function toggleABLoop() {
-    abLoop.enabled = !abLoop.enabled;
-    if (abLoop.enabled) abLoop.visible = true; // enabling forces visible
-    saveABLoop();
-}
-function toggleABVisibility() {
-    abLoop.visible = !abLoop.visible;
-    saveABLoop();
-}
+function toggleABLoop() { abLoop.enabled = !abLoop.enabled; if (abLoop.enabled) abLoop.visible = true; saveABLoop(); }
+function toggleABVisibility() { abLoop.visible = !abLoop.visible; saveABLoop(); }
 function setLoopA() {
     abLoop.a = audio.currentTime;
     if (abLoop.b !== null && abLoop.b <= abLoop.a + MIN_GAP_SEC) {
@@ -1471,6 +1309,11 @@ audio.addEventListener('volumechange', () => {
     }
 });
 
+function updateMuteUI() {
+    const vol = audio.volume;
+    const volPct = Math.round(vol * 100);
+    volBtn.textContent = vol === 0 ? 'Muted' : `${volPct}%`;
+}
 /* Volume control toggle and auto-hide */
 function resetVolumeHideTimer() {
     if (volumeHideTimer) clearTimeout(volumeHideTimer);
@@ -1480,7 +1323,6 @@ function resetVolumeHideTimer() {
         volumeHideTimer = null;
     }, 1500);
 }
-
 volBtn.addEventListener('click', (e) => {
     if (!audio.src) return;
     e.stopPropagation();
@@ -1740,16 +1582,13 @@ audio.addEventListener('seeked', updateProgressUI);
     await renderPlaylist();
 })();
 
-/* =================================== Mobile bars placement ============================= */
+/* ===================== Fixed bars: measure heights (no re-parenting) ===================== */
 (function () {
   const root = document.documentElement;
-  const mql  = window.matchMedia('(pointer: coarse), (hover: none)');
-
-  const topBar    = document.getElementById('mobileMidiBar');     // NEW: MIDI top bar
-  const bottomBar = document.getElementById('mobilePlayerBar');   // existing: mini-player bar
 
   function setHeights() {
-    // Measure both bars (their offsetHeight includes padding and safe-area padding)
+    const topBar    = document.getElementById('mobileMidiBar');
+    const bottomBar = document.getElementById('mobilePlayerBar');
     if (topBar) {
       const th = topBar.offsetHeight || 0;
       root.style.setProperty('--mobile-topbar-height', th + 'px');
@@ -1760,78 +1599,17 @@ audio.addEventListener('seeked', updateProgressUI);
     }
   }
 
-  function placeBars() {
-    const tabs         = document.querySelector('.tab-bar');
-    const tabsContainer= document.querySelector('.mobile-tabs-container');
-    const playlistCard = document.querySelector('.card-playlist');
-    const playerCard   = document.querySelector('.card-player');
-    const audioEl      = document.getElementById('audioTrack');
-
-    // --- MIDI Top Bar placement ---
-    if (topBar) {
-      if (mql.matches) {
-        // MOBILE: keep the bar above the tabs’ content (before .mobile-tabs-container)
-        const radios = document.querySelector('input#tab-player'); // anchor near the radios
-        const parent = document.body;
-        // Ensure it's placed before the container for global visibility
-        if (parent && tabsContainer && topBar.nextElementSibling !== tabsContainer) {
-          parent.insertBefore(topBar, tabsContainer);
-        }
-        topBar.classList.remove('in-card');
-      } else {
-        // DESKTOP: place inside Playlist card (top of card)
-        if (playlistCard) {
-          if (playlistCard.firstChild !== topBar) {
-            playlistCard.insertBefore(topBar, playlistCard.firstChild);
-          }
-          topBar.classList.add('in-card');
-        }
-      }
-    }
-
-    // --- Bottom Player Bar placement: keep it global for both desktop and mobile ---
-    if (bottomBar) {
-        const tabBar = document.querySelector('.tab-bar');
-        if (tabBar && bottomBar.nextElementSibling !== tabBar) {
-            // Always keep the bar right before the (possibly hidden) tab bar = global position
-            tabBar.parentNode.insertBefore(bottomBar, tabBar);
-        }
-
-        // We only change positioning styles between mobile and desktop,
-        // but DO NOT move the node back into the Player card.
-        if (mql.matches) {
-            bottomBar.classList.add('is-mobile');
-        } else {
-            bottomBar.classList.remove('is-mobile');
-        }
-    }
-
-    // After placements, recompute heights for safe padding
-    setHeights();
+  let scheduled = false;
+  function rafSetHeights() {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => { scheduled = false; setHeights(); });
   }
 
-  // Throttle resize/layout changes
-  function rafThrottle(fn) {
-    let scheduled = false;
-    return function() {
-      if (scheduled) return;
-      scheduled = true;
-      requestAnimationFrame(() => { scheduled = false; fn(); });
-    };
-  }
-
-  const onResize  = rafThrottle(setHeights);
-  const onChange  = () => placeBars();
-
-  if (mql.addEventListener) mql.addEventListener('change', onChange);
-  else mql.addListener(onChange);
-
-  window.addEventListener('resize', onResize, { passive: true });
-  window.addEventListener('orientationchange', onChange);
-
+  window.addEventListener('resize', rafSetHeights, { passive: true });
+  window.addEventListener('orientationchange', setHeights);
   document.addEventListener('DOMContentLoaded', () => {
-    placeBars();
-    // Fonts can change metrics; update once they’re ready
+    setHeights();
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(setHeights).catch(() => {});
     }
@@ -1839,12 +1617,11 @@ audio.addEventListener('seeked', updateProgressUI);
 })();
 </script>
 
-<!-- Mobile bottom tab bar -->
+<!-- Bottom tab bar (visible only in portrait via CSS) -->
 <nav class="tab-bar">
     <label for="tab-playlist" class="tab">Playlist</label>
     <label for="tab-player" class="tab">Player</label>
 </nav>
-
 
 </body>
 </html>
