@@ -165,6 +165,27 @@
         .marker-right  { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
         .preset-badge { font-size: 0.85rem; font-weight: 700; color: var(--color-text-primary); background: inherit; border: none; border-radius: 6px; padding: 2px 8px; }
 
+        /* Keep the edit row on a single line and make it fit */
+        #event-list li {
+            display: flex;        /* already set in your CSS; harmless to repeat */
+            align-items: center;
+            gap: 8px;
+        }
+
+        #event-list .time-input,
+        #event-list .preset-input {
+            /* Critical bits: let inputs shrink below min-content width */
+            flex: 1 1 0;          /* share remaining width, allow shrink */
+            min-width: 0;         /* allow shrinking in flex context */
+            width: 0;             /* WebKit/iOS: actually enable shrink */
+            box-sizing: border-box;
+        }
+
+        #event-list li button {
+            flex: 0 0 auto;       /* buttons keep natural width */
+            white-space: nowrap;  /* avoid multi-line button labels */
+        }
+
         /* ===== PROGRESS BAR COMPONENT ===== */
         .progress-container {
             background: var(--color-bg-panel);
@@ -631,7 +652,7 @@ let scrubTargetTime = null;
 
 const MIN_GAP_SEC = 0.05;
 const AVAILABLE_SPEEDS = [0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5, 1.75, 2.0];
-const ANCHOR_RATE = 2.0;
+// const ANCHOR_RATE = 2.0;
 
 /* =============================== Helpers ================================ */
 function configureGhostPreview({ fillColor, fillOpacity, lineColor, lineOpacity } = {}) {
