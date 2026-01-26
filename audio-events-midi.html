@@ -64,6 +64,19 @@
         .playlist-item.active { background: var(--color-primary-light); border-left: 4px solid var(--color-primary); font-weight: bold; }
         .playlist-item .danger { margin-left: 10px; }
 
+        /* Prevent Chrome Android "Tap to Search" from triggering on row taps */
+        .playlist-item,
+        .playlist-item * {
+            -webkit-user-select: none; /* Safari/Chrome WebKit */
+            user-select: none;         /* Standard */
+            -webkit-touch-callout: none; /* Prevent long-press callout (mostly iOS) */
+        }
+
+        /* Optional: remove tap highlight flash on Android */
+        .playlist-item {
+            -webkit-tap-highlight-color: transparent;
+        }
+
         /* ===== MIDI PANEL COMPONENT ===== */
         .midi-panel {
             background: var(--color-bg-lighter);
