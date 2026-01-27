@@ -467,11 +467,11 @@
 
             <!-- A/B loop controls -->
             <div class="controls-container" id="ab-controls" role="group" aria-label="A/B loop controls">
-                <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABLoop()" aria-label="Toggle A/B loop">A ⇄ B</button>
-                <button id="btnSetA" class="control-btn ab-btn" onclick="setLoopA()" aria-label="Set loop start point A">A |→ —</button>
-                <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show or hide A/B loop on progress bar">✖</button>
-                <button id="btnSetB" class="control-btn ab-btn" onclick="setLoopB()" aria-label="Set loop end point B">— ←| B</button>
-                <button class="control-btn ab-btn" onclick="rewindToA()" aria-label="Rewind to point A">↩A</button>
+                <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABLoop()" aria-label="Toggle A/B loop">AB</button>
+                <button id="btnSetA" class="control-btn ab-btn" onclick="setLoopA()" aria-label="Set loop start point A">—</button>
+                <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show or hide A/B loop on progress bar">⇄</button>
+                <button id="btnSetB" class="control-btn ab-btn" onclick="setLoopB()" aria-label="Set loop end point B">—</button>
+                <button class="control-btn ab-btn" onclick="rewindToA()" aria-label="Rewind to point A">↩</button>
             </div>
 
             <div class="markers-header">
@@ -1017,8 +1017,8 @@ function isABValid() { return abLoop.a !== null && abLoop.b !== null && abLoop.b
 function renderABButtons() {
     const aStr = (abLoop.a === null) ? '—' : formatClock(abLoop.a);
     const bStr = (abLoop.b === null) ? '—' : formatClock(abLoop.b);
-    btnSetA.innerHTML = `A |→ ${aStr}`;
-    btnSetB.innerHTML = `${bStr} ←| B`;
+    btnSetA.innerHTML = `${aStr}`;
+    btnSetB.innerHTML = `${bStr}`;
     abVisibleBtn.classList.toggle('loop-active', !!abLoop.visible);
 }
 function updateABUI() {
@@ -1027,12 +1027,21 @@ function updateABUI() {
     renderABButtons();
 }
 function toggleABLoop() { abLoop.enabled = !abLoop.enabled; if (abLoop.enabled) abLoop.visible = true; saveABLoop(); }
-function toggleABVisibility() { abLoop.visible = !abLoop.visible; saveABLoop(); }
+// function toggleABVisibility() { abLoop.visible = !abLoop.visible; saveABLoop(); }
+function toggleABVisibility() { 
+    abLoop.visible = !abLoop.visible;
+    if (abLoop.visible) { abLoop.enabled = true; }
+    else { abLoop.enabled = false; }
+    saveABLoop(); 
+}
 function setLoopA() {
     abLoop.a = audio.currentTime;
     if (abLoop.b !== null && abLoop.b <= abLoop.a + MIN_GAP_SEC) {
         abLoop.b = Math.min(audio.duration || abLoop.a + MIN_GAP_SEC, abLoop.a + MIN_GAP_SEC);
     }
+    abLoop.visible = true;
+    if (abLoop.a < abLoop.b - MIN_GAP_SEC) { abLoop.enabled = true; }
+    else { abLoop.enabled = false; }
     saveABLoop();
 }
 function setLoopB() {
@@ -1040,6 +1049,9 @@ function setLoopB() {
     if (abLoop.a !== null && abLoop.b <= abLoop.a + MIN_GAP_SEC) {
         abLoop.a = Math.max(0, abLoop.b - MIN_GAP_SEC);
     }
+    abLoop.visible = true;
+    if (abLoop.a < abLoop.b - MIN_GAP_SEC) { abLoop.enabled = true; }
+    else { abLoop.enabled = false; }
     saveABLoop();
 }
 function rewindToA() {
