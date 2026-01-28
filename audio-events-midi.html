@@ -243,6 +243,9 @@
         .ab-handle.right { right: 0; left: auto; transform: translate(50%, -50%); }
         .ab-drag { position: absolute; left: 0; right: 0; top: 0; bottom: 0; cursor: grab; }
         .ab-drag.dragging { cursor: grabbing; }
+        /* A/B drag targets: prevent the browser from treating drags as page scroll/zoom */
+        .ab-handle,
+        .ab-drag { touch-action: none; }
 
         .time-label { font-size: 0.85rem; color: var(--color-text-secondary); flex-shrink: 0; min-width: 74px; text-align: right; }
 
@@ -491,11 +494,11 @@
             <div id="progress-bar" class="progress-track">
                 <div id="progress-fill" class="progress-fill"></div>
                 <div id="progress-ghost-fill" class="progress-ghost-fill"></div>
-                <div id="progress-ghost" class="progress-ghost"></div>
+                <div id="progress-ghost" class="progress-ghost"></div>             
                 <div id="progress-ab" class="progress-ab">
-                    <div id="ab-drag" class="ab-drag"></div>
-                    <div id="ab-handle-a" class="ab-handle left"></div>
-                    <div id="ab-handle-b" class="ab-handle right"></div>
+                    <div id="ab-drag" class="ab-drag" data-role="segment"></div>
+                    <div id="ab-handle-a" class="ab-handle left" data-role="handle-a"></div>
+                    <div id="ab-handle-b" class="ab-handle right" data-role="handle-b"></div>
                 </div>
             </div>
             <span id="time-label" class="time-label">0:00.0 / 0:00</span>
