@@ -468,15 +468,6 @@
             <h2 id="current-title" style="padding:0px 10px">Select a song</h2>
             <audio id="audioTrack"></audio>
 
-            <!-- A/B loop controls -->
-            <div class="controls-container" id="ab-controls" role="group" aria-label="A/B loop controls">
-                <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABLoop()" aria-label="Toggle A/B loop">AB</button>
-                <button id="btnSetA" class="control-btn ab-btn" onclick="setLoopA()" aria-label="Set loop start point A">—</button>
-                <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show or hide A/B loop on progress bar">⇄</button>
-                <button id="btnSetB" class="control-btn ab-btn" onclick="setLoopB()" aria-label="Set loop end point B">—</button>
-                <button class="control-btn ab-btn" onclick="rewindToA()" aria-label="Rewind to point A">↩</button>
-            </div>
-
             <div class="markers-header">
                 <h4>Markers</h4>
                 <button class="primary" onclick="setEvent()">Add Marker</button>
@@ -484,11 +475,11 @@
 
             <ul id="event-list"></ul>
         </div>
-
     </div>
 
     <!-- Fixed Mini-player (bottom) -->
     <div id="mobilePlayerBar" class="mobile-player-bar" role="region" aria-label="Mini player">
+
         <!-- Progress bar -->
         <div class="progress-container">
             <div id="progress-bar" class="progress-track">
@@ -503,7 +494,15 @@
             </div>
             <span id="time-label" class="time-label">0:00.0 / 0:00</span>
         </div>
-
+        <!-- A/B loop controls -->
+        <div class="controls-container" id="ab-controls" role="group" aria-label="A/B loop controls">
+            <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABLoop()" aria-label="Toggle A/B loop">AB</button>
+            <button id="btnSetA" class="control-btn ab-btn" onclick="setLoopA()" aria-label="Set loop start point A">—</button>
+            <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show or hide A/B loop on progress bar">⇄</button>
+            <button id="btnSetB" class="control-btn ab-btn" onclick="setLoopB()" aria-label="Set loop end point B">—</button>
+            <button class="control-btn ab-btn" onclick="rewindToA()" aria-label="Rewind to point A">↩</button>
+        </div>
+      
         <!-- Playback controls -->
         <div class="controls-container" role="group" aria-label="Playback controls">
             <button class="control-btn" onclick="stopAudio()" aria-label="Stop">■</button>
