@@ -1027,13 +1027,13 @@ function updateABUI() {
     renderABButtons();
 }
 function toggleABLoop() { abLoop.enabled = !abLoop.enabled; if (abLoop.enabled) abLoop.visible = true; saveABLoop(); }
-// function toggleABVisibility() { abLoop.visible = !abLoop.visible; saveABLoop(); }
-function toggleABVisibility() { 
-    abLoop.visible = !abLoop.visible;
-    if (abLoop.visible) { abLoop.enabled = true; }
-    else { abLoop.enabled = false; }
-    saveABLoop(); 
-}
+function toggleABVisibility() { abLoop.visible = !abLoop.visible; saveABLoop(); }
+// function toggleABVisibility() { 
+    // abLoop.visible = !abLoop.visible;
+    // if (abLoop.visible) { abLoop.enabled = true; }
+    // else { abLoop.enabled = false; }
+    // saveABLoop(); 
+// }
 function setLoopA() {
     abLoop.a = audio.currentTime;
     if (abLoop.b !== null && abLoop.b <= abLoop.a + MIN_GAP_SEC) {
