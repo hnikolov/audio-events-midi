@@ -414,6 +414,15 @@
             .control-btn { width: 44px; height: 44px; font-size: 20px; }
             .controls-container { flex-wrap: wrap; gap: 10px; }
         }
+
+        /* === Sticky headers UNDER Connect (applies in PORTRAIT & LANDSCAPE) === */
+        .card-playlist .header-row,
+        .card-player #current-title {
+            position: sticky;
+            top: var(--mobile-topbar-height, 48px); /* uses measured height; 48px fallback */
+            z-index: 10;
+            background: #fff;       /* so content scrolls underneath cleanly */
+        }
     </style>
 </head>
 <body>
