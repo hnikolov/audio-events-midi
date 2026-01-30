@@ -428,6 +428,21 @@
             margin: 0;              /* remove default h2 margin that can look offset */
             display: block;         /* ensure background spans full width */
         }
+
+        /* Make edit inputs match the visual size in the list, especially on phones */
+        #event-list li.editing .time-input,
+        #event-list li.editing .preset-input {
+            /* Let inputs fill their column */
+            width: 100%;
+            box-sizing: border-box;
+
+            /* Comfortable, consistent size on mobile */
+            font-size: 1rem;        /* >=16px on your mobile base so no zoom */
+            line-height: 1.2;
+            padding: 10px 12px;
+            min-height: 44px;       /* touch target size */
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -1451,14 +1466,22 @@ async function refreshEventUI() {
     updateMarkerTicks();
 }
 function toggleEdit(idx) {
-    const evt = getEvents()[idx];
-    const li = document.getElementById(`row-${idx}`);
-    li.innerHTML = `
-        <input type="number" step="0.1" class="time-input" id="edit-time-${idx}" value="${evt.time}">
-        <input type="number" min="1" max="100" step="1" class="preset-input" id="edit-preset-${idx}" value="${evt.preset}">
-        <button onclick="saveEdit(${idx})">Save</button>
-        <button onclick="refreshEventUI()">Cancel</button>`;
+  const evt = getEvents()[idx];
+  const li = document.getElementById(`row-${idx}`);
+  li.classList.add('editing');
+  li.innerHTML = `
+    <span class="marker-left">
+      <input type="number" step="0.1" class="time-input" id="edit-time-${idx}" value="${evt.time}">
+    </span>
+    <span class="marker-middle" style="text-align:center">
+      <input type="number" min="1" max="100" step="1" class="preset-input" id="edit-preset-${idx}" value="${evt.preset}">
+    </span>
+    <span class="marker-right">
+      <button onclick="saveEdit(${idx})">Save</button>
+      <button onclick="refreshEventUI()">Cancel</button>
+    </span>`;
 }
+
 function saveEdit(idx) {
     const events = getEvents();
     const old = events[idx];
