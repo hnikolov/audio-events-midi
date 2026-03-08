@@ -59,8 +59,8 @@
         .danger { color: var(--color-danger); border-color: var(--color-danger); font-size: 0.8rem; }
 
         /* ===== PLAYLIST COMPONENT ===== */
-        #playlist-ui { border: 1px solid var(--color-border); border-radius: 8px; margin-top: 10px; overflow: visible; }
-        .playlist-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--color-border-light); cursor: pointer; font-size: 0.9rem; }
+        #playlist-ui { border: 1px solid var(--color-border); border-radius: 8px; margin-top: 10px; overflow: visible; touch-action: none; }
+        .playlist-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--color-border-light); cursor: pointer; font-size: 0.9rem; position: relative; }
         .playlist-item.active { background: var(--color-primary-light); border-left: 4px solid var(--color-primary); font-weight: bold; }
         .playlist-menu-btn { background: none; border: none; cursor: pointer; padding: 4px 8px; font-size: 1.2rem; color: #999; }
         .playlist-menu-btn:hover { color: #333; }
@@ -691,6 +691,12 @@ let dragSrcEl = null;
 let dragSrcIdx = null;
 let dropIndicator = null;
 let isDraggingItem = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragDistanceMoved = 0;
+let dragThreshold = 10; // pixels; threshold before drag activates
+let dragActivated = false; // tracks if drag actually started (threshold crossed)
+let recentlyDragged = false; // prevent click-play immediately after drag
 
 function onPlaylistPointerDown(e) {
     // ignore clicks on menu button
@@ -700,10 +706,13 @@ function onPlaylistPointerDown(e) {
     const idx = parseInt(row.dataset.idx, 10);
     if (isNaN(idx)) return; // safety: invalid index
     e.preventDefault();
-    isDraggingItem = true;
     dragSrcEl = row;
     dragSrcIdx = idx;
-    row.classList.add('dragging');
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragDistanceMoved = 0;
+    dragActivated = false; // flag: threshold not yet crossed
+    isDraggingItem = false; // will set true only after threshold
     dropIndicator = document.createElement('div');
     dropIndicator.className = 'drop-indicator';
     dropIndicator.dataset.targetIdx = dragSrcIdx;
@@ -713,6 +722,23 @@ function onPlaylistPointerDown(e) {
 }
 
 function onPlaylistPointerMove(e) {
+    if (!dragSrcEl) return;
+    
+    // track distance moved
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    dragDistanceMoved = Math.sqrt(dx * dx + dy * dy);
+    
+    // only activate drag after threshold is crossed
+    if (!dragActivated && dragDistanceMoved >= dragThreshold) {
+        dragActivated = true;
+        isDraggingItem = true;
+        dragSrcEl.classList.add('dragging');
+    }
+    
+    // only process drag moves if threshold crossed
+    if (!dragActivated) return;
+    
     const allRows = Array.from(playlistUI.querySelectorAll('.playlist-item'));
     const items = allRows.filter(r => !r.classList.contains('dragging'));
     let targetIdx = allRows.length; // default to end (original indexes range 0..len-1)
@@ -738,23 +764,28 @@ function onPlaylistPointerMove(e) {
 function onPlaylistPointerUp(e) {
     window.removeEventListener('pointermove', onPlaylistPointerMove);
     window.removeEventListener('pointerup', onPlaylistPointerUp);
+    window.removeEventListener('pointercancel', onPlaylistPointerCancel);
     isDraggingItem = false;
     if (dragSrcEl) dragSrcEl.classList.remove('dragging');
     if (dropIndicator) {
         const targetIdx = parseInt(dropIndicator.dataset.targetIdx, 10);
         dropIndicator.remove();
-        if (typeof dragSrcIdx === 'number') {
+        // only apply reorder if drag was actually activated
+        if (dragActivated && typeof dragSrcIdx === 'number') {
             let finalIdx = targetIdx;
             if (targetIdx > dragSrcIdx) finalIdx = targetIdx - 1;
             if (finalIdx !== dragSrcIdx) {
                 moveInOrder(dragSrcIdx, finalIdx);
                 renderPlaylist();
+                recentlyDragged = true;
+                setTimeout(() => { recentlyDragged = false; }, 150);
             }
         }
     }
     dragSrcEl = null;
     dragSrcIdx = null;
     dropIndicator = null;
+    dragActivated = false;
 }
 
 function onPlaylistPointerCancel(e) {
@@ -767,6 +798,7 @@ function onPlaylistPointerCancel(e) {
     dragSrcEl = null;
     dragSrcIdx = null;
     dropIndicator = null;
+    dragActivated = false;
 }
 
 /* ============================== App Constants ============================= */
@@ -1556,7 +1588,7 @@ async function renderPlaylist() {
             menu.appendChild(renameBtn);
             menu.appendChild(removeBtn);
 
-            row.onclick = (e) => { if (!isDraggingItem && !menu.classList.contains('open')) playSong(song.name); };
+            row.onclick = (e) => { if (!isDraggingItem && !recentlyDragged && !menu.classList.contains('open')) playSong(song.name); };
             row.appendChild(label);
             row.appendChild(menuBtn);
             row.appendChild(menu);
