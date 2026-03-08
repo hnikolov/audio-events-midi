@@ -71,6 +71,10 @@
         .playlist-dropdown-menu button:first-child { border-radius: 6px 6px 0 0; }
         .playlist-dropdown-menu button:last-child { border-radius: 0 0 6px 6px; }
 
+        /* drag-and-drop visuals */
+        .playlist-item.dragging { opacity: 0.5; cursor: grabbing; }
+        .drop-indicator { height: 4px; background: var(--color-primary); margin: 4px 0; border-radius: 2px; }
+
         /* Prevent Chrome Android "Tap to Search" from triggering on row taps */
         .playlist-item,
         .playlist-item * {
@@ -611,8 +615,7 @@ function putSongs(files) {
         const store = tx.objectStore(STORE_SONGS);
         try {
             files.forEach((file) => {
-                const blob = new Blob([file], { type: file.type || "audio/*" });
-                store.put({ name: file.name, type: file.type || "", lastModified: file.lastModified || Date.now(), data: blob });
+                store.put({ name: file.name, type: file.type || "", lastModified: file.lastModified || Date.now(), data: file });
             });
         } catch (err) { console.error("IDB put error", err); }
         tx.oncomplete = () => resolve(true);
@@ -635,7 +638,10 @@ function removeSongFromDB(name) {
         if (!db) return resolve(false);
         const tx = db.transaction(STORE_SONGS, "readwrite");
         tx.objectStore(STORE_SONGS).delete(name);
-        tx.oncomplete = () => resolve(true);
+        tx.oncomplete = () => {
+            removeFromOrder(name);
+            resolve(true);
+        };
         tx.onerror    = () => resolve(false);
         tx.onabort    = () => resolve(false);
     });
@@ -654,7 +660,7 @@ async function renameSongInDB(oldName) {
         store.put({ ...song, name: newName });
         
         tx.oncomplete = async () => {
-            if (currentFileName === oldName) {
+                    if (currentFileName === oldName) {
                 currentFileName = newName;
                 document.getElementById('current-title').textContent = newName;
                 const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
@@ -666,6 +672,7 @@ async function renameSongInDB(oldName) {
                 const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
                 if (abMap[oldName] !== undefined) { abMap[newName] = abMap[oldName]; delete abMap[oldName]; localStorage.setItem(AB_LOOP_MAP_KEY, JSON.stringify(abMap)); }
             }
+            renameInOrder(oldName, newName);
             await renderPlaylist();
         };
     }
@@ -677,6 +684,89 @@ function togglePlaylistMenu(e, songName, menuId) {
         if (m.id !== menuId) m.classList.remove('open');
     });
     menu.classList.toggle('open');
+}
+
+/* ---------- drag-to-reorder logic (pointer events) ---------- */
+let dragSrcEl = null;
+let dragSrcIdx = null;
+let dropIndicator = null;
+let isDraggingItem = false;
+
+function onPlaylistPointerDown(e) {
+    // ignore clicks on menu button
+    if (e.target.closest('.playlist-menu-btn')) return;
+    const row = e.target.closest('.playlist-item');
+    if (!row) return;
+    const idx = parseInt(row.dataset.idx, 10);
+    if (isNaN(idx)) return; // safety: invalid index
+    e.preventDefault();
+    isDraggingItem = true;
+    dragSrcEl = row;
+    dragSrcIdx = idx;
+    row.classList.add('dragging');
+    dropIndicator = document.createElement('div');
+    dropIndicator.className = 'drop-indicator';
+    dropIndicator.dataset.targetIdx = dragSrcIdx;
+    window.addEventListener('pointermove', onPlaylistPointerMove);
+    window.addEventListener('pointerup', onPlaylistPointerUp);
+    window.addEventListener('pointercancel', onPlaylistPointerCancel);
+}
+
+function onPlaylistPointerMove(e) {
+    const allRows = Array.from(playlistUI.querySelectorAll('.playlist-item'));
+    const items = allRows.filter(r => !r.classList.contains('dragging'));
+    let targetIdx = allRows.length; // default to end (original indexes range 0..len-1)
+    for (let i = 0; i < items.length; i++) {
+        const rect = items[i].getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) {
+            targetIdx = parseInt(items[i].dataset.idx, 10);
+            break;
+        }
+    }
+    // relocate indicator
+    if (dropIndicator.parentNode) dropIndicator.parentNode.removeChild(dropIndicator);
+    if (targetIdx < allRows.length) {
+        const refEl = allRows.find(it => parseInt(it.dataset.idx, 10) === targetIdx && !it.classList.contains('dragging'));
+        if (refEl) playlistUI.insertBefore(dropIndicator, refEl);
+        else playlistUI.appendChild(dropIndicator);
+    } else {
+        playlistUI.appendChild(dropIndicator);
+    }
+    dropIndicator.dataset.targetIdx = targetIdx;
+}
+
+function onPlaylistPointerUp(e) {
+    window.removeEventListener('pointermove', onPlaylistPointerMove);
+    window.removeEventListener('pointerup', onPlaylistPointerUp);
+    isDraggingItem = false;
+    if (dragSrcEl) dragSrcEl.classList.remove('dragging');
+    if (dropIndicator) {
+        const targetIdx = parseInt(dropIndicator.dataset.targetIdx, 10);
+        dropIndicator.remove();
+        if (typeof dragSrcIdx === 'number') {
+            let finalIdx = targetIdx;
+            if (targetIdx > dragSrcIdx) finalIdx = targetIdx - 1;
+            if (finalIdx !== dragSrcIdx) {
+                moveInOrder(dragSrcIdx, finalIdx);
+                renderPlaylist();
+            }
+        }
+    }
+    dragSrcEl = null;
+    dragSrcIdx = null;
+    dropIndicator = null;
+}
+
+function onPlaylistPointerCancel(e) {
+    window.removeEventListener('pointermove', onPlaylistPointerMove);
+    window.removeEventListener('pointerup', onPlaylistPointerUp);
+    window.removeEventListener('pointercancel', onPlaylistPointerCancel);
+    isDraggingItem = false;
+    if (dragSrcEl) dragSrcEl.classList.remove('dragging');
+    if (dropIndicator) dropIndicator.remove();
+    dragSrcEl = null;
+    dragSrcIdx = null;
+    dropIndicator = null;
 }
 
 /* ============================== App Constants ============================= */
@@ -716,6 +806,58 @@ const EVENT_MAP_KEY = 'audio_events_map_v1';
 const VOLUME_MAP_KEY = 'audio_volume_map_v1';
 const AB_LOOP_MAP_KEY = 'audio_ab_loop_map_v1';
 const SPEED_MAP_KEY = 'audio_speed_map_v1';
+
+// playlist order storage
+const ORDER_KEY = 'audio_playlist_order_v1';
+
+function getPlaylistOrder() {
+    try {
+        return JSON.parse(localStorage.getItem(ORDER_KEY) || '[]');
+    } catch { return []; }
+}
+function savePlaylistOrder(order) {
+    localStorage.setItem(ORDER_KEY, JSON.stringify(order));
+}
+function reconcileOrderWithSongs(songs) {
+    try {
+        if (!Array.isArray(songs) || !songs.length) return [];
+        // keep only existing names, then append any new ones
+        let order = getPlaylistOrder();
+        if (!Array.isArray(order)) order = [];
+        order = order.filter(n => songs.some(s => s.name === n));
+        songs.forEach(s => { if (s.name && !order.includes(s.name)) order.push(s.name); });
+        savePlaylistOrder(order);
+        return order;
+    } catch (err) {
+        console.error("reconcileOrderWithSongs error:", err);
+        return songs.map(s => s.name);
+    }
+}
+function moveInOrder(from, to) {
+    try {
+        const order = getPlaylistOrder();
+        if (!Array.isArray(order) || from < 0 || to < 0 || from >= order.length) return;
+        if (from === to) return; // no-op
+        const item = order.splice(from, 1)[0];
+        if (!item) return; // safety check
+        order.splice(to, 0, item);
+        savePlaylistOrder(order);
+    } catch (err) {
+        console.error("moveInOrder error:", err);
+    }
+}
+function removeFromOrder(name) {
+    const order = getPlaylistOrder().filter(n => n !== name);
+    savePlaylistOrder(order);
+}
+function renameInOrder(oldName, newName) {
+    const order = getPlaylistOrder();
+    const idx = order.indexOf(oldName);
+    if (idx !== -1) {
+        order[idx] = newName;
+        savePlaylistOrder(order);
+    }
+}
 
 /* ================================ State ================================= */
 let currentFileName = "";
@@ -1341,68 +1483,82 @@ async function renderPlaylist() {
         playlistUI.innerHTML = "<div style='padding:10px'>Storage unavailable</div>";
         return;
     }
-    const songs = await getAllSongs();
-    playlistUI.innerHTML = songs.length ? "" : "<div style='padding:10px'>Empty</div>";
-    songs.forEach((song, idx) => {
-        const row = document.createElement('div');
-        row.className = `playlist-item ${song.name === currentFileName ? 'active' : ''}`;
-        row.style.position = 'relative';
-        const label = document.createElement('span');
-        label.textContent = song.name;
-
-        const menuBtn = document.createElement('button');
-        menuBtn.className = 'playlist-menu-btn';
-        menuBtn.textContent = '⋮';
-        menuBtn.title = 'Options';
-        menuBtn.onclick = (e) => {
-            e.stopPropagation();
-            togglePlaylistMenu(e, song.name, `menu-${idx}`);
-        };
-
-        const menu = document.createElement('div');
-        menu.className = 'playlist-dropdown-menu';
-        menu.id = `menu-${idx}`;
-        menu.style.position = 'absolute';
-        menu.style.right = '0';
-        menu.style.top = '100%';
+    try {
+        const songs = await getAllSongs();
+        if (!Array.isArray(songs) || !songs.length) {
+            playlistUI.innerHTML = "<div style='padding:10px'>Empty</div>";
+            return;
+        }
         
-        const renameBtn = document.createElement('button');
-        renameBtn.textContent = 'Rename';
-        renameBtn.onclick = async (e) => {
-            e.stopPropagation();
-            await renameSongInDB(song.name);
-        };
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.textContent = 'Remove';
-        removeBtn.onclick = async (e) => {
-            e.stopPropagation();
-            if (confirm(`Remove ${song.name}?`)) {
-                const ok = await removeSongFromDB(song.name);
-                if (ok) {
-                    if (currentFileName === song.name) {
-                        audio.src = "";
-                        currentFileName = "";
-                        firedEvents.clear();
-                        lastTriggeredMarkerTime = null;
-                        lastTriggeredMarkerIndex = null;
-                        activeBlobUrl = safeRevoke(activeBlobUrl);
-                        updateMarkerTicks();
+        const order = reconcileOrderWithSongs(songs);
+        songs.sort((a,b) => order.indexOf(a.name) - order.indexOf(b.name));
+
+        playlistUI.innerHTML = "";
+        songs.forEach((song, idx) => {
+            const row = document.createElement('div');
+            row.className = `playlist-item ${song.name === currentFileName ? 'active' : ''}`;
+            row.style.position = 'relative';
+            row.dataset.idx = idx;
+            const label = document.createElement('span');
+            label.textContent = song.name;
+
+            const menuBtn = document.createElement('button');
+            menuBtn.className = 'playlist-menu-btn';
+            menuBtn.textContent = '⋮';
+            menuBtn.title = 'Options';
+            menuBtn.onclick = (e) => {
+                e.stopPropagation();
+                togglePlaylistMenu(e, song.name, `menu-${idx}`);
+            };
+
+            const menu = document.createElement('div');
+            menu.className = 'playlist-dropdown-menu';
+            menu.id = `menu-${idx}`;
+            menu.style.position = 'absolute';
+            menu.style.right = '0';
+            menu.style.top = '100%';
+            
+            const renameBtn = document.createElement('button');
+            renameBtn.textContent = 'Rename';
+            renameBtn.onclick = async (e) => {
+                e.stopPropagation();
+                await renameSongInDB(song.name);
+            };
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = 'Remove';
+            removeBtn.onclick = async (e) => {
+                e.stopPropagation();
+                if (confirm(`Remove ${song.name}?`)) {
+                    const ok = await removeSongFromDB(song.name);
+                    if (ok) {
+                        if (currentFileName === song.name) {
+                            audio.src = "";
+                            currentFileName = "";
+                            firedEvents.clear();
+                            lastTriggeredMarkerTime = null;
+                            lastTriggeredMarkerIndex = null;
+                            activeBlobUrl = safeRevoke(activeBlobUrl);
+                            updateMarkerTicks();
+                        }
+                        await renderPlaylist();
                     }
-                    await renderPlaylist();
                 }
-            }
-        };
-        
-        menu.appendChild(renameBtn);
-        menu.appendChild(removeBtn);
+            };
+            
+            menu.appendChild(renameBtn);
+            menu.appendChild(removeBtn);
 
-        row.onclick = (e) => { if(!menu.classList.contains('open')) playSong(song.name); };
-        row.appendChild(label);
-        row.appendChild(menuBtn);
-        row.appendChild(menu);
-        playlistUI.appendChild(row);
-    });
+            row.onclick = (e) => { if (!isDraggingItem && !menu.classList.contains('open')) playSong(song.name); };
+            row.appendChild(label);
+            row.appendChild(menuBtn);
+            row.appendChild(menu);
+            playlistUI.appendChild(row);
+        });
+    } catch (err) {
+        console.error("renderPlaylist error:", err);
+        playlistUI.innerHTML = "<div style='padding:10px'>Error loading playlist</div>";
+    }
 }
 
 async function playSong(name) {
@@ -1736,6 +1892,15 @@ audio.addEventListener('loadedmetadata', () => {
     renderABButtons();
 });
 audio.addEventListener('seeked', updateProgressUI);
+
+/* ======================== Playlist event listeners (after DOM refs) ====================== */
+playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
+
+document.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('.playlist-item .playlist-menu-btn') && !e.target.closest('.playlist-dropdown-menu')) {
+        document.querySelectorAll('.playlist-dropdown-menu').forEach(m => m.classList.remove('open'));
+    }
+});
 
 /* ============================== Initialize DB ============================= */
 (async function init() {
