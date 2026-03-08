@@ -1253,6 +1253,7 @@ function seekRelative(seconds) {
     if (seconds < 0 && target < prev) { reconcileMarkersOnBackwardJump(target, prev); }
     else if (seconds > 0 && target > prev) { reconcileMarkersOnForwardJump(prev, target); }
     audio.currentTime = target;
+    updateProgressUI(); // Explicitly update progress bar
 }
 
 function seekToTime(targetTime) {
@@ -1260,6 +1261,7 @@ function seekToTime(targetTime) {
     if (targetTime < prev) { reconcileMarkersOnBackwardJump(targetTime, prev); }
     else if (targetTime > prev) { reconcileMarkersOnForwardJump(prev, targetTime); }
     audio.currentTime = targetTime;
+    updateProgressUI(); // Explicitly update progress bar (important for paused audio)
 }
 function stopAudio() {
     audio.pause();
@@ -1320,6 +1322,7 @@ function rewindToA() {
     const a = (abLoop.a !== null) ? abLoop.a : 0;
     reconcileMarkersOnBackwardJump(a, audio.currentTime);
     audio.currentTime = Math.min(Math.max(0, a), audio.duration || a);
+    updateProgressUI(); // Explicitly update progress bar
 }
 function loadABLoop() {
     const map = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
@@ -1909,7 +1912,6 @@ audio.addEventListener('timeupdate', () => {
             fireMarkerByIndex(i, evt, { forceCc: false });
         }
         if (now < t - 0.5) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
-        if (now === 0.0 && t === 0.0) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
     });
 
     updateProgressUI();
