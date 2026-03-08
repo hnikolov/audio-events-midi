@@ -1222,6 +1222,13 @@ function seekRelative(seconds) {
     else if (seconds > 0 && target > prev) { reconcileMarkersOnForwardJump(prev, target); }
     audio.currentTime = target;
 }
+
+function seekToTime(targetTime) {
+    const prev = audio.currentTime;
+    if (targetTime < prev) { reconcileMarkersOnBackwardJump(targetTime, prev); }
+    else if (targetTime > prev) { reconcileMarkersOnForwardJump(prev, targetTime); }
+    audio.currentTime = targetTime;
+}
 function stopAudio() {
     audio.pause();
     audio.currentTime = 0;
@@ -1693,6 +1700,14 @@ async function refreshEventUI() {
                 <button onclick="toggleEdit(${i})">Edit</button>
                 <button class="danger" onclick="deleteEvent(${i})">×</button>
             </span>`;
+        // Click handler to seek to marker time (skip clicks on buttons)
+        li.addEventListener('click', (e) => {
+            if (!e.target.closest('button')) {
+                const wasPlaying = !audio.paused;
+                seekToTime(evt.time);
+                if (wasPlaying) audio.play();
+            }
+        });
         list.appendChild(li);
     });
     updateMarkerTicks();
