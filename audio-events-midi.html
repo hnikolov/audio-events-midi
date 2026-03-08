@@ -1912,6 +1912,7 @@ audio.addEventListener('timeupdate', () => {
             fireMarkerByIndex(i, evt, { forceCc: false });
         }
         if (now < t - 0.5) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
+        if (audio.loop && now === 0.0 && t === 0.0) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
     });
 
     updateProgressUI();
