@@ -1327,6 +1327,9 @@ async function getNextSongInPlaylist() {
 
 // Handle audio end event with queue/loop logic
 audio.addEventListener('ended', async () => {
+    // Clear fired events so they can trigger again on replay/loop/queue
+    firedEvents.clear();
+    
     if (playMode === 'queue') {
         const nextSong = await getNextSongInPlaylist();
         if (nextSong && nextSong !== currentFileName) {
