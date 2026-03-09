@@ -146,7 +146,8 @@
             padding: 0;
         }
         .control-btn:hover { background: #E5E7E8; }
-        .control-btn.loop-active { background: #E5E7E8; box-shadow: 0 0 4px rgba(26, 115, 232, 0.4); }
+        .control-btn.loop-mode { background: #E5E7E8; box-shadow: 0 0 4px rgba(26, 115, 232, 0.4); }
+        .control-btn.queue-mode { background: #FCE4B6; box-shadow: 0 0 4px rgba(251, 192, 45, 0.6); }
 
         /* ===== SPEED MENU COMPONENT ===== */
         .speed-wrapper { position: relative; }
@@ -899,6 +900,9 @@ let currentFileName = "";
 let activeBlobUrl = null;
 let firedEvents = new Set();
 
+// Play mode: 'none' | 'loop' | 'queue'
+let playMode = 'none';
+
 // Extended A/B loop state with `visible`
 let abLoop = { enabled: false, visible: true, a: null, b: null };
 
@@ -1281,7 +1285,70 @@ function stopAudio() {
     updateMarkerTicks();
     updatePlayPauseUI();
 }
-function toggleLoop() { audio.loop = !audio.loop; loopBtn.classList.toggle('loop-active', audio.loop); }
+function toggleLoop() {
+    // Cycle through modes: none → loop → queue → none
+    if (playMode === 'none') {
+        playMode = 'loop';
+        audio.loop = true;
+    } else if (playMode === 'loop') {
+        playMode = 'queue';
+        audio.loop = false;
+    } else {
+        playMode = 'none';
+        audio.loop = false;
+    }
+    updatePlayModeUI();
+}
+
+function updatePlayModeUI() {
+    loopBtn.classList.remove('loop-mode', 'queue-mode');
+    if (playMode === 'loop') {
+        loopBtn.classList.add('loop-mode');
+        loopBtn.title = 'Loop current song (Click to toggle)';
+    } else if (playMode === 'queue') {
+        loopBtn.classList.add('queue-mode');
+        loopBtn.title = 'Play next song in playlist (Click to toggle)';
+    } else {
+        loopBtn.title = 'No loop or queue (Click to toggle)';
+    }
+}
+
+async function getNextSongInPlaylist() {
+    if (!currentFileName) return null;
+    const order = getPlaylistOrder();
+    if (!order.length) return null;
+    
+    const currentIndex = order.indexOf(currentFileName);
+    if (currentIndex === -1) return null; // current song not in playlist
+    
+    const nextIndex = (currentIndex + 1) % order.length; // wrap to start if at end
+    return order[nextIndex];
+}
+
+// Handle audio end event with queue/loop logic
+audio.addEventListener('ended', async () => {
+    if (playMode === 'queue') {
+        const nextSong = await getNextSongInPlaylist();
+        if (nextSong && nextSong !== currentFileName) {
+            console.log('Queue: Playing next song:', nextSong);
+            await playSong(nextSong);
+        } else if (nextSong === currentFileName) {
+            // At end of playlist, restart from beginning
+            const order = getPlaylistOrder();
+            if (order.length > 0) {
+                console.log('Queue: Restarting from first song');
+                await playSong(order[0]);
+            }
+        }
+    } else if (playMode === 'loop') {
+        // audio.loop = true handles this natively
+        console.log('Loop: Song restarted');
+    } else {
+        // playMode === 'none': stop
+        console.log('No mode: Playback stopped');
+        updatePlayPauseUI();
+    }
+});
 
 /* ============================ A/B Loop Controls ========================== */
 function isABValid() { return abLoop.a !== null && abLoop.b !== null && abLoop.b > abLoop.a; }
@@ -1646,6 +1713,7 @@ async function playSong(name) {
     updateMarkerTicks();
     updatePlayPauseUI();
     updateMuteUI();
+    updatePlayModeUI();
     audio.play().catch(() => { updatePlayPauseUI(); });
 
     await renderPlaylist();
