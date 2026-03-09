@@ -210,6 +210,10 @@
             white-space: nowrap;  /* avoid multi-line button labels */
         }
 
+        #event-list li {
+            user-select: none;    /* Prevent text selection to avoid drag-to-select triggering clicks */
+        }
+
         /* ===== PROGRESS BAR COMPONENT ===== */
         .progress-container {
             background: var(--color-bg-panel);
@@ -1185,7 +1189,11 @@ btnConnect.addEventListener('click', connectOrDisconnect);
 /* =============================== Controls ================================ */
 function togglePlayPause() {
     if (!audio.src) return;
-    if (audio.paused) { audio.play(); } else { audio.pause(); }
+    if (audio.paused) {
+        audio.play().catch(() => { updatePlayPauseUI(); });
+    } else {
+        audio.pause();
+    }
     updatePlayPauseUI();
 }
 function updatePlayPauseUI() { playPauseBtn.textContent = audio.paused ? '▶' : '⏸'; }
@@ -1490,7 +1498,9 @@ function onPointerUp(e) {
         audio.currentTime = target;
         isScrubbing = false; scrubStartTime = null; scrubTargetTime = null;
 
-        if (wasPlaying) audio.play();
+        if (wasPlaying) {
+            audio.play().catch(() => { updatePlayPauseUI(); });
+        }
         updatePlayPauseUI(); updateProgressUI();
     } else if (dragMode) {
         saveABLoop();
@@ -1501,7 +1511,10 @@ function onPointerUp(e) {
 function onPointerCancel(e) {
     hideGhostPreview();
     updateProgressUI();
-    if (wasPlaying && audio.paused) { audio.play(); updatePlayPauseUI(); }
+    if (wasPlaying && audio.paused) {
+        audio.play().catch(() => { updatePlayPauseUI(); });
+        updatePlayPauseUI();
+    }
     dragMode = null; isScrubbing = false; scrubStartTime = null; scrubTargetTime = null; pointerId = null;
 }
 progressBar.addEventListener('pointerdown', onPointerDown);
@@ -1634,7 +1647,7 @@ async function playSong(name) {
     updateMarkerTicks();
     updatePlayPauseUI();
     updateMuteUI();
-    audio.play();
+    audio.play().catch(() => { updatePlayPauseUI(); });
 
     await renderPlaylist();
 }
@@ -1737,10 +1750,15 @@ async function refreshEventUI() {
             </span>`;
         // Click handler to seek to marker time (skip clicks on buttons)
         li.addEventListener('click', (e) => {
-            if (!e.target.closest('button')) {
+            if (!e.target.closest('button') && e.isTrusted) {
                 const wasPlaying = !audio.paused;
                 seekToTime(evt.time);
-                if (wasPlaying) audio.play();
+                if (wasPlaying) {
+                    audio.play().catch(() => {
+                        // Autoplay policy or other issue - silent fail
+                        updatePlayPauseUI();
+                    });
+                }
             }
         });
         list.appendChild(li);
@@ -1921,7 +1939,9 @@ audio.addEventListener('timeupdate', () => {
         if (now >= (abLoop.b - EPS_LOOP_B)) {
             reconcileMarkersOnLoopRewind(abLoop.a, abLoop.b);
             audio.currentTime = abLoop.a;
-            if (audio.paused) audio.play();
+            if (audio.paused) {
+                audio.play().catch(() => { updatePlayPauseUI(); });
+            }
             updatePlayPauseUI();
         }
     }
