@@ -40,6 +40,7 @@
             margin: 1rem auto;
             background: var(--color-bg-light);
             padding: 10px;
+            overscroll-behavior-y: contain;
         }
         .grid {
             display: grid;
@@ -412,8 +413,8 @@
             button:not(.control-btn) { font-size: 1rem; padding: 10px 14px; min-height: 44px; border-radius: 12px; }
             .primary { font-weight: 600; }
             .btn-connect { min-height: 44px; }
-            html { font-size: 18px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-            body { max-width: none; margin: 0; padding: 0; background: #f0f2f5; }
+            html { font-size: 18px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overscroll-behavior-y: contain; }
+            body { max-width: none; margin: 0; padding: 0; background: #f0f2f5; overscroll-behavior-y: contain; }
 
             /* Larger thumb/track for vertical volume slider */
             #vol-slider { height: 88px; }
