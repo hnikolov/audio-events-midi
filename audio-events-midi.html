@@ -963,9 +963,16 @@ const usbCancelBtn   = document.getElementById('usbCancelBtn');
 
 const MIDI_SERVICE_UUID = '03b80e5a-ede8-4b33-a751-6ce34ec4c700';
 const MIDI_CHARACTERISTIC_UUID = '7772e5db-3868-4112-a1a9-f2669d106bf3';
+const SPARK_SERVICE_UUID = '0000ffc0-0000-1000-8000-00805f9b34fb';
+const SPARK_WRITE_UUID   = '0000ffc1-0000-1000-8000-00805f9b34fb';
+const SPARK_NOTIFY_UUID  = '0000ffc2-0000-1000-8000-00805f9b34fb';
+
+// NOTE: Spark Go is supported only via BLE (preset selection via USB does not work)
 
 let currentTransport = null; // 'usb' | 'ble' | null
+let deviceType = null; // 'midi' | 'spark'
 let device = null, server = null, service = null, midiChar = null; // BLE
+let sparkWriteChar = null; // Spark BLE
 let midiAccess = null, usbOutput = null; // USB Web MIDI
 
 /* Single status setter: set the label's text (no connected background class) */
@@ -1011,6 +1018,21 @@ let bleQueue = Promise.resolve();
 function enqueueBle(bytes, opts = {}) {
     bleQueue = bleQueue.then(() => writeBle(bytes, opts)).catch(() => { /* swallow transient errors */ });
     return bleQueue;
+}
+
+// --- Spark BLE Helpers ---
+function buildSparkPresetCmd(index) {
+    const hex = `01fe000053fe1a000000000000000000f0013a15013800000${index}f7`;
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+    return bytes;
+}
+let sparkQueue = Promise.resolve();
+function sendSparkPreset(presetNumber) {
+    if (!sparkWriteChar) return;
+    const index = Math.max(0, Math.min(3, presetNumber - 1));
+    const cmd = buildSparkPresetCmd(index);
+    sparkQueue = sparkQueue.then(() => sparkWriteChar.writeValue(cmd)).then(() => flashCcStatus()).catch(() => {});
 }
 
 // USB Web MIDI helpers
@@ -1092,11 +1114,12 @@ async function connectOrDisconnect() {
     if (connectionStatus === toDisconnect) {
         if (currentTransport === 'ble') {
             try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch {}
-            device = server = service = midiChar = null;
+            device = server = service = midiChar = sparkWriteChar = null;
         } else if (currentTransport === 'usb') {
             usbOutput = null;
         }
         currentTransport = null;
+        deviceType = null;
         connectionStatus = toConnect;
         setStatusText('Connect');
         return;
@@ -1112,6 +1135,7 @@ async function connectOrDisconnect() {
             if (ok) {
                 usbOutput = candidate;
                 currentTransport = 'usb';
+                deviceType = 'midi';
                 connectionStatus = toDisconnect;
                 setStatusText(usbOutput.name || 'USB Output');
                 return;
@@ -1134,6 +1158,7 @@ async function connectOrDisconnect() {
                 usbCancelBtn.removeEventListener('click', onCancel);
                 if (usbOutput) {
                     currentTransport = 'usb';
+                    deviceType = 'midi';
                     connectionStatus.textContent = toDisconnect;
                     setStatusText(usbOutput.name || 'USB Output');
                 } else {
@@ -1158,27 +1183,41 @@ async function connectBleFlow() {
     try {
         setStatusText('Requesting BLE device...');
         device = await navigator.bluetooth.requestDevice({
-            filters: [{ services: [MIDI_SERVICE_UUID] }],
-            optionalServices: [MIDI_SERVICE_UUID]
+            filters: [
+                { services: [MIDI_SERVICE_UUID] },
+                { namePrefix: 'Spark' }
+            ],
+            optionalServices: [MIDI_SERVICE_UUID, SPARK_SERVICE_UUID]
         });
 
         device.addEventListener('gattserverdisconnected', () => {
             connectionStatus = toConnect;
             setStatusText('Connect');
-            device = server = service = midiChar = null;
+            device = server = service = midiChar = sparkWriteChar = null;
+            deviceType = null;
             currentTransport = null;
         });
 
         setStatusText('Connecting…');
         server = await device.gatt.connect();
-        service = await server.getPrimaryService(MIDI_SERVICE_UUID);
-        midiChar = await service.getCharacteristic(MIDI_CHARACTERISTIC_UUID);
 
-        // Some devices require notifications enabled to open data path
-        try {
-            await midiChar.startNotifications();
-            midiChar.addEventListener('characteristicvaluechanged', () => { /* no-op */ });
-        } catch { /* continue */ }
+        const isSpark = (device.name || '').toLowerCase().startsWith('spark');
+        if (isSpark) {
+            const sparkService = await server.getPrimaryService(SPARK_SERVICE_UUID);
+            sparkWriteChar = await sparkService.getCharacteristic(SPARK_WRITE_UUID);
+            const sparkNotifyChar = await sparkService.getCharacteristic(SPARK_NOTIFY_UUID);
+            await sparkNotifyChar.startNotifications();
+            sparkNotifyChar.addEventListener('characteristicvaluechanged', () => { /* no-op */ });
+            deviceType = 'spark';
+        } else {
+            service = await server.getPrimaryService(MIDI_SERVICE_UUID);
+            midiChar = await service.getCharacteristic(MIDI_CHARACTERISTIC_UUID);
+            try {
+                await midiChar.startNotifications();
+                midiChar.addEventListener('characteristicvaluechanged', () => { /* no-op */ });
+            } catch { /* continue */ }
+            deviceType = 'midi';
+        }
 
         currentTransport = 'ble';
         connectionStatus = toDisconnect;
@@ -1474,16 +1513,16 @@ function fireMarkerByIndex(i, evt, opts) {
     setActiveMarkerUIByIndex(i);
     updateTickFiredClassByIndex(i, true);
 
-    const name = getConnectedDeviceName();
-    const isPocketMaster = (name || '').toLowerCase().includes('pocket master');
-
-    if (currentTransport) {
-        if (forceSend || !firedBefore) {
-            try {
-                if (isPocketMaster) window.sendCc(1, 1, evt.preset);
+    if (currentTransport && (forceSend || !firedBefore)) {
+        try {
+            if (deviceType === 'spark') {
+                sendSparkPreset(evt.preset);
+            } else {
+                const name = getConnectedDeviceName();
+                if ((name || '').toLowerCase().includes('pocket master')) window.sendCc(1, 1, evt.preset);
                 else window.sendPc(1, presetToProgram(evt.preset));
-            } catch {}
-        }
+            }
+        } catch {}
     }
 }
 
