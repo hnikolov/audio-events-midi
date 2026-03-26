@@ -971,7 +971,7 @@ const SPARK_NOTIFY_UUID  = '0000ffc2-0000-1000-8000-00805f9b34fb';
 // NOTE: Spark Go is supported only via BLE (preset selection via USB does not work)
 
 let currentTransport = null; // 'usb' | 'ble' | null
-let deviceType = null; // 'midi' | 'spark'
+let deviceType = null; // 'midi' | 'spark' | 'thrii'
 let device = null, server = null, service = null, midiChar = null; // BLE
 let sparkWriteChar = null; // Spark BLE
 let midiAccess = null, usbOutput = null; // USB Web MIDI
@@ -1036,11 +1036,56 @@ function sendSparkPreset(presetNumber) {
     sparkQueue = sparkQueue.then(() => sparkWriteChar.writeValue(cmd)).then(() => flashCcStatus()).catch(() => {});
 }
 
+// --- THRII USB Helpers ---
+const THR10II_ACTIVATION_SEQUENCE = [
+    'f0 7E 7F 06 01 f7',
+    'f0 00 01 0c 24 01 4d 00 00 00 00 07 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 f7',
+    'f0 00 01 0c 24 01 4d 00 01 00 00 07 00 04 00 00 00 04 00 00 00 00 00 00 00 00 00 00 f7',
+    'f0 00 01 0c 24 01 4d 00 02 00 00 03 28 72 4d 54 5d 00 00 00 f7'
+];
+
+function parseSysExHex(hexStr) {
+    const clean = hexStr.replace(/\s+/g, '');
+    const bytes = new Uint8Array(clean.length / 2);
+    for (let i = 0; i < clean.length; i += 2) bytes[i / 2] = parseInt(clean.substr(i, 2), 16);
+    return bytes;
+}
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function activateThr10ii() {
+    try {
+        for (let i = 0; i < THR10II_ACTIVATION_SEQUENCE.length; i++) {
+            const syx = parseSysExHex(THR10II_ACTIVATION_SEQUENCE[i]);
+            writeUsb(syx);
+            await sleep(500);
+        }
+    } catch (err) {
+        console.error('THR10-II activation error:', err);
+    }
+}
+
+function sendThriiPreset(presetNumber) {
+    if (!usbOutput) return;
+    const index = Math.max(0, Math.min(4, presetNumber - 1));
+    const hex = `f000010c24014d0108000e0b000e0000000400000000${index.toString(16).padStart(2, '0')}0000000000f7`;
+    const cmd = parseSysExHex(hex);
+    try { writeUsb(cmd); flashCcStatus(); } catch {}
+}
+
+function finishUsbConnect() {
+    const name = getConnectedDeviceName().toLowerCase();
+    if (name.includes('thr')) {
+        deviceType = 'thrii';
+        activateThr10ii();
+    }
+}
+
 // USB Web MIDI helpers
 async function ensureMidiAccess() {
     if (!navigator.requestMIDIAccess) return null;
     if (!midiAccess) {
-        try { midiAccess = await navigator.requestMIDIAccess({ sysex: false }); }
+        try { midiAccess = await navigator.requestMIDIAccess({ sysex: true }); }
         catch { midiAccess = null; }
     }
     return midiAccess;
@@ -1139,6 +1184,7 @@ async function connectOrDisconnect() {
                 deviceType = 'midi';
                 connectionStatus = toDisconnect;
                 setStatusText(usbOutput.name || 'USB Output');
+                finishUsbConnect();
                 return;
             }
         } else if (outputs.length > 1) {
@@ -1160,8 +1206,9 @@ async function connectOrDisconnect() {
                 if (usbOutput) {
                     currentTransport = 'usb';
                     deviceType = 'midi';
-                    connectionStatus.textContent = toDisconnect;
+                    connectionStatus = toDisconnect;
                     setStatusText(usbOutput.name || 'USB Output');
+                    finishUsbConnect();
                 } else {
                     connectBleFlow();
                 }
@@ -1202,7 +1249,19 @@ async function connectBleFlow() {
         setStatusText('Connecting…');
         server = await device.gatt.connect();
 
-        const isSpark = (device.name || '').toLowerCase().startsWith('spark');
+        const devName = (device.name || '').toLowerCase();
+        if (devName.includes('thr')) {
+            device.gatt.disconnect();
+            device = server = service = midiChar = sparkWriteChar = null;
+            currentTransport = null;
+            deviceType = null;
+            connectionStatus = toConnect;
+            setStatusText('Connect');
+            alert('THRII connected via Bluetooth is not supported.\nPlease connect via USB.');
+            return;
+        }
+
+        const isSpark = devName.startsWith('spark');
         if (isSpark) {
             const sparkService = await server.getPrimaryService(SPARK_SERVICE_UUID);
             sparkWriteChar = await sparkService.getCharacteristic(SPARK_WRITE_UUID);
@@ -1518,6 +1577,8 @@ function fireMarkerByIndex(i, evt, opts) {
         try {
             if (deviceType === 'spark') {
                 sendSparkPreset(evt.preset);
+            } else if (deviceType === 'thrii') {
+                sendThriiPreset(evt.preset);
             } else {
                 const name = getConnectedDeviceName();
                 if ((name || '').toLowerCase().includes('pocket master')) window.sendCc(1, 1, evt.preset);
