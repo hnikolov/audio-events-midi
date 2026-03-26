@@ -4,6 +4,10 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1a73e8" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
     <title>Audio Events MIDI 2026</title>
     <style>
         /* ===== ROOT COLOR VARIABLES ===== */
@@ -2190,5 +2194,10 @@ document.addEventListener('pointerdown', (e) => {
     <label for="tab-player" class="tab">Player</label>
 </nav>
 
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
 </body>
 </html>
