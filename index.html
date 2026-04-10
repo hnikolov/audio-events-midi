@@ -2198,7 +2198,25 @@ document.addEventListener('pointerdown', (e) => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js');
 }
-screen.orientation.lock('portrait').catch(() => {});
+
+// Portrait orientation lock for installed PWA
+(function () {
+  function lockPortrait() {
+    if (screen.orientation && typeof screen.orientation.lock === 'function') {
+      screen.orientation.lock('portrait').catch(function (err) {
+        console.warn('[orientation-lock]', err.name, err.message);
+      });
+    }
+  }
+  // Try immediately (works if already in standalone context)
+  lockPortrait();
+  // Retry after DOM is ready
+  document.addEventListener('DOMContentLoaded', lockPortrait);
+  // Retry every time the app comes back to foreground
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) lockPortrait();
+  });
+})();
 </script>
 </body>
 </html>
