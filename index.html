@@ -2198,6 +2198,7 @@ document.addEventListener('pointerdown', (e) => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js');
 }
+screen.orientation.lock('portrait').catch(() => {});
 </script>
 </body>
 </html>
