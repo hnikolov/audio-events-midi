@@ -1,11 +1,11 @@
 {
-  "name": "Audio Events MIDI 2026",
+  "name": "Audio Events MIDI v1.1",
   "short_name": "Audio MIDI",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f0f2f5",
-  "theme_color": "#1a73e8",
+  "background_color": "#0f0f0f",
+  "theme_color": "#0f0f0f",
   "icons": [
     {
       "src": "icon.svg",

@@ -4,483 +4,559 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#1a73e8" />
+    <meta name="theme-color" content="#0f0f0f" />
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon-192.png" />
     <title>Audio Events MIDI v1.1</title>
     <style>
-        /* ===== ROOT COLOR VARIABLES ===== */
+        /* ===== ROOT DESIGN TOKENS ===== */
         :root {
-            --color-primary: #1a73e8;
-            --color-primary-light: #e7f3ff;
-            --color-primary-dark: #0d47a1;
-            --color-accent: #fbc02d;
-            --color-danger: #dc3545;
-            --color-border: #ddd;
-            --color-border-light: #eee;
-            --color-bg-light: #f0f2f5;
-            --color-bg-lighter: #f7f9fa;
-            --color-bg-panel: #f1f3f4;
-            --color-text-primary: #333;
-            --color-text-secondary: #5f6368;
-            --color-text-muted: #7a5a00;
-            --color-highlight: #fff9c4;
-            --color-warning-bg: #fff3cd;
-
-            /* === Layout variables === */
-            --mobile-tab-height: 56px;         /* default; will be 0 in landscape */
-            --mobile-playerbar-height: 132px;  /* measured at runtime */
-            --mobile-topbar-height: 0px;       /* measured at runtime */
-
-            /* === Split ratio (left column) – tweakable === */
-            --split-left: 35%;
+            --bg-base: #0f0f0f;
+            --bg-surface: #1a1a1a;
+            --bg-elevated: #242424;
+            --bg-hover: #2a2a2a;
+            --bg-active: #333;
+            --text-primary: #f0f0f0;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666;
+            --accent: #1db954;
+            --accent-hover: #1ed760;
+            --accent-dim: rgba(29,185,84,0.15);
+            --amber: #f59e0b;
+            --amber-dark: #b45309;
+            --amber-dim: rgba(245,158,11,0.15);
+            --danger: #ef4444;
+            --border: #2a2a2a;
+            --border-light: #222;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 9999px;
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --mobile-tab-height: 56px;
+            --mobile-playerbar-height: 132px;
+            --mobile-topbar-height: 0px;
         }
 
-        /* ===== LAYOUT & GLOBAL ===== */
-        body {
-            font-family: -apple-system, system-ui, sans-serif;
-            max-width: 850px;
-            margin: 1rem auto;
-            background: var(--color-bg-light);
-            padding: 10px;
+        /* ===== RESET & GLOBAL ===== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        a, button, label, input, select, [role="button"] { -webkit-tap-highlight-color: transparent; }
+        html {
+            font-size: 16px;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
             overscroll-behavior-y: contain;
         }
-        .grid {
-            display: grid;
-            grid-template-columns: minmax(240px, var(--split-left)) 1fr; /* Landscape default; portrait overrides to block */
-            gap: 20px;
+        body {
+            font-family: -apple-system, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-base);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+            overscroll-behavior-y: contain;
+            max-width: 500px;
+            margin: 0 auto;
         }
+        audio { width: 100%; display: none; }
+
+        /* ===== LAYOUT ===== */
+        .grid { display: block; }
         .card {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        audio { width: 100%; }
-
-        /* ===== BUTTONS & FORM ELEMENTS ===== */
-        .primary { background: var(--color-primary); color: white; border: none; }
-        .danger { color: var(--color-danger); border-color: var(--color-danger); font-size: 0.8rem; }
-
-        /* ===== PLAYLIST COMPONENT ===== */
-        #playlist-ui { border: 1px solid var(--color-border); border-radius: 8px; margin-top: 10px; overflow: visible; touch-action: none; }
-        .playlist-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--color-border-light); cursor: pointer; font-size: 0.9rem; position: relative; }
-        .playlist-item.active { background: var(--color-primary-light); border-left: 4px solid var(--color-primary); font-weight: bold; }
-        .playlist-menu-btn { background: none; border: none; cursor: pointer; padding: 4px 8px; font-size: 1.2rem; color: #999; }
-        .playlist-menu-btn:hover { color: #333; }
-        .playlist-dropdown-menu { display: none; position: absolute; background: white; border: 1px solid var(--color-border); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; min-width: 120px; }
-        .playlist-dropdown-menu.open { display: block; }
-        .playlist-dropdown-menu button { display: block; width: 100%; text-align: left; padding: 10px 12px; border: none; background: white; cursor: pointer; font-size: 0.9rem; }
-        .playlist-dropdown-menu button:hover { background: var(--color-bg-light); }
-        .playlist-dropdown-menu button:first-child { border-radius: 6px 6px 0 0; }
-        .playlist-dropdown-menu button:last-child { border-radius: 0 0 6px 6px; }
-
-        /* drag-and-drop visuals */
-        .playlist-item.dragging { opacity: 0.5; cursor: grabbing; }
-        .drop-indicator { height: 4px; background: var(--color-primary); margin: 4px 0; border-radius: 2px; }
-
-        /* Prevent Chrome Android "Tap to Search" from triggering on row taps */
-        .playlist-item,
-        .playlist-item * {
-            -webkit-user-select: none; /* Safari/Chrome WebKit */
-            user-select: none;         /* Standard */
-            -webkit-touch-callout: none; /* Prevent long-press callout (mostly iOS) */
-        }
-
-        /* Optional: remove tap highlight flash on Android */
-        .playlist-item {
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        /* ===== MIDI PANEL COMPONENT ===== */
-        .midi-panel {
-            background: var(--color-bg-lighter);
-            border: 1px solid var(--color-border);
-            border-radius: 10px;
-            padding: 1px 1px;
-            margin-bottom: 12px;
-        }
-        .btn-connect { width: 100%; background: transparent; border: none; }
-        .midi-status {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--color-primary);
-            background: transparent;
-            border-radius: 6px;
-            padding: 2px 8px;
-            transition: background-color 200ms ease, color 200ms ease;
-        }
-        /* Flash style (activity indicator) */
-        .midi-status.cc-flash { background: var(--color-warning-bg) !important; color: var(--color-text-muted) !important; }
-
-        /* ===== DIALOG & FORMS ===== */
-        dialog { border: 1px solid var(--color-border); border-radius: 10px; padding: 12px; }
-        dialog h3 { margin: 0 0 .5rem; }
-        dialog .row { display: flex; align-items: center; gap: 8px; }
-        dialog .form-spacing { margin-top: 0.75rem; }
-        dialog label { display: flex; flex-direction: column; font-size: 0.9rem; }
-        dialog select { width: 100%; padding: 6px; font-size: 1rem; }
-
-        /* ===== PLAYBACK CONTROLS COMPONENT ===== */
-        .controls-container {
-            background: var(--color-bg-panel);
-            padding: 5px 0px;
-            border-radius: 0px;
-            margin: 15px 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid var(--color-border);
-            flex-wrap: nowrap; /* force one line */
-        }
-
-        .control-btn {
-            background: var(--color-bg-panel);
-            color: black;
+            background: var(--bg-base);
+            padding: 0 16px;
             border: none;
-            width: 30px; height: 30px;
-            border-radius: 50%;
+            border-radius: 0;
+        }
+        .card-playlist, .card-player { display: none; }
+        #tab-playlist:checked ~ .mobile-tabs-container .card-playlist { display: block; }
+        #tab-player:checked   ~ .mobile-tabs-container .card-player   { display: block; }
+
+        .mobile-tabs-container {
+            padding-top: var(--mobile-topbar-height);
+            padding-bottom: calc(
+                var(--mobile-playerbar-height)
+                + var(--mobile-tab-height)
+                + env(safe-area-inset-bottom, 0px)
+            );
+        }
+
+        /* ===== SVG ICON HELPER ===== */
+        .icon { width: 20px; height: 20px; flex-shrink: 0; pointer-events: none; }
+        .icon-sm { width: 16px; height: 16px; }
+        .icon-lg { width: 24px; height: 24px; }
+
+        /* ===== BUTTONS ===== */
+        button { font-family: inherit; cursor: pointer; }
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: var(--radius-full);
+            padding: 8px 18px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            flex-shrink: 0;
-            transition: all 0.2s;
-            font-size: 18px;
-            padding: 0;
+            gap: 5px;
+            letter-spacing: 0.02em;
         }
-        .control-btn:hover { background: #E5E7E8; }
-        .control-btn.loop-mode { background: #E5E7E8; box-shadow: 0 0 4px rgba(26, 115, 232, 0.4); }
-        .control-btn.queue-mode { background: #FCE4B6; box-shadow: 0 0 4px rgba(251, 192, 45, 0.6); }
+        .btn-primary:active { transform: scale(0.96); background: var(--accent-hover); }
 
-        /* ===== SPEED MENU COMPONENT ===== */
-        .speed-wrapper { position: relative; }
-        .speed-btn-label { min-width: 50px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem; color: var(--color-text-secondary); font-weight: 500; }
-        .speed-menu { position: absolute; background: white; border-radius: 12px; box-shadow: 0 10px 24px rgba(0,0,0,0.18); padding: 8px; display: none; z-index: 2000; min-width: 60px; }
-        .speed-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.85rem; color: var(--color-text-secondary); font-weight: 500; padding: 12px 14px; border-radius: 8px; border: none; background: #ffffff; width: 100%; cursor: pointer; }
-        .speed-option:hover { background: #f5f7f9; }
-        .speed-option.active { font-weight: 600; color: var(--color-primary); background: #eef4ff; }
-
-        /* ===== VOLUME SLIDER COMPONENT ===== */
-        .volume-control { position: relative; display: inline-block; }
-        .volume-control #vol-slider {
-            position: absolute;
-            bottom: 100%;
-            display: none;
-            padding: 8px;
-            z-index: 1000;
-        }
-        .volume-control.expanded #vol-slider { display: block; }
-        #vol-slider {
-            writing-mode: vertical-lr;
-            direction: rtl;
-            width: 4px;
-            height: 200px;
-            background: transparent;
-            cursor: pointer;
-        }
-
-        /* ===== MARKERS LIST COMPONENT ===== */
-        .header-row { display: flex; justify-content: space-between; align-items: center; }
-        .header-row h3 { margin: 0; }
-        .markers-header { display: flex; justify-content: space-between; align-items: center; padding:0 10px}
-        .markers-header h4 { margin: 0; }
-        ul { list-style: none; padding: 0; margin-top: 10px; }
-        li { display: flex; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid var(--color-border-light); transition: background 0.3s; }
-        li.active-event { background: var(--color-highlight); border-left: 4px solid var(--color-accent); }
-        .marker-left   { flex: 1; }
-        .marker-middle { flex: 1; text-align: center; }
-        .marker-right  { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-        .preset-badge { font-size: 0.85rem; font-weight: 700; color: var(--color-text-primary); background: inherit; border: none; border-radius: 6px; padding: 2px 8px; }
-
-        /* Keep the edit row on a single line and make it fit */
-        #event-list li {
-            display: flex;        /* already set in your CSS; harmless to repeat */
-            align-items: center;
-            gap: 8px;
-        }
-
-        #event-list .time-input,
-        #event-list .preset-input {
-            /* Critical bits: let inputs shrink below min-content width */
-            flex: 1 1 0;          /* share remaining width, allow shrink */
-            min-width: 0;         /* allow shrinking in flex context */
-            width: 0;             /* WebKit/iOS: actually enable shrink */
-            box-sizing: border-box;
-        }
-
-        #event-list li button {
-            flex: 0 0 auto;       /* buttons keep natural width */
-            white-space: nowrap;  /* avoid multi-line button labels */
-        }
-
-        #event-list li {
-            user-select: none;    /* Prevent text selection to avoid drag-to-select triggering clicks */
-        }
-
-        /* ===== PROGRESS BAR COMPONENT ===== */
-        .progress-container {
-            background: var(--color-bg-panel);
-            border: 1px solid var(--color-border);
-            padding: 5px 10px;
-            border-radius: 0px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin: 10px 0 5px;
-            user-select: none;
-        }
-        .progress-track {
-            position: relative;
-            height: 10px;
-            background: #B5B7B8;
-            border-radius: 6px;
-            flex: 1;
-            cursor: pointer;
-            overflow: hidden;
-            touch-action: pan-y; /* allow vertical page scroll while supporting horizontal scrubs */
-        }
-        .progress-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: var(--color-primary); z-index: 1; }
-
-        /* Ghost preview (lookahead) */
-        .progress-ghost-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: var(--color-primary); opacity: 0.35; pointer-events: none; display: none; z-index: 1; }
-        .progress-ghost { position: absolute; top: 0; width: 2px; height: 100%; background: var(--color-primary); opacity: 0.9; box-shadow: 0 0 6px rgba(0,0,0,0.35); pointer-events: none; transform: translateX(-1px); display: none; z-index: 4; }
-
-        /* A/B loop region overlay */
-        .progress-ab {
-            position: absolute; top: 0; height: 100%; left: 0%; width: 0%;
-            background: rgba(251, 192, 45, 0.25); display: none; z-index: 2;
-        }
-        .progress-ab.enabled { background: rgba(251, 192, 45, 0.6); }
-
-        /* A/B loop handles */
-        .ab-handle {
-            position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%;
-            background: var(--color-accent); border: 2px solid #9c6f00; box-shadow: 0 1px 2px rgba(0,0,0,0.25);
-            transform: translate(-50%, -50%); cursor: ew-resize;
-        }
-        .ab-handle.right { right: 0; left: auto; transform: translate(50%, -50%); }
-        .ab-drag { position: absolute; left: 0; right: 0; top: 0; bottom: 0; cursor: grab; }
-        .ab-drag.dragging { cursor: grabbing; }
-        /* A/B drag targets: prevent the browser from treating drags as page scroll/zoom */
-        .ab-handle,
-        .ab-drag { touch-action: none; }
-
-        .time-label { font-size: 0.85rem; color: var(--color-text-secondary); flex-shrink: 0; min-width: 74px; text-align: right; }
-
-        /* Marker tick indicators on progress bar */
-        .progress-tick {
-            position: absolute; top: 0; width: 2px; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 3; pointer-events: none; transform: translateX(-1px);
-        }
-        .progress-tick.fired { background: var(--color-primary); opacity: 0.95; }
-        .progress-tick.current { background: var(--color-accent); box-shadow: 0 0 6px rgba(251, 192, 45, 0.7); }
-
-        /* ===== A/B LOOP CONTROLS COMPONENT ===== */
-        #ab-controls { flex-wrap: wrap; row-gap: 10px; }
-        #ab-controls .ab-btn { white-space: nowrap; flex: 0 0 auto; min-width: fit-content; }
-        .ab-btn { border-radius: 16px; font-size: 18px; padding: 6px 12px; line-height: 1.2; width: auto; height: auto; }
-
-        /* ===== TAB BAR (hidden by default; visible in portrait) ===== */
-        .tab-bar { display: none; }
-        .tab-bar .tab {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 500;
-            color: #5f6368;
-            cursor: pointer;
-            user-select: none;
-            min-height: 44px;
-            touch-action: manipulation;
-            font-size: clamp(1.05rem, 3vw, 1.25rem);
-        }
-
-        /* ===== FIXED BARS (global: both orientations & desktop) ===== */
+        /* ===== TOP BAR (MIDI) ===== */
         .mobile-midi-bar {
             position: fixed;
             top: 0; left: 0; right: 0;
             z-index: 1000;
-            background: #ffffff;
-            border-bottom: 1px solid var(--color-border);
-            padding-top: env(safe-area-inset-top);
+            background: rgba(15,15,15,0.88);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            padding: env(safe-area-inset-top, 0px) 12px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
         }
-        .mobile-midi-bar .midi-panel {
+        .midi-panel { background: transparent; border: none; padding: 0; margin: 0; width: 100%; }
+        .btn-connect {
+            background: transparent; border: none; width: 100%; cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .midi-status {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
             background: transparent;
-            border: none;
-            padding: 6px 10px;
-            margin: 0;
+            border-radius: 0;
+            padding: 8px 14px;
+            transition: background 200ms, color 200ms, box-shadow 200ms;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+        }
+        .midi-status.cc-flash {
+            background: var(--amber-dim) !important;
+            color: var(--amber) !important;
+            box-shadow: none !important;
         }
 
+        /* ===== DIALOG ===== */
+        dialog {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-lg);
+            max-width: 340px;
+            width: 90vw;
+        }
+        dialog::backdrop { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        dialog h3 { margin: 0 0 .75rem; font-size: 1.05rem; }
+        dialog .row { display: flex; align-items: center; gap: 10px; }
+        dialog .form-spacing { margin-top: 1rem; }
+        dialog label { display: flex; flex-direction: column; font-size: 0.85rem; gap: 4px; color: var(--text-secondary); }
+        dialog select {
+            width: 100%; padding: 10px; font-size: 1rem;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--bg-surface); color: var(--text-primary);
+        }
+
+        /* ===== PLAYLIST CARD ===== */
+        .header-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 0 10px;
+        }
+        .header-row h3 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+        #playlist-ui {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: visible;
+            touch-action: none;
+        }
+        .playlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 11px 12px;
+            border-bottom: 1px solid var(--border-light);
+            cursor: pointer;
+            font-size: 0.85rem;
+            position: relative;
+            transition: background 0.12s;
+            color: var(--text-secondary);
+        }
+        .playlist-item:last-child { border-bottom: none; }
+        .playlist-item:active { background: var(--bg-hover); }
+        .playlist-item.active {
+            background: var(--accent-dim);
+            color: var(--accent);
+            font-weight: 600;
+        }
+        .playlist-item.dragging { opacity: 0.4; cursor: grabbing; }
+        .drop-indicator { height: 2px; background: var(--accent); margin: 1px 0; border-radius: var(--radius-full); }
+        .playlist-item, .playlist-item * {
+            -webkit-user-select: none; user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* ===== 3-DOT MENU (shared: playlist & markers) ===== */
+        .menu-btn {
+            background: none; border: none; cursor: pointer;
+            padding: 6px 8px; color: var(--text-muted);
+            border-radius: var(--radius-sm);
+            transition: background 0.12s, color 0.12s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .menu-btn:active { background: var(--bg-hover); color: var(--text-secondary); }
+        .dropdown-menu {
+            display: none; position: absolute;
+            background: var(--bg-elevated); border: 1px solid var(--border);
+            border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+            z-index: 1000; min-width: 130px; overflow: hidden;
+            right: 0; top: 100%;
+        }
+        .dropdown-menu.open { display: block; }
+        .dropdown-menu button {
+            display: flex; align-items: center; gap: 8px;
+            width: 100%; text-align: left; padding: 11px 14px;
+            border: none; background: transparent; cursor: pointer;
+            font-size: 0.85rem; color: var(--text-primary);
+            transition: background 0.1s;
+        }
+        .dropdown-menu button:active { background: var(--bg-hover); }
+        .dropdown-menu button.danger-item { color: var(--danger); }
+
+        /* ===== EVENTS/MARKERS CARD ===== */
+        .markers-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 2px;
+        }
+        .markers-header h4 { margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-secondary); }
+        ul { list-style: none; padding: 0; margin: 0; }
+        li {
+            display: flex; gap: 8px; align-items: center;
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.12s;
+            position: relative;
+        }
+        li:last-child { border-bottom: none; }
+        li.active-event {
+            background: var(--amber-dim);
+        }
+        .marker-left { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); min-width: 50px; }
+        .marker-middle { flex: 1; text-align: center; min-width: 0; }
+        .marker-right { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+        .preset-badge {
+            font-size: 0.75rem; font-weight: 700;
+            color: var(--text-primary);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-full);
+            padding: 2px 10px;
+            letter-spacing: 0.03em;
+        }
+        #event-list li { display: flex; align-items: center; gap: 8px; user-select: none; }
+        #event-list .time-input, #event-list .preset-input {
+            flex: 1 1 0; min-width: 0; width: 0;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 8px 10px; font-size: 0.9rem;
+            background: var(--bg-surface); color: var(--text-primary);
+            outline: none; transition: border-color 0.15s;
+        }
+        #event-list .time-input:focus, #event-list .preset-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(29,185,84,0.15);
+        }
+        #event-list li button { flex: 0 0 auto; white-space: nowrap; }
+        #event-list li.editing { flex-wrap: wrap; }
+        #event-list li.editing .marker-left,
+        #event-list li.editing .marker-middle { flex: 1 1 0; min-width: 0; }
+        #event-list li.editing .marker-right { flex: 0 0 100%; justify-content: flex-end; padding-top: 6px; }
+        #event-list li.editing .time-input, #event-list li.editing .preset-input {
+            width: 100%; font-size: 0.9rem; padding: 8px 10px; min-height: 44px;
+            border-radius: var(--radius-sm);
+        }
+        #event-list li.editing .marker-right button {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-full);
+            padding: 7px 16px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.12s;
+        }
+        #event-list li.editing .marker-right button:first-child {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+        }
+        #event-list li.editing .marker-right button:active { transform: scale(0.96); }
+
+        /* ===== BOTTOM PLAYER BAR ===== */
         .mobile-player-bar {
             position: fixed;
             left: 0; right: 0;
-            background: var(--color-bg-panel);
-            border-top: 1px solid var(--color-border);
-            padding: 0px 0px;
-            display: grid;             /* stack: progress over controls */
-            grid-template-columns: 1fr;
-            gap: 0px;
-            z-index: 998;              /* tabs are 999 (portrait) */
-            box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+            bottom: calc(var(--mobile-tab-height) + env(safe-area-inset-bottom, 0px));
+            background: rgba(18,18,18,0.94);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border);
+            padding: 0;
+            display: grid; grid-template-columns: 1fr;
+            z-index: 998;
+            box-shadow: 0 -2px 16px rgba(0,0,0,0.3);
         }
-        /* Use drop-up for menus inside the fixed bottom bar */
-        .mobile-player-bar .speed-wrapper .speed-menu {
-            top: auto;
-            bottom: calc(100% + 6px);
-        }
-        /* Remove extra margins inside the bar */
+        .mobile-player-bar .speed-wrapper .speed-menu { top: auto; bottom: calc(100% + 6px); }
         .mobile-player-bar .progress-container,
         .mobile-player-bar .controls-container { margin: 0; }
 
-        /* ===== ORIENTATION: PORTRAIT ===== */
-        @media (orientation: portrait) {
-            /* Show tab bar in portrait */
-            .tab-bar {
-                position: fixed;
-                bottom: 0; left: 0; right: 0;
-                height: var(--mobile-tab-height);
-                display: flex;
-                background: #ffffff;
-                border-top: 1px solid #ddd;
-                z-index: 999;
-                padding-bottom: env(safe-area-inset-bottom);
-            }
+        /* ===== PROGRESS BAR ===== */
+        .progress-container {
+            background: transparent; border: none;
+            padding: 10px 16px 2px;
+            display: flex; align-items: center; gap: 8px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .progress-track {
+            position: relative; height: 4px;
+            background: var(--bg-active); border-radius: var(--radius-full);
+            flex: 1; cursor: pointer;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .progress-track::before {
+            content: ''; position: absolute;
+            top: -14px; bottom: -14px; left: 0; right: 0;
+        }
+        .progress-fill {
+            position: absolute; left: 0; top: 0; height: 100%; width: 0%;
+            background: var(--accent); border-radius: var(--radius-full); z-index: 1;
+        }
+        .progress-ghost-fill { position: absolute; top: 0; height: 100%; width: 0%; background: var(--accent); opacity: 0.3; pointer-events: none; display: none; z-index: 1; }
+        .progress-ghost { position: absolute; top: 0; width: 2px; height: 100%; background: var(--accent); opacity: 0.8; pointer-events: none; transform: translateX(-1px); display: none; z-index: 4; }
+        .progress-ab {
+            position: absolute; top: 0; height: 100%; left: 0%; width: 0%;
+            background: rgba(245,158,11,0.2); display: none; z-index: 2;
+            border-radius: var(--radius-full);
+        }
+        .progress-ab.enabled { background: rgba(245,158,11,0.45); }
+        .ab-handle {
+            position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%;
+            background: var(--amber); border: 2px solid var(--amber-dark);
+            transform: translate(-50%, -50%); cursor: ew-resize;
+            transition: transform 0.1s;
+        }
+        .ab-handle:active { transform: translate(-50%, -50%) scale(1.25); }
+        .ab-handle.right { right: 0; left: auto; transform: translate(50%, -50%); }
+        .ab-handle.right:active { transform: translate(50%, -50%) scale(1.25); }
+        .ab-drag { position: absolute; left: 0; right: 0; top: -14px; bottom: -14px; cursor: grab; }
+        .ab-drag.dragging { cursor: grabbing; }
+        .ab-handle, .ab-drag { touch-action: none; -webkit-tap-highlight-color: transparent; }
+        .time-label {
+            font-size: 0.7rem; color: var(--text-muted); flex-shrink: 0;
+            min-width: 72px; text-align: right;
+            font-variant-numeric: tabular-nums; font-weight: 500;
+        }
+        .progress-tick {
+            position: absolute; top: 0; width: 2px; height: 100%;
+            background: rgba(255,255,255,0.3); z-index: 3; pointer-events: none;
+            transform: translateX(-1px); border-radius: 1px;
+        }
+        .progress-tick.fired { background: var(--accent); opacity: 0.9; }
+        .progress-tick.current { background: #fff; box-shadow: 0 0 4px rgba(255,255,255,0.6); width: 3px; }
 
-            /* Single-pane with tabs */
-            .grid { display: block; }
-            .card { border-radius: 0; margin: 0; box-shadow: none; }
-            .card.card-player h2 { margin-top: 0; }
-
-            .card-playlist, .card-player { display: none; }
-            #tab-playlist:checked ~ .mobile-tabs-container .card-playlist { display: block; }
-            #tab-player:checked   ~ .mobile-tabs-container .card-player   { display: block; }
-
-            /* Keep mini-player above the tab bar */
-            .mobile-player-bar {
-                bottom: calc(var(--mobile-tab-height) + env(safe-area-inset-bottom));
-            }
-
-            /* Container paddings so content doesn't go under fixed bars */
-            .mobile-tabs-container {
-                padding-top: var(--mobile-topbar-height);
-                padding-bottom: calc(
-                    var(--mobile-playerbar-height)
-                    + var(--mobile-tab-height)
-                    + env(safe-area-inset-bottom)
-                );
-            }
-
-            /* Tab selected style */
-            #tab-playlist:checked ~ .tab-bar label[for="tab-playlist"],
-            #tab-player:checked   ~ .tab-bar label[for="tab-player"] {
-                color: #1a73e8; font-weight: 600;
-            }
+        /* ===== A/B LOOP CONTROLS ===== */
+        #ab-controls {
+            flex-wrap: nowrap; gap: 4px; padding: 2px 12px; justify-content: center;
+        }
+        #ab-controls .ab-btn { white-space: nowrap; flex: 0 0 auto; min-width: fit-content; }
+        .ab-btn {
+            border-radius: var(--radius-full);
+            font-size: 0.78rem; padding: 4px 12px;
+            line-height: 1.2; width: auto; height: auto;
+            font-weight: 600; font-variant-numeric: tabular-nums;
         }
 
-        /* ===== ORIENTATION: LANDSCAPE ===== */
-        @media (orientation: landscape) {
-            /* Hide tab bar */
-            .tab-bar { display: none; }
-
-            /* Two-pane layout */
-            .grid {
-                display: grid;
-                grid-template-columns: minmax(240px, var(--split-left)) 1fr; /* 35% / 65% by default */
-                gap: 20px;
-            }
-            .card-playlist, .card-player { display: block; }
-
-            /* Mini-player sits at the bottom edge */
-            .mobile-player-bar { bottom: env(safe-area-inset-bottom); }
-
-            /* Container paddings (no tab bar here) */
-            .mobile-tabs-container {
-                padding-top: var(--mobile-topbar-height);
-                padding-bottom: calc(
-                    var(--mobile-playerbar-height)
-                    + env(safe-area-inset-bottom)
-                );
-            }
+        /* ===== PLAYBACK CONTROLS ===== */
+        .controls-container {
+            background: transparent; padding: 4px 12px 8px;
+            display: flex; align-items: center; justify-content: center;
+            gap: 4px; border: none; flex-wrap: nowrap;
+        }
+        .control-btn {
+            background: transparent; color: var(--text-secondary);
+            border: none; width: 40px; height: 40px;
+            border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            cursor: pointer; flex-shrink: 0;
+            transition: background 0.12s, transform 0.1s, color 0.12s;
+            padding: 0;
+        }
+        .control-btn:active { transform: scale(0.9); }
+        .control-btn.play-btn {
+            width: 48px; height: 48px;
+            background: var(--accent); color: #000;
+            margin: 0 4px;
+        }
+        .control-btn.play-btn:active { background: var(--accent-hover); transform: scale(0.93); }
+        .control-btn.loop-mode {
+            background: var(--accent-dim); color: var(--accent);
+        }
+        .control-btn.queue-mode {
+            background: var(--amber-dim); color: var(--amber);
+        }
+        .control-btn.loop-active {
+            background: var(--amber-dim); color: var(--amber);
         }
 
-        /* ===== Touch-friendly adjustments (keep, independent of layout) ===== */
-        @media (pointer: coarse) and (orientation: portrait) {
-            .tab-bar .tab { font-size: 1.15rem; }
-            h3, h4 { font-size: 1.2rem; }
-            .playlist-item { font-size: 1rem; }
+        /* ===== SPEED MENU ===== */
+        .speed-wrapper { position: relative; }
+        .speed-btn-label {
+            min-width: 44px; font-size: 0.75rem;
+            color: var(--text-muted); font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            display: inline-flex; align-items: center; justify-content: center;
         }
-        @media (pointer: coarse), (hover: none) {
-            .ab-handle { width: 18px; height: 18px; }
-            button:not(.control-btn) { font-size: 1rem; padding: 10px 14px; min-height: 44px; border-radius: 12px; }
-            .primary { font-weight: 600; }
-            .btn-connect { min-height: 44px; }
-            html { font-size: 18px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overscroll-behavior-y: contain; }
-            body { max-width: none; margin: 0; padding: 0; background: #f0f2f5; overscroll-behavior-y: contain; }
+        .speed-menu {
+            position: absolute; background: var(--bg-elevated);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg); border: 1px solid var(--border);
+            padding: 4px; display: none; z-index: 2000; min-width: 56px;
+        }
+        .speed-option {
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;
+            padding: 9px 12px; border-radius: var(--radius-sm);
+            border: none; background: transparent; width: 100%; cursor: pointer;
+            transition: background 0.1s;
+        }
+        .speed-option:active { background: var(--bg-hover); }
+        .speed-option.active { font-weight: 700; color: var(--accent); background: var(--accent-dim); }
 
-            /* Larger thumb/track for vertical volume slider */
-            #vol-slider { height: 88px; }
-            #vol-slider::-webkit-slider-runnable-track { height: 6px; }
-            #vol-slider::-webkit-slider-thumb { height: 18px; width: 18px; margin-top: -6px; }
-            #vol-slider::-moz-range-track { height: 6px; }
-            #vol-slider::-moz-range-thumb { height: 18px; width: 18px; border: none; }
-
-            /* Progress bar height bump */
-            .progress-track { height: 14px; }
-
-            /* Touch-friendly control sizes */
-            .control-btn { width: 44px; height: 44px; font-size: 20px; }
-            .controls-container { flex-wrap: wrap; gap: 10px; }
+        /* ===== VOLUME SLIDER ===== */
+        .volume-control { position: relative; display: inline-block; }
+        .volume-control #vol-slider {
+            position: absolute; bottom: 100%; display: none;
+            padding: 8px; z-index: 1000;
+        }
+        .volume-control.expanded #vol-slider { display: block; }
+        #vol-slider {
+            writing-mode: vertical-lr; direction: rtl;
+            width: 4px; height: 100px;
+            background: transparent; cursor: pointer;
+            accent-color: var(--accent);
         }
 
-        /* === Sticky headers UNDER Connect (applies in PORTRAIT & LANDSCAPE) === */
+        /* ===== TAB BAR ===== */
+        .tab-bar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: var(--mobile-tab-height);
+            display: flex;
+            background: rgba(15,15,15,0.92);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid var(--border);
+            z-index: 999;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        .tab-bar .tab {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 3px;
+            font-weight: 500; color: var(--text-muted);
+            cursor: pointer; user-select: none;
+            min-height: 44px; touch-action: manipulation;
+            font-size: 0.68rem; letter-spacing: 0.02em;
+            transition: color 0.15s;
+            position: relative;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tab-bar .tab .icon { transition: fill 0.15s; }
+        #tab-playlist:checked ~ .tab-bar label[for="tab-playlist"],
+        #tab-player:checked   ~ .tab-bar label[for="tab-player"] {
+            color: var(--accent);
+        }
+        #tab-playlist:checked ~ .tab-bar label[for="tab-playlist"] .icon,
+        #tab-player:checked   ~ .tab-bar label[for="tab-player"] .icon {
+            fill: var(--accent);
+        }
+
+        /* ===== STICKY HEADERS ===== */
         .card-playlist .header-row,
         .card-player #current-title {
             position: sticky;
-            top: var(--mobile-topbar-height, 48px); /* uses measured height; 48px fallback */
+            top: var(--mobile-topbar-height, 44px);
             z-index: 10;
-            background: #fff;       /* so content scrolls underneath cleanly */
+            background: var(--bg-base);
         }
-
         .card-player #current-title {
-            margin: 0;              /* remove default h2 margin that can look offset */
-            display: block;         /* ensure background spans full width */
+            margin: 0; display: block;
+            padding: 14px 2px 8px;
+            font-size: 1rem; font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
-        /* Make edit inputs match the visual size in the list, especially on phones */
-        #event-list li.editing .time-input,
-        #event-list li.editing .preset-input {
-            /* Let inputs fill their column */
-            width: 100%;
-            box-sizing: border-box;
+        /* ===== TOUCH-FRIENDLY ===== */
+        @media (pointer: coarse), (hover: none) {
+            .ab-handle { width: 22px; height: 22px; }
+            .progress-track { height: 6px; }
+            .progress-track::before { top: -16px; bottom: -16px; }
+            .ab-drag { top: -16px; bottom: -16px; }
+            .control-btn { width: 44px; height: 44px; }
+            .control-btn.play-btn { width: 52px; height: 52px; }
+            #vol-slider { height: 80px; }
+            #vol-slider::-webkit-slider-thumb { height: 18px; width: 18px; }
+            #vol-slider::-moz-range-thumb { height: 18px; width: 18px; border: none; }
+        }
 
-            /* Comfortable, consistent size on mobile */
-            font-size: 1rem;        /* >=16px on your mobile base so no zoom */
-            line-height: 1.2;
-            padding: 10px 12px;
-            min-height: 44px;       /* touch target size */
-            border-radius: 8px;
+        /* ===== LANDSCAPE BLOCKER ===== */
+        #landscape-blocker {
+            display: none;
+            position: fixed; inset: 0; z-index: 99999;
+            background: var(--bg-base);
+            color: var(--text-secondary);
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 16px; font-size: 1rem; text-align: center;
+            padding: 20px;
+        }
+        @media (orientation: landscape) and (max-height: 600px) {
+            #landscape-blocker { display: flex; }
         }
     </style>
 </head>
 <body>
 
+<!-- Landscape blocker overlay -->
+<div id="landscape-blocker">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+  <div>Please rotate your device<br>to <b>portrait</b> mode</div>
+</div>
+
 <!-- Mobile tab state (CSS-only) -->
 <input type="radio" name="mobile-tab" id="tab-playlist" checked hidden>
 <input type="radio" name="mobile-tab" id="tab-player" hidden>
 
-<!-- Fixed Top MIDI Bar (visible in both orientations) -->
+<!-- Fixed Top MIDI Bar -->
 <div id="mobileMidiBar" class="mobile-midi-bar" role="region" aria-label="MIDI connection">
   <div class="midi-panel">
     <button id="btnConnect" class="midi-status btn-connect" aria-label="Connect to MIDI device">
+      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
       Connect
     </button>
   </div>
 </div>
 
-<!-- USB dialog remains at body level -->
+<!-- USB dialog -->
 <dialog id="usbDialog">
   <form method="dialog">
     <h3>Select USB MIDI Output</h3>
@@ -491,9 +567,9 @@
       </label>
     </div>
     <div class="row form-spacing">
-      <button id="usbConnectBtn" type="button" class="primary">Connect</button>
+      <button id="usbConnectBtn" type="button" class="btn-primary">Connect</button>
       <span class="stretch"></span>
-      <button id="usbCancelBtn" type="button">Cancel</button>
+      <button id="usbCancelBtn" type="button" style="background:var(--bg-hover);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-full);padding:8px 18px;font-size:0.85rem;">Cancel</button>
     </div>
   </form>
 </dialog>
@@ -506,27 +582,31 @@
             <div class="header-row">
                 <h3>Playlist</h3>
                 <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
-                <label for="fileInput" class="primary" style="display:inline-block; padding:10px 14px; border-radius:4px; cursor:pointer; margin:0;">Add Audio</label>
+                <label for="fileInput" class="btn-primary" style="cursor:pointer">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Add
+                </label>
             </div>
-
             <div id="playlist-ui"></div>
         </div>
 
-        <!-- PLAYER CARD -->
+        <!-- EVENTS/MARKERS CARD -->
         <div class="card card-player">
-            <h2 id="current-title" style="padding:0px 10px">Select a song</h2>
+            <h2 id="current-title">Select a song</h2>
             <audio id="audioTrack"></audio>
 
             <div class="markers-header">
                 <h4>Markers</h4>
-                <button class="primary" onclick="setEvent()">Add Marker</button>
+                <button class="btn-primary" onclick="setEvent()">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Add
+                </button>
             </div>
-
             <ul id="event-list"></ul>
         </div>
     </div>
 
-    <!-- Fixed Mini-player (bottom) -->
+    <!-- Fixed Bottom Player Bar -->
     <div id="mobilePlayerBar" class="mobile-player-bar" role="region" aria-label="Mini player">
 
         <!-- Progress bar -->
@@ -534,7 +614,7 @@
             <div id="progress-bar" class="progress-track">
                 <div id="progress-fill" class="progress-fill"></div>
                 <div id="progress-ghost-fill" class="progress-ghost-fill"></div>
-                <div id="progress-ghost" class="progress-ghost"></div>             
+                <div id="progress-ghost" class="progress-ghost"></div>
                 <div id="progress-ab" class="progress-ab">
                     <div id="ab-drag" class="ab-drag" data-role="segment"></div>
                     <div id="ab-handle-a" class="ab-handle left" data-role="handle-a"></div>
@@ -543,36 +623,62 @@
             </div>
             <span id="time-label" class="time-label">0:00.0 / 0:00</span>
         </div>
+
         <!-- A/B loop controls -->
         <div class="controls-container" id="ab-controls" role="group" aria-label="A/B loop controls">
             <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABLoop()" aria-label="Toggle A/B loop">AB</button>
-            <button id="btnSetA" class="control-btn ab-btn" onclick="setLoopA()" aria-label="Set loop start point A">—</button>
-            <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show or hide A/B loop on progress bar">⇄</button>
-            <button id="btnSetB" class="control-btn ab-btn" onclick="setLoopB()" aria-label="Set loop end point B">—</button>
-            <button class="control-btn ab-btn" onclick="rewindToA()" aria-label="Rewind to point A">↩</button>
+            <button id="btnSetA" class="control-btn ab-btn" onclick="setLoopA()" aria-label="Set loop start">—</button>
+            <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show/hide loop overlay">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button id="btnSetB" class="control-btn ab-btn" onclick="setLoopB()" aria-label="Set loop end">—</button>
+            <button class="control-btn ab-btn" onclick="rewindToA()" aria-label="Rewind to A">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            </button>
         </div>
-      
+
         <!-- Playback controls -->
         <div class="controls-container" role="group" aria-label="Playback controls">
-            <button class="control-btn" onclick="stopAudio()" aria-label="Stop">■</button>
-            <button class="control-btn" onclick="seekRelative(-10)" aria-label="Rewind 10 seconds">↺</button>
-            <button id="playPauseBtn" class="control-btn" onclick="togglePlayPause()" aria-label="Play or pause">▶</button>
-            <button class="control-btn" onclick="seekRelative(10)" aria-label="Fast forward 10 seconds">↻</button>
-            <button id="loopBtn" class="control-btn" onclick="toggleLoop()" aria-label="Toggle loop">⇄</button>
+            <button class="control-btn" onclick="stopAudio()" aria-label="Stop">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+            </button>
+            <button class="control-btn" onclick="seekRelative(-10)" aria-label="Rewind 10s">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/><text x="9" y="16" fill="currentColor" stroke="none" font-size="7" font-weight="700">10</text></svg>
+            </button>
+            <button id="playPauseBtn" class="control-btn play-btn" onclick="togglePlayPause()" aria-label="Play or pause">
+              <svg class="icon icon-lg" id="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>
+            </button>
+            <button class="control-btn" onclick="seekRelative(10)" aria-label="Forward 10s">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/><text x="9" y="16" fill="currentColor" stroke="none" font-size="7" font-weight="700">10</text></svg>
+            </button>
+            <button id="loopBtn" class="control-btn" onclick="toggleLoop()" aria-label="Toggle loop">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </button>
 
             <div class="speed-wrapper">
                 <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()" aria-label="Playback speed">1.00</button>
                 <div id="speedMenu" class="speed-menu" role="menu"></div>
             </div>
 
-            <!-- Volume control (drop-up) -->
             <div class="volume-control" id="volumeControl">
                 <button id="volBtn" class="control-btn speed-btn-label" aria-label="Volume">100%</button>
-                <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume (vertical slider)">
+                <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume slider">
             </div>
         </div>
     </div>
 </div>
+
+<!-- Bottom Tab Bar -->
+<label class="tab-bar" aria-label="Navigation tabs" style="display:flex">
+  <label for="tab-playlist" class="tab">
+    <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+    Playlist
+  </label>
+  <label for="tab-player" class="tab">
+    <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+    Events
+  </label>
+</label>
 
 <script>
 /* ============================ Robust IndexedDB ============================ */
@@ -688,7 +794,7 @@ async function renameSongInDB(oldName) {
 }
 function togglePlaylistMenu(e, songName, menuId) {
     const menu = document.getElementById(menuId);
-    const allMenus = document.querySelectorAll('.playlist-dropdown-menu');
+    const allMenus = document.querySelectorAll('#playlist-ui .dropdown-menu');
     allMenus.forEach(m => {
         if (m.id !== menuId) m.classList.remove('open');
     });
@@ -709,7 +815,7 @@ let recentlyDragged = false; // prevent click-play immediately after drag
 
 function onPlaylistPointerDown(e) {
     // ignore clicks on menu button
-    if (e.target.closest('.playlist-menu-btn')) return;
+    if (e.target.closest('.menu-btn')) return;
     const row = e.target.closest('.playlist-item');
     if (!row) return;
     const idx = parseInt(row.dataset.idx, 10);
@@ -1302,7 +1408,11 @@ function togglePlayPause() {
     }
     updatePlayPauseUI();
 }
-function updatePlayPauseUI() { playPauseBtn.textContent = audio.paused ? '▶' : '⏸'; }
+function updatePlayPauseUI() {
+    playPauseBtn.innerHTML = audio.paused
+        ? '<svg class="icon icon-lg" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>'
+        : '<svg class="icon icon-lg" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>';
+}
 audio.addEventListener('play', updatePlayPauseUI);
 audio.addEventListener('pause', updatePlayPauseUI);
 
@@ -1355,8 +1465,8 @@ function setPlaybackRate(rate) {
 }
 document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.speed-wrapper')) speedMenu.style.display = 'none'; });
 document.addEventListener('pointerdown', (e) => {
-    if (!e.target.closest('.playlist-item .playlist-menu-btn') && !e.target.closest('.playlist-dropdown-menu')) {
-        document.querySelectorAll('.playlist-dropdown-menu').forEach(m => m.classList.remove('open'));
+    if (!e.target.closest('.menu-btn') && !e.target.closest('.dropdown-menu')) {
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
     }
 });
 
@@ -1557,13 +1667,28 @@ function xToTime(clientX) {
 function showGhostPreview(targetTime) {
     const dur = audio.duration || 0;
     if (!dur || !isFinite(dur)) return;
-    const pct = (targetTime / dur) * 100;
-    progressGhostFill.style.width = `${pct}%`;
+    const targetPct = (targetTime / dur) * 100;
+    const currentPct = scrubStartTime != null ? (scrubStartTime / dur) * 100 : parseFloat(progressFill.style.width) || 0;
+    if (targetPct >= currentPct) {
+        // Dragging forward: ghost extends beyond the solid fill
+        progressFill.style.width = `${currentPct}%`;
+        progressGhostFill.style.left = '0%';
+        progressGhostFill.style.width = `${targetPct}%`;
+    } else {
+        // Dragging backward: shrink the solid fill to target, ghost covers the gap
+        progressFill.style.width = `${targetPct}%`;
+        progressGhostFill.style.left = `${targetPct}%`;
+        progressGhostFill.style.width = `${currentPct - targetPct}%`;
+    }
     progressGhostFill.style.display = 'block';
-    progressGhost.style.left = `${pct}%`;
+    progressGhost.style.left = `${targetPct}%`;
     progressGhost.style.display = 'block';
 }
-function hideGhostPreview() { progressGhostFill.style.display = 'none'; progressGhost.style.display = 'none'; }
+function hideGhostPreview() {
+    progressGhostFill.style.display = 'none';
+    progressGhostFill.style.left = '0%';
+    progressGhost.style.display = 'none';
+}
 
 /* ====================== Markers (with MIDI dispatch) ===================== */
 function fireMarkerByIndex(i, evt, opts) {
@@ -1732,8 +1857,8 @@ async function renderPlaylist() {
             label.textContent = song.name;
 
             const menuBtn = document.createElement('button');
-            menuBtn.className = 'playlist-menu-btn';
-            menuBtn.textContent = '⋮';
+            menuBtn.className = 'menu-btn';
+            menuBtn.innerHTML = '<svg class="icon icon-sm" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
             menuBtn.title = 'Options';
             menuBtn.onclick = (e) => {
                 e.stopPropagation();
@@ -1741,11 +1866,8 @@ async function renderPlaylist() {
             };
 
             const menu = document.createElement('div');
-            menu.className = 'playlist-dropdown-menu';
+            menu.className = 'dropdown-menu';
             menu.id = `menu-${idx}`;
-            menu.style.position = 'absolute';
-            menu.style.right = '0';
-            menu.style.top = '100%';
             
             const renameBtn = document.createElement('button');
             renameBtn.textContent = 'Rename';
@@ -1920,17 +2042,21 @@ async function refreshEventUI() {
             <span class="marker-left"><b>${formatClock(evt.time)}</b></span>
             <span class="marker-middle"><span class="preset-badge">${formatPreset(evt.preset)}</span></span>
             <span class="marker-right">
-                <button onclick="toggleEdit(${i})">Edit</button>
-                <button class="danger" onclick="deleteEvent(${i})">×</button>
+                <button class="menu-btn" onclick="event.stopPropagation();toggleMarkerMenu(${i})" aria-label="Options">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                </button>
+                <div class="dropdown-menu" id="marker-menu-${i}">
+                    <button onclick="event.stopPropagation();toggleEdit(${i})">Edit</button>
+                    <button class="danger-item" onclick="event.stopPropagation();deleteEvent(${i})">Remove</button>
+                </div>
             </span>`;
-        // Click handler to seek to marker time (skip clicks on buttons)
+        // Click handler to seek to marker time (skip clicks on buttons/menus)
         li.addEventListener('click', (e) => {
-            if (!e.target.closest('button') && e.isTrusted) {
+            if (!e.target.closest('button') && !e.target.closest('.dropdown-menu') && !e.target.closest('input') && e.isTrusted) {
                 const wasPlaying = !audio.paused;
                 seekToTime(evt.time);
                 if (wasPlaying) {
                     audio.play().catch(() => {
-                        // Autoplay policy or other issue - silent fail
                         updatePlayPauseUI();
                     });
                 }
@@ -1940,7 +2066,16 @@ async function refreshEventUI() {
     });
     updateMarkerTicks();
 }
+function toggleMarkerMenu(idx) {
+    const menu = document.getElementById(`marker-menu-${idx}`);
+    const allMenus = document.querySelectorAll('#event-list .dropdown-menu');
+    allMenus.forEach(m => { if (m !== menu) m.classList.remove('open'); });
+    menu.classList.toggle('open');
+}
 function toggleEdit(idx) {
+  // Cancel any other marker currently being edited
+  const editingLi = document.querySelector('#event-list li.editing');
+  if (editingLi) { refreshEventUI(); }
   const evt = getEvents()[idx];
   const li = document.getElementById(`row-${idx}`);
   li.classList.add('editing');
@@ -2142,8 +2277,8 @@ audio.addEventListener('seeked', updateProgressUI);
 playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
 
 document.addEventListener('pointerdown', (e) => {
-    if (!e.target.closest('.playlist-item .playlist-menu-btn') && !e.target.closest('.playlist-dropdown-menu')) {
-        document.querySelectorAll('.playlist-dropdown-menu').forEach(m => m.classList.remove('open'));
+    if (!e.target.closest('.menu-btn') && !e.target.closest('.dropdown-menu')) {
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
     }
 });
 
@@ -2187,12 +2322,6 @@ document.addEventListener('pointerdown', (e) => {
   });
 })();
 </script>
-
-<!-- Bottom tab bar (visible only in portrait via CSS) -->
-<nav class="tab-bar">
-    <label for="tab-playlist" class="tab">Playlist</label>
-    <label for="tab-player" class="tab">Player</label>
-</nav>
 
 <script>
 if ('serviceWorker' in navigator) {
