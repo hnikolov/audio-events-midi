@@ -82,9 +82,9 @@
         }
 
         /* ===== SVG ICON HELPER ===== */
-        .icon { width: 20px; height: 20px; flex-shrink: 0; pointer-events: none; }
-        .icon-sm { width: 16px; height: 16px; }
-        .icon-lg { width: 24px; height: 24px; }
+        .icon { width: 22px; height: 22px; flex-shrink: 0; pointer-events: none; }
+        .icon-sm { width: 18px; height: 18px; }
+        .icon-lg { width: 26px; height: 26px; }
 
         /* ===== BUTTONS ===== */
         button { font-family: inherit; cursor: pointer; }
@@ -95,7 +95,7 @@
             border-radius: var(--radius-full);
             padding: 8px 18px;
             font-weight: 600;
-            font-size: 0.8rem;
+            font-size: 0.88rem;
             cursor: pointer;
             transition: background 0.15s, transform 0.1s;
             display: inline-flex;
@@ -125,7 +125,7 @@
             -webkit-tap-highlight-color: transparent;
         }
         .midi-status {
-            font-size: 0.8rem;
+            font-size: 0.88rem;
             font-weight: 600;
             color: var(--text-secondary);
             background: transparent;
@@ -171,7 +171,7 @@
             display: flex; justify-content: space-between; align-items: center;
             padding: 14px 0 10px;
         }
-        .header-row h3 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+        .header-row h3 { margin: 0; font-size: 1.21rem; font-weight: 700; }
         #playlist-ui {
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
@@ -185,10 +185,10 @@
             padding: 11px 12px;
             border-bottom: 1px solid var(--border-light);
             cursor: pointer;
-            font-size: 0.85rem;
+            font-size: 0.94rem;
             position: relative;
             transition: background 0.12s;
-            color: var(--text-secondary);
+            color: var(--text-primary);
         }
         .playlist-item:last-child { border-bottom: none; }
         .playlist-item:active { background: var(--bg-hover); }
@@ -226,7 +226,7 @@
             display: flex; align-items: center; gap: 8px;
             width: 100%; text-align: left; padding: 11px 14px;
             border: none; background: transparent; cursor: pointer;
-            font-size: 0.85rem; color: var(--text-primary);
+            font-size: 0.94rem; color: var(--text-primary);
             transition: background 0.1s;
         }
         .dropdown-menu button:active { background: var(--bg-hover); }
@@ -237,7 +237,7 @@
             display: flex; justify-content: space-between; align-items: center;
             padding: 8px 2px;
         }
-        .markers-header h4 { margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-secondary); }
+        .markers-header h4 { margin: 0; font-size: 1.05rem; font-weight: 600; color: var(--text-secondary); }
         ul { list-style: none; padding: 0; margin: 0; }
         li {
             display: flex; gap: 8px; align-items: center;
@@ -250,11 +250,11 @@
         li.active-event {
             background: var(--amber-dim);
         }
-        .marker-left { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); min-width: 50px; }
+        .marker-left { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 0.94rem; font-weight: 500; color: var(--text-primary); min-width: 50px; }
         .marker-middle { flex: 1; text-align: center; min-width: 0; }
         .marker-right { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
         .preset-badge {
-            font-size: 0.75rem; font-weight: 700;
+            font-size: 0.83rem; font-weight: 600;
             color: var(--text-primary);
             background: var(--bg-elevated);
             border: 1px solid var(--border);
@@ -266,7 +266,7 @@
         #event-list .time-input, #event-list .preset-input {
             flex: 1 1 0; min-width: 0; width: 0;
             border: 1px solid var(--border); border-radius: var(--radius-sm);
-            padding: 8px 10px; font-size: 0.9rem;
+            padding: 8px 10px; font-size: 1rem;
             background: var(--bg-surface); color: var(--text-primary);
             outline: none; transition: border-color 0.15s;
         }
@@ -280,7 +280,7 @@
         #event-list li.editing .marker-middle { flex: 1 1 0; min-width: 0; }
         #event-list li.editing .marker-right { flex: 0 0 100%; justify-content: flex-end; padding-top: 6px; }
         #event-list li.editing .time-input, #event-list li.editing .preset-input {
-            width: 100%; font-size: 0.9rem; padding: 8px 10px; min-height: 44px;
+            width: 100%; font-size: 1rem; padding: 8px 10px; min-height: 44px;
             border-radius: var(--radius-sm);
         }
         #event-list li.editing .marker-right button {
@@ -289,7 +289,7 @@
             border: 1px solid var(--border);
             border-radius: var(--radius-full);
             padding: 7px 16px;
-            font-size: 0.8rem;
+            font-size: 0.88rem;
             font-weight: 600;
             cursor: pointer;
             transition: background 0.12s;
@@ -327,7 +327,7 @@
             -webkit-tap-highlight-color: transparent;
         }
         .progress-track {
-            position: relative; height: 4px;
+            position: relative; height: 5px;
             background: var(--bg-active); border-radius: var(--radius-full);
             flex: 1; cursor: pointer;
             touch-action: none;
@@ -362,7 +362,7 @@
         .ab-drag.dragging { cursor: grabbing; }
         .ab-handle, .ab-drag { touch-action: none; -webkit-tap-highlight-color: transparent; }
         .time-label {
-            font-size: 0.7rem; color: var(--text-muted); flex-shrink: 0;
+            font-size: 0.77rem; color: var(--text-secondary); flex-shrink: 0;
             min-width: 72px; text-align: right;
             font-variant-numeric: tabular-nums; font-weight: 500;
         }
@@ -381,7 +381,7 @@
         #ab-controls .ab-btn { white-space: nowrap; flex: 0 0 auto; min-width: fit-content; }
         .ab-btn {
             border-radius: var(--radius-full);
-            font-size: 0.78rem; padding: 4px 12px;
+            font-size: 0.86rem; padding: 4px 12px;
             line-height: 1.2; width: auto; height: auto;
             font-weight: 600; font-variant-numeric: tabular-nums;
         }
@@ -394,7 +394,7 @@
         }
         .control-btn {
             background: transparent; color: var(--text-secondary);
-            border: none; width: 40px; height: 40px;
+            border: none; width: 44px; height: 44px;
             border-radius: 50%;
             display: inline-flex; align-items: center; justify-content: center;
             cursor: pointer; flex-shrink: 0;
@@ -403,7 +403,7 @@
         }
         .control-btn:active { transform: scale(0.9); }
         .control-btn.play-btn {
-            width: 48px; height: 48px;
+            width: 52px; height: 52px;
             background: var(--accent); color: #000;
             margin: 0 4px;
         }
@@ -421,7 +421,7 @@
         /* ===== SPEED MENU ===== */
         .speed-wrapper { position: relative; }
         .speed-btn-label {
-            min-width: 44px; font-size: 0.75rem;
+            min-width: 44px; font-size: 0.83rem;
             color: var(--text-muted); font-weight: 600;
             font-variant-numeric: tabular-nums;
             display: inline-flex; align-items: center; justify-content: center;
@@ -434,7 +434,7 @@
         }
         .speed-option {
             display: flex; align-items: center; justify-content: center;
-            font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;
+            font-size: 0.88rem; color: var(--text-secondary); font-weight: 500;
             padding: 9px 12px; border-radius: var(--radius-sm);
             border: none; background: transparent; width: 100%; cursor: pointer;
             transition: background 0.1s;
@@ -474,7 +474,7 @@
             font-weight: 500; color: var(--text-muted);
             cursor: pointer; user-select: none;
             min-height: 44px; touch-action: manipulation;
-            font-size: 0.68rem; letter-spacing: 0.02em;
+            font-size: 0.75rem; letter-spacing: 0.02em;
             transition: color 0.15s;
             position: relative;
             -webkit-tap-highlight-color: transparent;
@@ -500,7 +500,7 @@
         .card-player #current-title {
             margin: 0; display: block;
             padding: 14px 2px 8px;
-            font-size: 1rem; font-weight: 600;
+            font-size: 1.1rem; font-weight: 600;
             color: var(--text-primary);
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
@@ -508,11 +508,11 @@
         /* ===== TOUCH-FRIENDLY ===== */
         @media (pointer: coarse), (hover: none) {
             .ab-handle { width: 22px; height: 22px; }
-            .progress-track { height: 6px; }
+            .progress-track { height: 7px; }
             .progress-track::before { top: -16px; bottom: -16px; }
             .ab-drag { top: -16px; bottom: -16px; }
-            .control-btn { width: 44px; height: 44px; }
-            .control-btn.play-btn { width: 52px; height: 52px; }
+            .control-btn { width: 48px; height: 48px; }
+            .control-btn.play-btn { width: 58px; height: 58px; }
             #vol-slider { height: 80px; }
             #vol-slider::-webkit-slider-thumb { height: 18px; width: 18px; }
             #vol-slider::-moz-range-thumb { height: 18px; width: 18px; border: none; }
@@ -580,7 +580,7 @@
         <!-- PLAYLIST CARD -->
         <div class="card card-playlist">
             <div class="header-row">
-                <h3>Playlist</h3>
+                <h4>Playlist</h4>
                 <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
                 <label for="fileInput" class="btn-primary" style="cursor:pointer">
                   <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1878,6 +1878,7 @@ async function renderPlaylist() {
             
             const removeBtn = document.createElement('button');
             removeBtn.textContent = 'Remove';
+            removeBtn.className = 'danger-item';
             removeBtn.onclick = async (e) => {
                 e.stopPropagation();
                 if (confirm(`Remove ${song.name}?`)) {
