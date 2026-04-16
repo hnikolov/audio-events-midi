@@ -45,7 +45,7 @@
             --backdrop-overlay: rgba(0,0,0,0.6);
             --accent-on-btn: #000;
             --mobile-tab-height: 56px;
-            --mobile-playerbar-height: 132px;
+            --mobile-playerbar-height: 160px;
             --mobile-topbar-height: 0px;
         }
 
@@ -213,6 +213,7 @@
             padding: 14px 0 10px;
         }
         .header-row h3 { margin: 0; font-size: 1.21rem; font-weight: 700; }
+        .header-row h4 { margin: 0; font-size: 1.05rem; font-weight: 600; color: var(--text-secondary); }
         #playlist-ui {
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
@@ -404,9 +405,11 @@
         .ab-handle, .ab-drag { touch-action: none; -webkit-tap-highlight-color: transparent; }
         .time-label {
             font-size: 0.77rem; color: var(--text-secondary); flex-shrink: 0;
-            min-width: 72px; text-align: right;
             font-variant-numeric: tabular-nums; font-weight: 500;
+            min-width: 40px;
         }
+        .time-label.time-left { text-align: left; }
+        .time-label.time-right { text-align: right; }
         .progress-tick {
             position: absolute; top: 0; width: 2px; height: 100%;
             background: var(--tick-default); z-index: 3; pointer-events: none;
@@ -416,26 +419,36 @@
         .progress-tick.current { background: var(--tick-current); box-shadow: var(--tick-current-shadow); width: 3px; }
 
         /* ===== A/B LOOP CONTROLS ===== */
-        #ab-controls {
-            flex-wrap: nowrap; gap: 4px; padding: 2px 12px; justify-content: center;
-        }
-        #ab-controls .ab-btn { white-space: nowrap; flex: 0 0 auto; min-width: fit-content; }
+        .aux-controls { justify-content: space-evenly; }
         .ab-btn {
             border-radius: var(--radius-full);
             font-size: 0.86rem; padding: 4px 12px;
             line-height: 1.2; width: auto; height: auto;
             font-weight: 600; font-variant-numeric: tabular-nums;
         }
+        .ab-timestamp {
+            min-width: 76px; text-align: center; white-space: nowrap;
+        }
+        .ab-panel {
+            max-height: 56px;
+            overflow: hidden;
+            transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease;
+            opacity: 1;
+        }
+        .ab-panel.collapsed {
+            max-height: 0; opacity: 0;
+            padding-top: 0; padding-bottom: 0;
+        }
 
         /* ===== PLAYBACK CONTROLS ===== */
         .controls-container {
-            background: transparent; padding: 4px 12px 8px;
-            display: flex; align-items: center; justify-content: center;
-            gap: 4px; border: none; flex-wrap: nowrap;
+            background: transparent; padding: 2px 16px 4px;
+            display: flex; align-items: center; justify-content: space-evenly;
+            border: none; flex-wrap: nowrap;
         }
         .control-btn {
             background: transparent; color: var(--text-secondary);
-            border: none; width: 44px; height: 44px;
+            border: none; width: 48px; height: 48px;
             border-radius: 50%;
             display: inline-flex; align-items: center; justify-content: center;
             cursor: pointer; flex-shrink: 0;
@@ -444,9 +457,8 @@
         }
         .control-btn:active { transform: scale(0.9); }
         .control-btn.play-btn {
-            width: 52px; height: 52px;
+            width: 56px; height: 56px;
             background: var(--accent); color: var(--accent-on-btn);
-            margin: 0 4px;
         }
         .control-btn.play-btn:active { background: var(--accent-hover); transform: scale(0.93); }
         .control-btn.loop-mode {
@@ -552,8 +564,8 @@
             .progress-track { height: 7px; }
             .progress-track::before { top: -16px; bottom: -16px; }
             .ab-drag { top: -16px; bottom: -16px; }
-            .control-btn { width: 48px; height: 48px; }
-            .control-btn.play-btn { width: 58px; height: 58px; }
+            .control-btn { width: 52px; height: 52px; }
+            .control-btn.play-btn { width: 60px; height: 60px; }
             #vol-slider { height: 80px; }
             #vol-slider::-webkit-slider-thumb { height: 18px; width: 18px; }
             #vol-slider::-moz-range-thumb { height: 18px; width: 18px; border: none; }
@@ -653,8 +665,9 @@
     <!-- Fixed Bottom Player Bar -->
     <div id="mobilePlayerBar" class="mobile-player-bar" role="region" aria-label="Mini player">
 
-        <!-- Progress bar -->
+        <!-- Progress bar with flanking time labels -->
         <div class="progress-container">
+            <span id="time-current" class="time-label time-left">0:00.0</span>
             <div id="progress-bar" class="progress-track">
                 <div id="progress-fill" class="progress-fill"></div>
                 <div id="progress-ghost-fill" class="progress-ghost-fill"></div>
@@ -665,26 +678,13 @@
                     <div id="ab-handle-b" class="ab-handle right" data-role="handle-b"></div>
                 </div>
             </div>
-            <span id="time-label" class="time-label">0:00.0 / 0:00</span>
+            <span id="time-duration" class="time-label time-right">0:00</span>
         </div>
 
-        <!-- A/B loop controls -->
-        <div class="controls-container" id="ab-controls" role="group" aria-label="A/B loop controls">
-            <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABLoop()" aria-label="Toggle A/B loop">AB</button>
-            <button id="btnSetA" class="control-btn ab-btn" onclick="setLoopA()" aria-label="Set loop start">—</button>
-            <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show/hide loop overlay">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-            <button id="btnSetB" class="control-btn ab-btn" onclick="setLoopB()" aria-label="Set loop end">—</button>
-            <button class="control-btn ab-btn" onclick="rewindToA()" aria-label="Rewind to A">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-            </button>
-        </div>
-
-        <!-- Playback controls -->
+        <!-- Main controls: Prev, Seek-10, Play, Seek+10, Next -->
         <div class="controls-container" role="group" aria-label="Playback controls">
-            <button class="control-btn" onclick="stopAudio()" aria-label="Stop">
-              <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+            <button class="control-btn" onclick="prevTrack()" aria-label="Previous track">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
             </button>
             <button class="control-btn" onclick="seekRelative(-10)" aria-label="Rewind 10s">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/><text x="9" y="16" fill="currentColor" stroke="none" font-size="7" font-weight="700">10</text></svg>
@@ -695,19 +695,43 @@
             <button class="control-btn" onclick="seekRelative(10)" aria-label="Forward 10s">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/><text x="9" y="16" fill="currentColor" stroke="none" font-size="7" font-weight="700">10</text></svg>
             </button>
-            <button id="loopBtn" class="control-btn" onclick="toggleLoop()" aria-label="Toggle loop">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            <button class="control-btn" onclick="nextTrack()" aria-label="Next track">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
             </button>
+        </div>
 
+        <!-- Aux controls: Speed, Loop, AB, Volume, Stop -->
+        <div class="controls-container aux-controls" role="group" aria-label="Auxiliary controls">
             <div class="speed-wrapper">
                 <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()" aria-label="Playback speed">1.00</button>
                 <div id="speedMenu" class="speed-menu" role="menu"></div>
             </div>
-
+            <button id="loopBtn" class="control-btn" onclick="toggleLoop()" aria-label="Toggle loop">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+            </button>
+            <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABPanel()" aria-label="Toggle A/B loop panel">AB</button>
             <div class="volume-control" id="volumeControl">
                 <button id="volBtn" class="control-btn speed-btn-label" aria-label="Volume">100%</button>
                 <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume slider">
             </div>
+            <button class="control-btn" onclick="stopAudio()" aria-label="Stop">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+            </button>
+        </div>
+
+        <!-- A/B loop panel (collapsible) -->
+        <div class="controls-container ab-panel collapsed" id="ab-panel" role="group" aria-label="A/B loop controls">
+            <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show/hide loop overlay">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button id="btnSetA" class="control-btn ab-btn ab-timestamp" onclick="setLoopA()" aria-label="Set loop start">A: — —</button>
+            <button class="control-btn" onclick="rewindToA()" aria-label="Rewind to A">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            </button>
+            <button id="btnSetB" class="control-btn ab-btn ab-timestamp" onclick="setLoopB()" aria-label="Set loop end">B: — —</button>
+            <button class="control-btn" onclick="clearABLoop()" aria-label="Clear loop points">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
         </div>
     </div>
 </div>
@@ -1008,7 +1032,8 @@ const progressAB = document.getElementById('progress-ab');
 const abDrag = document.getElementById('ab-drag');
 const abHandleA = document.getElementById('ab-handle-a');
 const abHandleB = document.getElementById('ab-handle-b');
-const timeLabel = document.getElementById('time-label');
+const timeCurrent = document.getElementById('time-current');
+const timeDuration = document.getElementById('time-duration');
 
 const btnSetA = document.getElementById('btnSetA');
 const btnSetB = document.getElementById('btnSetB');
@@ -1584,11 +1609,14 @@ function updatePlayModeUI() {
     if (playMode === 'loop') {
         loopBtn.classList.add('loop-mode');
         loopBtn.title = 'Loop current song (Click to toggle)';
+        loopBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
     } else if (playMode === 'queue') {
         loopBtn.classList.add('queue-mode');
-        loopBtn.title = 'Play next song in playlist (Click to toggle)';
+        loopBtn.title = 'Play through playlist (Click to toggle)';
+        loopBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 4 4 8 8 12"/><path d="M4 8h12a4 4 0 0 1 4 4v0"/><polyline points="16 20 20 16 16 12"/><path d="M20 16H8a4 4 0 0 1-4-4v0"/></svg>';
     } else {
-        loopBtn.title = 'No loop or queue (Click to toggle)';
+        loopBtn.title = 'No repeat (Click to toggle)';
+        loopBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
     }
 }
 
@@ -1602,6 +1630,41 @@ async function getNextSongInPlaylist() {
     
     const nextIndex = (currentIndex + 1) % order.length; // wrap to start if at end
     return order[nextIndex];
+}
+
+async function prevTrack() {
+    if (!currentFileName) return;
+    // If more than 3 seconds in, restart current song; otherwise go to previous
+    if (audio.currentTime > 3) {
+        seekToTime(0);
+        return;
+    }
+    const order = getPlaylistOrder();
+    if (!order.length) return;
+    const idx = order.indexOf(currentFileName);
+    if (idx === -1) return;
+    const prevIdx = (idx - 1 + order.length) % order.length;
+    await playSong(order[prevIdx]);
+}
+
+async function nextTrack() {
+    const next = await getNextSongInPlaylist();
+    if (next) await playSong(next);
+}
+
+function toggleABPanel() {
+    const panel = document.getElementById('ab-panel');
+    panel.classList.toggle('collapsed');
+    panel.addEventListener('transitionend', () => {
+        window.dispatchEvent(new Event('resize'));
+    }, { once: true });
+}
+
+function clearABLoop() {
+    abLoop.a = null;
+    abLoop.b = null;
+    abLoop.enabled = false;
+    saveABLoop();
 }
 
 // Handle audio end event with queue/loop logic
@@ -1635,10 +1698,10 @@ audio.addEventListener('ended', async () => {
 /* ============================ A/B Loop Controls ========================== */
 function isABValid() { return abLoop.a !== null && abLoop.b !== null && abLoop.b > abLoop.a; }
 function renderABButtons() {
-    const aStr = (abLoop.a === null) ? '—' : formatClock(abLoop.a);
-    const bStr = (abLoop.b === null) ? '—' : formatClock(abLoop.b);
-    btnSetA.innerHTML = `${aStr}`;
-    btnSetB.innerHTML = `${bStr}`;
+    const aStr = (abLoop.a === null) ? 'A: — —' : `A:${formatClock(abLoop.a)}`;
+    const bStr = (abLoop.b === null) ? 'B: — —' : `B:${formatClock(abLoop.b)}`;
+    btnSetA.textContent = aStr;
+    btnSetB.textContent = bStr;
     abVisibleBtn.classList.toggle('loop-active', !!abLoop.visible);
 }
 function updateABUI() {
@@ -1691,6 +1754,16 @@ function loadABLoop() {
     } : { enabled: false, visible: true, a: null, b: null };
     updateABUI();
     updateABOverlay();
+    // Auto-open/close AB panel based on saved state
+    const panel = document.getElementById('ab-panel');
+    if (panel) {
+        if (abLoop.enabled && isABValid()) {
+            panel.classList.remove('collapsed');
+        } else {
+            panel.classList.add('collapsed');
+        }
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    }
 }
 function saveABLoop() {
     if (!currentFileName) return;
@@ -1704,7 +1777,8 @@ function saveABLoop() {
 /* =========================== Progress / Overlay ========================== */
 function renderTimeLabel(currentTime) {
     const dur = audio.duration || 0;
-    timeLabel.textContent = `${formatClock(currentTime)} / ${formatClock(dur, 0)}`;
+    timeCurrent.textContent = formatClock(currentTime);
+    timeDuration.textContent = formatClock(dur, 0);
 }
 function updateProgressUI() {
     const dur = audio.duration || 0;
