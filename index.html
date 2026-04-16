@@ -218,11 +218,9 @@
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
             overflow: visible;
-            touch-action: none;
         }
         .playlist-item {
             display: flex;
-            justify-content: space-between;
             align-items: center;
             padding: 11px 12px;
             border-bottom: 1px solid var(--border-light);
@@ -232,6 +230,7 @@
             transition: background 0.12s;
             color: var(--text-primary);
         }
+        .playlist-item > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .playlist-item:last-child { border-bottom: none; }
         .playlist-item:active { background: var(--bg-hover); }
         .playlist-item.active {
@@ -240,6 +239,15 @@
             font-weight: 600;
         }
         .playlist-item.dragging { opacity: 0.4; cursor: grabbing; }
+        .drag-handle {
+            display: flex; align-items: center; justify-content: center;
+            padding: 4px 6px; margin-right: 4px; cursor: grab;
+            color: var(--text-muted);
+            touch-action: none;
+            flex-shrink: 0;
+        }
+        .drag-handle:active { color: var(--text-secondary); }
+        .drag-handle svg { width: 16px; height: 16px; pointer-events: none; }
         .drop-indicator { height: 2px; background: var(--accent); margin: 1px 0; border-radius: var(--radius-full); }
         .playlist-item, .playlist-item * {
             -webkit-user-select: none; user-select: none;
@@ -891,70 +899,71 @@ function togglePlaylistMenu(e, songName, menuId) {
     menu.classList.toggle('open');
 }
 
-/* ---------- drag-to-reorder logic (pointer events) ---------- */
+/* ---------- drag-to-reorder logic (drag handle approach) ---------- */
 let dragSrcEl = null;
 let dragSrcIdx = null;
 let dropIndicator = null;
 let isDraggingItem = false;
-let dragStartX = 0;
-let dragStartY = 0;
-let dragDistanceMoved = 0;
-let dragThreshold = 10; // pixels; threshold before drag activates
-let dragActivated = false; // tracks if drag actually started (threshold crossed)
-let recentlyDragged = false; // prevent click-play immediately after drag
+let recentlyDragged = false;
+const DRAG_ACTIVATE_PX = 6;  // min movement before drag "activates" visually
 
 function onPlaylistPointerDown(e) {
-    // ignore clicks on menu button
-    if (e.target.closest('.menu-btn')) return;
-    const row = e.target.closest('.playlist-item');
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;                   // only start drag from the handle
+    const row = handle.closest('.playlist-item');
     if (!row) return;
     const idx = parseInt(row.dataset.idx, 10);
-    if (isNaN(idx)) return; // safety: invalid index
-    e.preventDefault();
+    if (isNaN(idx)) return;
+
+    e.preventDefault();                    // prevent text selection & scroll (safe because touch-action:none on handle)
+    handle.setPointerCapture(e.pointerId); // track pointer even outside element
+
     dragSrcEl = row;
     dragSrcIdx = idx;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    dragDistanceMoved = 0;
-    dragActivated = false; // flag: threshold not yet crossed
-    isDraggingItem = false; // will set true only after threshold
+    isDraggingItem = false;                // not yet visually dragging (need DRAG_ACTIVATE_PX movement)
+    const startY = e.clientY;
+
     dropIndicator = document.createElement('div');
     dropIndicator.className = 'drop-indicator';
-    dropIndicator.dataset.targetIdx = dragSrcIdx;
-    window.addEventListener('pointermove', onPlaylistPointerMove);
-    window.addEventListener('pointerup', onPlaylistPointerUp);
-    window.addEventListener('pointercancel', onPlaylistPointerCancel);
+    dropIndicator.dataset.targetIdx = idx;
+
+    function onMove(ev) {
+        const dy = Math.abs(ev.clientY - startY);
+        if (!isDraggingItem) {
+            if (dy < DRAG_ACTIVATE_PX) return;  // dead-zone: small moves ignored
+            isDraggingItem = true;
+            dragSrcEl.classList.add('dragging');
+            if (navigator.vibrate) navigator.vibrate(30);
+        }
+        updateDragPosition(ev.clientY);
+    }
+
+    function onUp(ev) {
+        handle.releasePointerCapture(ev.pointerId);
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+        finishDrag();
+    }
+
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
 }
 
-function onPlaylistPointerMove(e) {
-    if (!dragSrcEl) return;
-    
-    // track distance moved
-    const dx = e.clientX - dragStartX;
-    const dy = e.clientY - dragStartY;
-    dragDistanceMoved = Math.sqrt(dx * dx + dy * dy);
-    
-    // only activate drag after threshold is crossed
-    if (!dragActivated && dragDistanceMoved >= dragThreshold) {
-        dragActivated = true;
-        isDraggingItem = true;
-        dragSrcEl.classList.add('dragging');
-    }
-    
-    // only process drag moves if threshold crossed
-    if (!dragActivated) return;
-    
+/* --- Active drag phase: reorder --- */
+function updateDragPosition(clientY) {
+    if (!dragSrcEl || !isDraggingItem) return;
     const allRows = Array.from(playlistUI.querySelectorAll('.playlist-item'));
     const items = allRows.filter(r => !r.classList.contains('dragging'));
-    let targetIdx = allRows.length; // default to end (original indexes range 0..len-1)
+    let targetIdx = allRows.length;
     for (let i = 0; i < items.length; i++) {
         const rect = items[i].getBoundingClientRect();
-        if (e.clientY < rect.top + rect.height / 2) {
+        if (clientY < rect.top + rect.height / 2) {
             targetIdx = parseInt(items[i].dataset.idx, 10);
             break;
         }
     }
-    // relocate indicator
     if (dropIndicator.parentNode) dropIndicator.parentNode.removeChild(dropIndicator);
     if (targetIdx < allRows.length) {
         const refEl = allRows.find(it => parseInt(it.dataset.idx, 10) === targetIdx && !it.classList.contains('dragging'));
@@ -966,17 +975,12 @@ function onPlaylistPointerMove(e) {
     dropIndicator.dataset.targetIdx = targetIdx;
 }
 
-function onPlaylistPointerUp(e) {
-    window.removeEventListener('pointermove', onPlaylistPointerMove);
-    window.removeEventListener('pointerup', onPlaylistPointerUp);
-    window.removeEventListener('pointercancel', onPlaylistPointerCancel);
-    isDraggingItem = false;
+function finishDrag() {
     if (dragSrcEl) dragSrcEl.classList.remove('dragging');
     if (dropIndicator) {
         const targetIdx = parseInt(dropIndicator.dataset.targetIdx, 10);
         dropIndicator.remove();
-        // only apply reorder if drag was actually activated
-        if (dragActivated && typeof dragSrcIdx === 'number') {
+        if (isDraggingItem && typeof dragSrcIdx === 'number') {
             let finalIdx = targetIdx;
             if (targetIdx > dragSrcIdx) finalIdx = targetIdx - 1;
             if (finalIdx !== dragSrcIdx) {
@@ -990,20 +994,7 @@ function onPlaylistPointerUp(e) {
     dragSrcEl = null;
     dragSrcIdx = null;
     dropIndicator = null;
-    dragActivated = false;
-}
-
-function onPlaylistPointerCancel(e) {
-    window.removeEventListener('pointermove', onPlaylistPointerMove);
-    window.removeEventListener('pointerup', onPlaylistPointerUp);
-    window.removeEventListener('pointercancel', onPlaylistPointerCancel);
     isDraggingItem = false;
-    if (dragSrcEl) dragSrcEl.classList.remove('dragging');
-    if (dropIndicator) dropIndicator.remove();
-    dragSrcEl = null;
-    dragSrcIdx = null;
-    dropIndicator = null;
-    dragActivated = false;
 }
 
 /* ============================== App Constants ============================= */
@@ -1613,7 +1604,7 @@ function updatePlayModeUI() {
     } else if (playMode === 'queue') {
         loopBtn.classList.add('queue-mode');
         loopBtn.title = 'Play through playlist (Click to toggle)';
-        loopBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 4 4 8 8 12"/><path d="M4 8h12a4 4 0 0 1 4 4v0"/><polyline points="16 20 20 16 16 12"/><path d="M20 16H8a4 4 0 0 1-4-4v0"/></svg>';
+        loopBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(90deg)"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
     } else {
         loopBtn.title = 'No repeat (Click to toggle)';
         loopBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
@@ -2042,6 +2033,12 @@ async function renderPlaylist() {
             menu.appendChild(removeBtn);
 
             row.onclick = (e) => { if (!isDraggingItem && !recentlyDragged && !menu.classList.contains('open')) playSong(song.name); };
+
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'drag-handle';
+            dragHandle.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>';
+
+            row.appendChild(dragHandle);
             row.appendChild(label);
             row.appendChild(menuBtn);
             row.appendChild(menu);
