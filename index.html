@@ -2343,7 +2343,7 @@ function reconcileMarkersOnForwardJump(prevTime, targetTime) {
 
     events.forEach((evt, i) => {
         const t = evt.time;
-        if (t > prevTime && t <= targetTime) {
+        if (t >= prevTime && t <= targetTime) {
             firedEvents.add(t);
             updateTickFiredClassByIndex(i, true);
         }
@@ -2378,7 +2378,7 @@ audio.addEventListener('timeupdate', () => {
             fireMarkerByIndex(i, evt, { forceCc: false });
         }
         if (now < t - 0.5) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
-        if (audio.loop && now === 0.0 && t === 0.0) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
+        if (audio.loop && !audio.paused && now === 0.0 && t === 0.0) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
     });
 
     updateProgressUI();
