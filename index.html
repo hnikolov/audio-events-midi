@@ -215,8 +215,6 @@
         .header-row h3 { margin: 0; font-size: 1.21rem; font-weight: 700; }
         .header-row h4 { margin: 0; font-size: 1.05rem; font-weight: 600; color: var(--text-secondary); }
         #playlist-ui {
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
             overflow: visible;
         }
         .playlist-item {
@@ -470,13 +468,13 @@
         }
         .control-btn.play-btn:active { background: var(--accent-hover); transform: scale(0.93); }
         .control-btn.loop-mode {
-            background: var(--accent-dim); color: var(--accent);
+            /* background: var(--accent-dim); */  color: var(--accent);
         }
         .control-btn.queue-mode {
-            background: var(--amber-dim); color: var(--amber);
+            /* background: var(--amber-dim); */  color: var(--amber);
         }
         .control-btn.loop-active {
-            background: var(--amber-dim); color: var(--amber);
+            /* background: var(--amber-dim); */  color: var(--amber);
         }
 
         /* ===== SPEED MENU ===== */
@@ -2413,6 +2411,42 @@ audio.addEventListener('seeked', updateProgressUI);
 
 /* ======================== Playlist event listeners (after DOM refs) ====================== */
 playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
+
+/* ======================== Swipe between tabs ======================== */
+(function () {
+    const container = document.querySelector('.mobile-tabs-container');
+    const tabPlaylist = document.getElementById('tab-playlist');
+    const tabPlayer   = document.getElementById('tab-player');
+    if (!container || !tabPlaylist || !tabPlayer) return;
+
+    let startX = 0, startY = 0, tracking = false;
+    const SWIPE_MIN = 60;   // px horizontal threshold
+    const ANGLE_MAX = 35;   // max degrees from horizontal
+
+    container.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        tracking = true;
+    }, { passive: true });
+
+    container.addEventListener('touchend', (e) => {
+        if (!tracking) return;
+        tracking = false;
+        const dx = e.changedTouches[0].clientX - startX;
+        const dy = e.changedTouches[0].clientY - startY;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+        if (absDx < SWIPE_MIN) return;
+        const angle = Math.atan2(absDy, absDx) * (180 / Math.PI);
+        if (angle > ANGLE_MAX) return;          // too vertical — scroll, not swipe
+        if (dx < 0 && tabPlaylist.checked) {
+            tabPlayer.checked = true;           // swipe left → Events
+        } else if (dx > 0 && tabPlayer.checked) {
+            tabPlaylist.checked = true;          // swipe right → Playlist
+        }
+    }, { passive: true });
+})();
 
 document.addEventListener('pointerdown', (e) => {
     if (!e.target.closest('.menu-btn') && !e.target.closest('.dropdown-menu')) {
