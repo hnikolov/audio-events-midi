@@ -682,11 +682,18 @@
         <div class="card card-playlist">
             <div class="header-row">
                 <h4>Playlist</h4>
-                <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
-                <label for="fileInput" class="btn-primary" style="cursor:pointer">
-                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  Add
-                </label>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input type="file" id="importInput" accept=".aem" style="display:none">
+                  <label for="importInput" class="btn-primary" style="cursor:pointer;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border)">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Import
+                  </label>
+                  <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
+                  <label for="fileInput" class="btn-primary" style="cursor:pointer">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add
+                  </label>
+                </div>
             </div>
             <div id="playlist-ui"></div>
         </div>
@@ -2080,7 +2087,16 @@ async function renderPlaylist() {
                 }
             };
             
+            const exportBtn = document.createElement('button');
+            exportBtn.textContent = 'Export';
+            exportBtn.onclick = async (e) => {
+                e.stopPropagation();
+                menu.classList.remove('open');
+                await exportSong(song.name);
+            };
+
             menu.appendChild(renameBtn);
+            menu.appendChild(exportBtn);
             menu.appendChild(removeBtn);
 
             row.onclick = (e) => { if (!isDraggingItem && !recentlyDragged && !menu.classList.contains('open')) playSong(song.name); };
@@ -2507,6 +2523,190 @@ document.addEventListener('pointerdown', (e) => {
         document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
     }
 });
+
+/* ========================== .aem Export / Import ========================== */
+const AEM_MAGIC = new Uint8Array([0x41, 0x45, 0x4D, 0x49]); // "AEMI"
+const AEM_VERSION = 1;
+let lastExportDirHandle = null;
+
+async function packAem(songName) {
+    const song = await getSongByName(songName);
+    if (!song) throw new Error('Song not found: ' + songName);
+
+    const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
+    const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
+    const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
+    const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
+
+    const metadata = {
+        version: AEM_VERSION,
+        name: song.name,
+        type: song.type || '',
+        lastModified: song.lastModified || Date.now(),
+        markers: eventMap[songName] || [],
+        volume: volMap[songName] !== undefined ? volMap[songName] : 1.0,
+        speed: speedMap[songName] !== undefined ? speedMap[songName] : 1.0,
+        abLoop: abMap[songName] || null
+    };
+
+    const metaJson = new TextEncoder().encode(JSON.stringify(metadata));
+    const audioBlob = song.data instanceof Blob ? song.data : new Blob([song.data]);
+    const audioBuffer = await audioBlob.arrayBuffer();
+
+    // Layout: [4 magic][1 version][4 meta-length][N meta][rest audio]
+    const totalSize = 4 + 1 + 4 + metaJson.byteLength + audioBuffer.byteLength;
+    const output = new ArrayBuffer(totalSize);
+    const view = new DataView(output);
+    const bytes = new Uint8Array(output);
+
+    bytes.set(AEM_MAGIC, 0);
+    view.setUint8(4, AEM_VERSION);
+    view.setUint32(5, metaJson.byteLength, false);
+    bytes.set(metaJson, 9);
+    bytes.set(new Uint8Array(audioBuffer), 9 + metaJson.byteLength);
+
+    return new Blob([output], { type: 'application/octet-stream' });
+}
+
+function unpackAem(arrayBuffer) {
+    const view = new DataView(arrayBuffer);
+    const bytes = new Uint8Array(arrayBuffer);
+
+    if (bytes.length < 9) throw new Error('File too small to be a valid .aem file');
+    for (let i = 0; i < 4; i++) {
+        if (bytes[i] !== AEM_MAGIC[i]) throw new Error('Not a valid .aem file (bad magic)');
+    }
+    const fileVersion = view.getUint8(4);
+    if (fileVersion > AEM_VERSION) throw new Error('Unsupported .aem version: ' + fileVersion);
+
+    const metaLen = view.getUint32(5, false);
+    if (9 + metaLen > bytes.length) throw new Error('Corrupt .aem file (metadata overflows)');
+
+    const metaBytes = bytes.slice(9, 9 + metaLen);
+    const metadata = JSON.parse(new TextDecoder().decode(metaBytes));
+
+    const audioBytes = bytes.slice(9 + metaLen);
+    const audioBlob = new Blob([audioBytes], { type: metadata.type || 'audio/mpeg' });
+
+    return { metadata, audioBlob };
+}
+
+function makeSongNameUnique(desiredName, existingNames) {
+    if (!existingNames.includes(desiredName)) return desiredName;
+    let counter = 1;
+    const dotIdx = desiredName.lastIndexOf('.');
+    const base = dotIdx > 0 ? desiredName.substring(0, dotIdx) : desiredName;
+    const ext = dotIdx > 0 ? desiredName.substring(dotIdx) : '';
+    let candidate;
+    do {
+        candidate = `${base} (${counter})${ext}`;
+        counter++;
+    } while (existingNames.includes(candidate));
+    return candidate;
+}
+
+async function exportSong(songName) {
+    try {
+        const blob = await packAem(songName);
+        const safeName = songName.replace(/[^a-zA-Z0-9._\-() ]/g, '_');
+        const fileName = safeName.replace(/\.[^.]+$/, '') + '.aem';
+
+        if (window.showSaveFilePicker) {
+            try {
+                const opts = {
+                    suggestedName: fileName,
+                    types: [{ description: 'Audio Events MIDI file', accept: { 'application/octet-stream': ['.aem'] } }]
+                };
+                if (lastExportDirHandle) opts.startIn = lastExportDirHandle;
+                const handle = await window.showSaveFilePicker(opts);
+                lastExportDirHandle = await handle.getParent?.() || null;
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                return;
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+            }
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+        alert('Export failed: ' + err.message);
+    }
+}
+
+async function importSong(file) {
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const { metadata, audioBlob } = unpackAem(arrayBuffer);
+
+        const allSongs = await getAllSongs();
+        const existingNames = allSongs.map(s => s.name);
+
+        let finalName = metadata.name || file.name.replace(/\.aem$/i, '');
+
+        if (existingNames.includes(finalName)) {
+            const suggested = makeSongNameUnique(finalName, existingNames);
+            const userInput = prompt(
+                `"${finalName}" already exists.\nEnter a new name:`,
+                suggested
+            );
+            if (userInput === null) return;
+            finalName = userInput.trim();
+            if (!finalName) return;
+            if (existingNames.includes(finalName)) {
+                finalName = makeSongNameUnique(finalName, existingNames);
+            }
+        }
+
+        const audioFile = new File([audioBlob], finalName, {
+            type: metadata.type || 'audio/mpeg',
+            lastModified: metadata.lastModified || Date.now()
+        });
+        await putSongs([audioFile]);
+
+        if (metadata.markers && metadata.markers.length) {
+            const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
+            eventMap[finalName] = metadata.markers;
+            localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(eventMap));
+        }
+        if (metadata.volume !== undefined && metadata.volume !== 1.0) {
+            const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
+            volMap[finalName] = metadata.volume;
+            localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap));
+        }
+        if (metadata.speed !== undefined && metadata.speed !== 1.0) {
+            const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
+            speedMap[finalName] = metadata.speed;
+            localStorage.setItem(SPEED_MAP_KEY, JSON.stringify(speedMap));
+        }
+        if (metadata.abLoop) {
+            const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
+            abMap[finalName] = metadata.abLoop;
+            localStorage.setItem(AB_LOOP_MAP_KEY, JSON.stringify(abMap));
+        }
+
+        await renderPlaylist();
+    } catch (err) {
+        alert('Import failed: ' + err.message);
+    }
+}
+
+const importInput = document.getElementById('importInput');
+importInput.addEventListener('click', () => { importInput.value = ''; });
+importInput.onchange = async () => {
+    const file = importInput.files?.[0];
+    importInput.value = '';
+    if (!file || !db) return;
+    await importSong(file);
+};
 
 /* ============================== Initialize DB ============================= */
 (async function init() {
