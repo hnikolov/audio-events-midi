@@ -480,6 +480,28 @@
 
         /* ===== SPEED MENU ===== */
         .speed-wrapper { position: relative; }
+        .info-wrapper { position: relative; flex: 0 0 auto; }
+        .info-popup {
+            position: absolute; top: calc(100% + 6px); left: 0;
+            background: var(--bg-elevated);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg); border: 1px solid var(--border);
+            padding: 12px 16px; display: none; z-index: 2000;
+            min-width: 200px; white-space: nowrap;
+        }
+        .info-popup .info-heading {
+            font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--text-muted);
+            margin: 0 0 6px;
+        }
+        .info-popup .info-heading:not(:first-child) { margin-top: 12px; }
+        .info-popup .info-version {
+            font-size: 0.92rem; font-weight: 600; color: var(--text-primary); margin: 0 0 2px;
+        }
+        .info-popup .info-device {
+            font-size: 0.86rem; color: var(--text-secondary);
+            padding: 4px 0;
+        }
         .speed-btn-label {
             min-width: 44px; font-size: 0.83rem;
             color: var(--text-muted); font-weight: 600;
@@ -611,6 +633,20 @@
 <!-- Fixed Top MIDI Bar -->
 <div id="mobileMidiBar" class="mobile-midi-bar" role="region" aria-label="MIDI connection">
   <div class="midi-panel" style="display:flex;align-items:center">
+    <div class="info-wrapper">
+      <button id="infoBtn" class="menu-btn" onclick="toggleInfoPopup()" aria-label="App info" style="flex:0 0 auto;padding:8px 10px">
+        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      </button>
+      <div id="infoPopup" class="info-popup">
+        <p class="info-heading">Version</p>
+        <p class="info-version" id="infoVersionLabel">v1.1</p>
+        <p class="info-heading">Supported MIDI Devices</p>
+        <div class="info-device">NUX Mighty Plug Pro (BLE and USB)</div>
+        <div class="info-device">Sonicake Pocket Master (BLE and USB)</div>
+        <div class="info-device">Positive Grid Spark GO (BLE only)</div>
+        <div class="info-device">Yamaha THR-II (USB only)</div>
+      </div>
+    </div>
     <button id="btnConnect" class="midi-status btn-connect" aria-label="Connect to MIDI device" style="flex:1">
       <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
       Connect
@@ -781,6 +817,18 @@ function toggleTheme() {
     applyTheme(next);
 }
 applyTheme(localStorage.getItem('ui-theme') || 'dark');
+
+/* -------------------------------- INFO POPUP ----------------------------- */
+function toggleInfoPopup() {
+    const popup = document.getElementById('infoPopup');
+    popup.style.display = popup.style.display === 'block' ? 'none' : 'block';
+}
+document.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('.info-wrapper')) {
+        const popup = document.getElementById('infoPopup');
+        if (popup) popup.style.display = 'none';
+    }
+});
 
 /* ============================ Robust IndexedDB ============================ */
 const IDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
