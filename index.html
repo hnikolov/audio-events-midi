@@ -2772,6 +2772,23 @@ if ('serviceWorker' in navigator) {
     if (!document.hidden) lockPortrait();
   });
 })();
+
+// Screen Wake Lock: keep screen on while the app is visible
+(function () {
+  var wl = null;
+  function acquire() {
+    if (wl || !('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(function (lock) {
+      wl = lock;
+      wl.addEventListener('release', function () { wl = null; });
+    }).catch(function () { /* OS refused */ });
+  }
+  function release() { if (wl) { wl.release(); wl = null; } }
+  document.addEventListener('visibilitychange', function () {
+    document.visibilityState === 'visible' ? acquire() : release();
+  });
+  acquire();
+})();
 </script>
 </body>
 </html>
