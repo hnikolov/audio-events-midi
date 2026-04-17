@@ -363,6 +363,7 @@
             box-shadow: var(--glass-shadow);
         }
         .mobile-player-bar .speed-wrapper .speed-menu { top: auto; bottom: calc(100% + 6px); }
+        .mobile-player-bar .volume-wrapper .volume-popup { top: auto; bottom: calc(100% + 6px); }
         .mobile-player-bar .progress-container,
         .mobile-player-bar .controls-container { margin: 0; }
 
@@ -502,12 +503,14 @@
         .speed-option.active { font-weight: 700; color: var(--accent); background: var(--accent-dim); }
 
         /* ===== VOLUME SLIDER ===== */
-        .volume-control { position: relative; display: inline-block; }
-        .volume-control #vol-slider {
-            position: absolute; bottom: 100%; display: none;
-            padding: 8px; z-index: 1000;
+        .volume-wrapper { position: relative; }
+        .volume-popup {
+            position: absolute; background: var(--bg-elevated);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg); border: 1px solid var(--border);
+            padding: 10px 22px; display: none; z-index: 2000;
+            left: 50%; transform: translateX(-50%);
         }
-        .volume-control.expanded #vol-slider { display: block; }
         #vol-slider {
             writing-mode: vertical-lr; direction: rtl;
             width: 4px; height: 100px;
@@ -716,9 +719,11 @@
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
             </button>
             <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABPanel()" aria-label="Toggle A/B loop panel">AB</button>
-            <div class="volume-control" id="volumeControl">
+            <div class="volume-wrapper" id="volumeControl">
                 <button id="volBtn" class="control-btn speed-btn-label" aria-label="Volume">100%</button>
-                <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume slider">
+                <div id="volumePopup" class="volume-popup">
+                    <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume slider">
+                </div>
             </div>
             <button class="control-btn" onclick="stopAudio()" aria-label="Stop">
               <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
@@ -2087,6 +2092,7 @@ async function playSong(name) {
 
 /* -------------------------------- VOLUME -------------------------------- */
 const volumeControl = document.getElementById('volumeControl');
+const volumePopup = document.getElementById('volumePopup');
 const volBtn = document.getElementById('volBtn');
 let volumeHideTimer = null;
 
@@ -2114,9 +2120,9 @@ function updateMuteUI() {
 /* Volume control toggle and auto-hide */
 function resetVolumeHideTimer() {
     if (volumeHideTimer) clearTimeout(volumeHideTimer);
-    volumeControl.classList.add('expanded');
+    volumePopup.style.display = 'block';
     volumeHideTimer = setTimeout(() => {
-        volumeControl.classList.remove('expanded');
+        volumePopup.style.display = 'none';
         volumeHideTimer = null;
     }, 1500);
 }
@@ -2129,17 +2135,17 @@ volBtn.addEventListener('click', (e) => {
 
 /* Collapse volume control when clicking outside */
 document.addEventListener('pointerdown', (e) => {
-    if (!volumeControl.contains(e.target) && volumeControl.classList.contains('expanded')) {
-        volumeControl.classList.remove('expanded');
-        if (volumeHideTimer) clearTimeout(volumeHideTimer);
+    if (!e.target.closest('.volume-wrapper') && volumePopup.style.display === 'block') {
+        volumePopup.style.display = 'none';
+        if (volumeHideTimer) { clearTimeout(volumeHideTimer); volumeHideTimer = null; }
     }
 });
 
 /* Collapse when pressing Escape */
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && volumeControl.classList.contains('expanded')) {
-        volumeControl.classList.remove('expanded');
-        if (volumeHideTimer) clearTimeout(volumeHideTimer);
+    if (e.key === 'Escape' && volumePopup.style.display === 'block') {
+        volumePopup.style.display = 'none';
+        if (volumeHideTimer) { clearTimeout(volumeHideTimer); volumeHideTimer = null; }
     }
 });
 
