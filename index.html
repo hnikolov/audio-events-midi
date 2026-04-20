@@ -149,6 +149,7 @@
             align-items: center;
             gap: 5px;
             letter-spacing: 0.02em;
+            -webkit-user-select: none; user-select: none;
         }
         .btn-primary:active { transform: scale(0.96); background: var(--accent-hover); }
 
@@ -217,6 +218,7 @@
         .header-row {
             display: flex; justify-content: space-between; align-items: center;
             padding: 14px 0 10px;
+            -webkit-user-select: none; user-select: none;
         }
         .header-row h3 { margin: 0; font-size: 1.21rem; font-weight: 700; }
         .header-row h4 { margin: 0; font-size: 1.05rem; font-weight: 600; color: var(--text-secondary); }
@@ -290,6 +292,7 @@
         .markers-header {
             display: flex; justify-content: space-between; align-items: center;
             padding: 8px 2px;
+            -webkit-user-select: none; user-select: none;
         }
         .markers-header h4 { margin: 0; font-size: 1.05rem; font-weight: 600; color: var(--text-secondary); }
         ul { list-style: none; padding: 0; margin: 0; }
@@ -514,6 +517,7 @@
             color: var(--text-muted); font-weight: 600;
             font-variant-numeric: tabular-nums;
             display: inline-flex; align-items: center; justify-content: center;
+            -webkit-user-select: none; user-select: none;
         }
         .speed-menu {
             position: absolute; background: var(--bg-elevated);
@@ -976,6 +980,7 @@ function togglePlaylistMenu(e, songName, menuId) {
         if (m.id !== menuId) m.classList.remove('open');
     });
     menu.classList.toggle('open');
+    if (menu.classList.contains('open')) flipMenuIfOverflow(menu);
 }
 
 /* ---------- drag-to-reorder logic (drag handle approach) ---------- */
@@ -2293,11 +2298,24 @@ async function refreshEventUI() {
     });
     updateMarkerTicks();
 }
+function flipMenuIfOverflow(menu) {
+    menu.style.top = ''; menu.style.bottom = '';
+    const grid = document.querySelector('.grid');
+    if (grid) {
+        const menuRect = menu.getBoundingClientRect();
+        const gridRect = grid.getBoundingClientRect();
+        if (menuRect.bottom > gridRect.bottom) {
+            menu.style.top = 'auto';
+            menu.style.bottom = '100%';
+        }
+    }
+}
 function toggleMarkerMenu(idx) {
     const menu = document.getElementById(`marker-menu-${idx}`);
     const allMenus = document.querySelectorAll('#event-list .dropdown-menu');
     allMenus.forEach(m => { if (m !== menu) m.classList.remove('open'); });
     menu.classList.toggle('open');
+    if (menu.classList.contains('open')) flipMenuIfOverflow(menu);
 }
 function toggleEdit(idx) {
   // Cancel any other marker currently being edited
@@ -2545,7 +2563,7 @@ document.querySelectorAll('.tab-bar .tab').forEach((label, i) => {
     if (!container) return;
 
     let startX = 0, startY = 0, tracking = false;
-    const SWIPE_MIN = 35;
+    const SWIPE_MIN = 10;
     const ANGLE_MAX = 40;
 
     container.addEventListener('touchstart', (e) => {
@@ -2562,7 +2580,7 @@ document.querySelectorAll('.tab-bar .tab').forEach((label, i) => {
         const dy = e.changedTouches[0].clientY - startY;
         const absDx = Math.abs(dx);
         const absDy = Math.abs(dy);
-        //if (absDx < SWIPE_MIN) return;
+        if (absDx < SWIPE_MIN) return;
         const angle = Math.atan2(absDy, absDx) * (180 / Math.PI);
         if (angle > ANGLE_MAX) return;
         // Swipe left → forward (Playlist→Events), swipe right → backward (Events→Playlist)
