@@ -586,11 +586,18 @@
 
         /* ===== STICKY HEADERS ===== */
         .card-playlist .header-row,
-        .card-player #current-title {
+        .card-player #current-title,
+        .card-player .markers-header {
             position: sticky;
             top: 0;
             z-index: 10;
             background: var(--bg-base);
+        }
+        .card-player #current-title {
+            z-index: 11;
+        }
+        .card-player .markers-header {
+            top: var(--sticky-title-height, 43px);
         }
         .card-player #current-title {
             margin: 0; display: block;
@@ -2533,6 +2540,7 @@ function switchTab(newIndex) {
     if (!document.startViewTransition) {
         radio.checked = true;
         currentTabIndex = newIndex;
+        measureStickyTitle();
         return;
     }
 
@@ -2546,7 +2554,15 @@ function switchTab(newIndex) {
 
     transition.finished.finally(() => {
         document.documentElement.classList.remove(directionClass);
+        measureStickyTitle();
     });
+}
+
+function measureStickyTitle() {
+    const el = document.getElementById('current-title');
+    if (el && el.offsetHeight > 0) {
+        document.documentElement.style.setProperty('--sticky-title-height', el.offsetHeight + 'px');
+    }
 }
 
 /* Tab bar click handlers */
@@ -2564,7 +2580,7 @@ document.querySelectorAll('.tab-bar .tab').forEach((label, i) => {
 
     let startX = 0, startY = 0, tracking = false;
     const SWIPE_MIN = 10;
-    const ANGLE_MAX = 40;
+    const ANGLE_MAX = 35;
 
     container.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1) return;
@@ -2795,6 +2811,7 @@ importInput.onchange = async () => {
   function setHeights() {
     const topBar    = document.getElementById('mobileMidiBar');
     const bottomBar = document.getElementById('mobilePlayerBar');
+    const titleEl   = document.getElementById('current-title');
     if (topBar) {
       const th = topBar.offsetHeight || 0;
       root.style.setProperty('--mobile-topbar-height', th + 'px');
@@ -2802,6 +2819,9 @@ importInput.onchange = async () => {
     if (bottomBar) {
       const bh = bottomBar.offsetHeight || 0;
       root.style.setProperty('--mobile-playerbar-height', bh + 'px');
+    }
+    if (titleEl && titleEl.offsetHeight > 0) {
+      root.style.setProperty('--sticky-title-height', titleEl.offsetHeight + 'px');
     }
   }
 
