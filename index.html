@@ -2491,8 +2491,8 @@ playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
     if (!container || !tabPlaylist || !tabPlayer) return;
 
     let startX = 0, startY = 0, tracking = false;
-    const SWIPE_MIN = 40;   // px horizontal threshold (lower for better sensitivity)
-    const ANGLE_MAX = 40;   // max degrees from horizontal (increase for easier swiping)
+    const SWIPE_MIN = 35; // px horizontal threshold (lower for better sensitivity)
+    const ANGLE_MAX = 40; // max degrees from horizontal (increase for easier swiping)
 
     container.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1) return;
@@ -2510,9 +2510,10 @@ playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
         const absDy = Math.abs(dy);
         if (absDx < SWIPE_MIN) return;
         const angle = Math.atan2(absDy, absDx) * (180 / Math.PI);
-        if (angle > ANGLE_MAX) return;          // too vertical — scroll, not swipe
-        // Circular: any swipe left → Events, any swipe right → Playlist
-        if (dx < 0) {
+        if (angle > ANGLE_MAX) return; // too vertical — scroll, not swipe
+        // Circular: with only 2 tabs, any horizontal swipe toggles to the other tab
+        // Note: use dx > 0 for right swipe, dx < 0 for left swipe if you want directional control in the future
+        if (tabPlaylist.checked) {
             tabPlayer.checked = true;
         } else {
             tabPlaylist.checked = true;
