@@ -102,7 +102,13 @@
         audio { width: 100%; display: none; }
 
         /* ===== LAYOUT ===== */
-        .grid { display: block; }
+        .grid {
+            display: block;
+            height: calc(100vh - var(--mobile-topbar-height, 0px) - var(--mobile-playerbar-height, 160px) - var(--mobile-tab-height, 56px) - env(safe-area-inset-bottom, 0px));
+            overflow-y: auto;
+            overscroll-behavior-y: contain;
+            -webkit-overflow-scrolling: touch;
+        }
         .card {
             background: var(--bg-base);
             padding: 0 16px;
@@ -578,7 +584,7 @@
         .card-playlist .header-row,
         .card-player #current-title {
             position: sticky;
-            top: var(--mobile-topbar-height, 44px);
+            top: 0;
             z-index: 10;
             background: var(--bg-base);
         }
@@ -617,6 +623,20 @@
         @media (orientation: landscape) and (max-height: 600px) {
             #landscape-blocker { display: flex; }
         }
+
+        /* ===== TAB VIEW TRANSITIONS ===== */
+        .grid {
+            view-transition-name: tab-content;
+        }
+        @keyframes slide-to-left   { to   { transform: translateX(-100%); opacity: 0; } }
+        @keyframes slide-from-right { from { transform: translateX(100%);  opacity: 0; } }
+        @keyframes slide-to-right   { to   { transform: translateX(100%);  opacity: 0; } }
+        @keyframes slide-from-left  { from { transform: translateX(-100%); opacity: 0; } }
+
+        .slide-forward::view-transition-old(tab-content)  { animation: 300ms ease-in  both slide-to-left;   }
+        .slide-forward::view-transition-new(tab-content)  { animation: 300ms ease-out both slide-from-right; }
+        .slide-backward::view-transition-old(tab-content) { animation: 300ms ease-in  both slide-to-right;  }
+        .slide-backward::view-transition-new(tab-content) { animation: 300ms ease-out both slide-from-left;  }
     </style>
 </head>
 <body>
@@ -2483,16 +2503,50 @@ audio.addEventListener('seeked', updateProgressUI);
 /* ======================== Playlist event listeners (after DOM refs) ====================== */
 playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
 
+/* =================== Tab switching with view transitions ================= */
+const TAB_IDS = ['tab-playlist', 'tab-player'];
+let currentTabIndex = 0;
+
+function switchTab(newIndex) {
+    if (newIndex === currentTabIndex) return;
+    const radio = document.getElementById(TAB_IDS[newIndex]);
+    if (!radio) return;
+
+    if (!document.startViewTransition) {
+        radio.checked = true;
+        currentTabIndex = newIndex;
+        return;
+    }
+
+    const directionClass = newIndex > currentTabIndex ? 'slide-forward' : 'slide-backward';
+    document.documentElement.classList.add(directionClass);
+
+    const transition = document.startViewTransition(() => {
+        radio.checked = true;
+        currentTabIndex = newIndex;
+    });
+
+    transition.finished.finally(() => {
+        document.documentElement.classList.remove(directionClass);
+    });
+}
+
+/* Tab bar click handlers */
+document.querySelectorAll('.tab-bar .tab').forEach((label, i) => {
+    label.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab(i);
+    });
+});
+
 /* ======================== Swipe between tabs ======================== */
 (function () {
     const container = document.querySelector('.mobile-tabs-container');
-    const tabPlaylist = document.getElementById('tab-playlist');
-    const tabPlayer   = document.getElementById('tab-player');
-    if (!container || !tabPlaylist || !tabPlayer) return;
+    if (!container) return;
 
     let startX = 0, startY = 0, tracking = false;
-    const SWIPE_MIN = 35; // px horizontal threshold (lower for better sensitivity)
-    const ANGLE_MAX = 40; // max degrees from horizontal (increase for easier swiping)
+    const SWIPE_MIN = 35;
+    const ANGLE_MAX = 40;
 
     container.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1) return;
@@ -2510,13 +2564,12 @@ playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
         const absDy = Math.abs(dy);
         if (absDx < SWIPE_MIN) return;
         const angle = Math.atan2(absDy, absDx) * (180 / Math.PI);
-        if (angle > ANGLE_MAX) return; // too vertical — scroll, not swipe
-        // Circular: with only 2 tabs, any horizontal swipe toggles to the other tab
-        // Note: use dx > 0 for right swipe, dx < 0 for left swipe if you want directional control in the future
-        if (tabPlaylist.checked) {
-            tabPlayer.checked = true;
-        } else {
-            tabPlaylist.checked = true;
+        if (angle > ANGLE_MAX) return;
+        // Swipe left → forward (Playlist→Events), swipe right → backward (Events→Playlist)
+        if (dx < 0 && currentTabIndex === 0) {
+            switchTab(1);
+        } else if (dx > 0 && currentTabIndex === 1) {
+            switchTab(0);
         }
     }, { passive: true });
 })();
