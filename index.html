@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon-192.png" />
-    <title>Audio Events MIDI v1.2.3</title>
+    <title>Audio Events MIDI v1.2.4</title>
     <style>
         /* ===== ROOT DESIGN TOKENS ===== */
         :root {
@@ -671,7 +671,7 @@
       </button>
       <div id="infoPopup" class="info-popup">
         <p class="info-heading">Version</p>
-        <p class="info-version" id="infoVersionLabel">v1.2.3</p>
+        <p class="info-version" id="infoVersionLabel">v1.2.4</p>
         <p class="info-heading">Supported MIDI Devices</p>
         <div class="info-device">NUX Mighty Plug Pro</div>
         <div class="info-device">Sonicake Pocket Master</div>
@@ -1739,6 +1739,11 @@ function toggleABPanel() {
     panel.classList.toggle('collapsed');
     panel.addEventListener('transitionend', () => {
         window.dispatchEvent(new Event('resize'));
+        // After player bar resizes, ensure active item is still visible
+        // Use double-rAF to let setHeights (also rAF) and layout settle first
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            scrollActiveItemIntoView();
+        }));
     }, { once: true });
 }
 
@@ -1839,12 +1844,25 @@ function loadABLoop() {
     // Auto-open/close AB panel based on saved state
     const panel = document.getElementById('ab-panel');
     if (panel) {
-        if (abLoop.enabled && isABValid()) {
-            panel.classList.remove('collapsed');
-        } else {
+        const wasCollapsed = panel.classList.contains('collapsed');
+        const shouldCollapse = !(abLoop.enabled && isABValid());
+        if (shouldCollapse && !wasCollapsed) {
             panel.classList.add('collapsed');
+            panel.addEventListener('transitionend', () => {
+                window.dispatchEvent(new Event('resize'));
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    scrollActiveItemIntoView();
+                }));
+            }, { once: true });
+        } else if (!shouldCollapse && wasCollapsed) {
+            panel.classList.remove('collapsed');
+            panel.addEventListener('transitionend', () => {
+                window.dispatchEvent(new Event('resize'));
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    scrollActiveItemIntoView();
+                }));
+            }, { once: true });
         }
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
     }
 }
 function saveABLoop() {
@@ -2185,6 +2203,12 @@ async function playSong(name) {
     audio.play().catch(() => { updatePlayPauseUI(); });
 
     await renderPlaylist();
+
+    // Auto-scroll to active playlist item (double-rAF to survive loadedmetadata & layout shifts)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        const activeItem = playlistUI.querySelector('.playlist-item.active');
+        if (activeItem) scrollIntoGridView(activeItem);
+    }));
 }
 
 /* -------------------------------- VOLUME -------------------------------- */
@@ -2410,7 +2434,7 @@ function updateMarkerTicks() {
 }
 function setActiveMarkerUIByIndex(i) {
     document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
-    const li = document.getElementById(`row-${i}`); if (li) li.classList.add('active-event');
+    const li = document.getElementById(`row-${i}`); if (li) { li.classList.add('active-event'); scrollIntoGridView(li); }
     progressBar.querySelectorAll('.progress-tick').forEach(el => el.classList.remove('current'));
     const tick = document.getElementById(`tick-${i}`); if (tick) tick.classList.add('current');
 }
@@ -2562,6 +2586,48 @@ function measureStickyTitle() {
     const el = document.getElementById('current-title');
     if (el && el.offsetHeight > 0) {
         document.documentElement.style.setProperty('--sticky-title-height', el.offsetHeight + 'px');
+    }
+}
+
+/* Scroll an element into view within the .grid scroll container if it's clipped */
+function scrollIntoGridView(el) {
+    const grid = document.querySelector('.grid');
+    if (!grid || !el) return;
+    const elRect = el.getBoundingClientRect();
+    // Skip hidden elements (inside display:none tab) — they report all zeros
+    if (elRect.width === 0 && elRect.height === 0) return;
+    const gridRect = grid.getBoundingClientRect();
+    // Account for sticky headers overlapping from the top
+    const stickyBottom = getStickyBottomEdge(el, gridRect.top);
+    if (elRect.bottom > gridRect.bottom) {
+        grid.scrollTop += elRect.bottom - gridRect.bottom;
+    } else if (elRect.top < stickyBottom) {
+        grid.scrollTop -= stickyBottom - elRect.top;
+    }
+}
+
+/* Get the bottom edge of the lowest sticky header in the current tab */
+function getStickyBottomEdge(el, gridTop) {
+    const card = el.closest('.card');
+    if (!card) return gridTop;
+    const stickies = card.querySelectorAll('.header-row, #current-title, .markers-header');
+    let bottom = gridTop;
+    stickies.forEach(s => {
+        const r = s.getBoundingClientRect();
+        if (r.height > 0 && r.bottom > bottom) bottom = r.bottom;
+    });
+    return bottom;
+}
+
+/* Scroll the active item on whichever tab is currently visible */
+function scrollActiveItemIntoView() {
+    const playlistTab = document.getElementById('tab-playlist');
+    if (playlistTab && playlistTab.checked) {
+        const item = playlistUI.querySelector('.playlist-item.active');
+        if (item) scrollIntoGridView(item);
+    } else {
+        const marker = document.querySelector('#event-list li.active-event');
+        if (marker) scrollIntoGridView(marker);
     }
 }
 
