@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon-192.png" />
-    <title>Audio Events MIDI v1.2.1</title>
+    <title>Audio Events MIDI v1.2.2</title>
     <style>
         /* ===== ROOT DESIGN TOKENS ===== */
         :root {
@@ -633,10 +633,10 @@
         @keyframes slide-to-right   { to   { transform: translateX(100%);  opacity: 0; } }
         @keyframes slide-from-left  { from { transform: translateX(-100%); opacity: 0; } }
 
-        .slide-forward::view-transition-old(tab-content)  { animation: 300ms ease-in  both slide-to-left;   }
-        .slide-forward::view-transition-new(tab-content)  { animation: 300ms ease-out both slide-from-right; }
-        .slide-backward::view-transition-old(tab-content) { animation: 300ms ease-in  both slide-to-right;  }
-        .slide-backward::view-transition-new(tab-content) { animation: 300ms ease-out both slide-from-left;  }
+        .slide-forward::view-transition-old(tab-content)  { animation: 200ms ease-in  both slide-to-left;   }
+        .slide-forward::view-transition-new(tab-content)  { animation: 200ms ease-out both slide-from-right; }
+        .slide-backward::view-transition-old(tab-content) { animation: 200ms ease-in  both slide-to-right;  }
+        .slide-backward::view-transition-new(tab-content) { animation: 200ms ease-out both slide-from-left;  }
     </style>
 </head>
 <body>
@@ -660,7 +660,7 @@
       </button>
       <div id="infoPopup" class="info-popup">
         <p class="info-heading">Version</p>
-        <p class="info-version" id="infoVersionLabel">v1.2.1</p>
+        <p class="info-version" id="infoVersionLabel">v1.2.2</p>
         <p class="info-heading">Supported MIDI Devices</p>
         <div class="info-device">NUX Mighty Plug Pro</div>
         <div class="info-device">Sonicake Pocket Master</div>
@@ -2562,7 +2562,7 @@ document.querySelectorAll('.tab-bar .tab').forEach((label, i) => {
         const dy = e.changedTouches[0].clientY - startY;
         const absDx = Math.abs(dx);
         const absDy = Math.abs(dy);
-        if (absDx < SWIPE_MIN) return;
+        //if (absDx < SWIPE_MIN) return;
         const angle = Math.atan2(absDy, absDx) * (180 / Math.PI);
         if (angle > ANGLE_MAX) return;
         // Swipe left → forward (Playlist→Events), swipe right → backward (Events→Playlist)
