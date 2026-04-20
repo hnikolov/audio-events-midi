@@ -2491,8 +2491,8 @@ playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
     if (!container || !tabPlaylist || !tabPlayer) return;
 
     let startX = 0, startY = 0, tracking = false;
-    const SWIPE_MIN = 60;   // px horizontal threshold
-    const ANGLE_MAX = 35;   // max degrees from horizontal
+    const SWIPE_MIN = 40;   // px horizontal threshold (lower for better sensitivity)
+    const ANGLE_MAX = 40;   // max degrees from horizontal (increase for easier swiping)
 
     container.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1) return;
@@ -2511,10 +2511,11 @@ playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
         if (absDx < SWIPE_MIN) return;
         const angle = Math.atan2(absDy, absDx) * (180 / Math.PI);
         if (angle > ANGLE_MAX) return;          // too vertical — scroll, not swipe
-        if (dx < 0 && tabPlaylist.checked) {
-            tabPlayer.checked = true;           // swipe left → Events
-        } else if (dx > 0 && tabPlayer.checked) {
-            tabPlaylist.checked = true;          // swipe right → Playlist
+        // Circular: any swipe left → Events, any swipe right → Playlist
+        if (dx < 0) {
+            tabPlayer.checked = true;
+        } else {
+            tabPlaylist.checked = true;
         }
     }, { passive: true });
 })();
