@@ -1,10 +1,11 @@
-const CACHE_NAME = 'audio-midi-v1.1';
+const CACHE_NAME = 'audio-midi-v1.2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './icon.svg',
-  './icon-192.png'
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', (e) => {

@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon-192.png" />
-    <title>Audio Events MIDI v1.1</title>
+    <title>Audio Events MIDI v1.2</title>
     <style>
         /* ===== ROOT DESIGN TOKENS ===== */
         :root {
@@ -496,7 +496,8 @@
         }
         .info-popup .info-heading:not(:first-child) { margin-top: 12px; }
         .info-popup .info-version {
-            font-size: 0.92rem; font-weight: 600; color: var(--text-primary); margin: 0 0 2px;
+            /* font-size: 0.86rem; font-weight: 600; color: var(--text-primary); margin: 0 0 2px; */
+            font-size: 0.86rem; color: var(--text-secondary); margin: 0 0 2px;
         }
         .info-popup .info-device {
             font-size: 0.86rem; color: var(--text-secondary);
@@ -639,12 +640,12 @@
       </button>
       <div id="infoPopup" class="info-popup">
         <p class="info-heading">Version</p>
-        <p class="info-version" id="infoVersionLabel">v1.1</p>
+        <p class="info-version" id="infoVersionLabel">v1.2</p>
         <p class="info-heading">Supported MIDI Devices</p>
-        <div class="info-device">NUX Mighty Plug Pro (BLE and USB)</div>
-        <div class="info-device">Sonicake Pocket Master (BLE and USB)</div>
-        <div class="info-device">Positive Grid Spark GO (BLE only)</div>
-        <div class="info-device">Yamaha THR-II (USB only)</div>
+        <div class="info-device">NUX Mighty Plug Pro</div>
+        <div class="info-device">Sonicake Pocket Master</div>
+        <div class="info-device">Positive Grid Spark GO <span style="color: var(--text-muted);">(BLE only)</span></div>
+        <div class="info-device">Yamaha THR-II <span style="color: var(--text-muted);">(USB only)</span></div>
       </div>
     </div>
     <button id="btnConnect" class="midi-status btn-connect" aria-label="Connect to MIDI device" style="flex:1">
