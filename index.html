@@ -2812,15 +2812,12 @@ async function importSong(file) {
         if (existingNames.includes(finalName)) {
             const suggested = makeSongNameUnique(finalName, existingNames);
             const userInput = prompt(
-                `"${finalName}" already exists.\nEnter a new name:`,
+                `"${finalName}" already exists.\n\nEnter a new name, or press OK to use the suggested alternative:`,
                 suggested
             );
             if (userInput === null) return;
             finalName = userInput.trim();
             if (!finalName) return;
-            if (existingNames.includes(finalName)) {
-                finalName = makeSongNameUnique(finalName, existingNames);
-            }
         }
 
         const audioFile = new File([audioBlob], finalName, {
