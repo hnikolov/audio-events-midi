@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon-192.png" />
-    <title>Audio Events MIDI v1.2.4</title>
+    <title>Audio Events MIDI</title>
     <style>
         /* ===== ROOT DESIGN TOKENS ===== */
         :root {
@@ -765,6 +765,21 @@
             <span id="time-duration" class="time-label time-right">0:00</span>
         </div>
 
+        <!-- A/B loop panel (collapsible) -->
+        <div class="controls-container ab-panel collapsed" id="ab-panel" role="group" aria-label="A/B loop controls">
+            <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show/hide loop overlay">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button id="btnSetA" class="control-btn ab-btn ab-timestamp" onclick="setLoopA()" aria-label="Set loop start">A: — —</button>
+            <button class="control-btn" onclick="rewindToA()" aria-label="Rewind to A">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            </button>
+            <button id="btnSetB" class="control-btn ab-btn ab-timestamp" onclick="setLoopB()" aria-label="Set loop end">B: — —</button>
+            <button class="control-btn" onclick="clearABLoop()" aria-label="Clear loop points">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+
         <!-- Main controls: Prev, Seek-10, Play, Seek+10, Next -->
         <div class="controls-container" role="group" aria-label="Playback controls">
             <button class="control-btn" onclick="prevTrack()" aria-label="Previous track">
@@ -805,20 +820,6 @@
             </button>
         </div>
 
-        <!-- A/B loop panel (collapsible) -->
-        <div class="controls-container ab-panel collapsed" id="ab-panel" role="group" aria-label="A/B loop controls">
-            <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show/hide loop overlay">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-            <button id="btnSetA" class="control-btn ab-btn ab-timestamp" onclick="setLoopA()" aria-label="Set loop start">A: — —</button>
-            <button class="control-btn" onclick="rewindToA()" aria-label="Rewind to A">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-            </button>
-            <button id="btnSetB" class="control-btn ab-btn ab-timestamp" onclick="setLoopB()" aria-label="Set loop end">B: — —</button>
-            <button class="control-btn" onclick="clearABLoop()" aria-label="Clear loop points">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-        </div>
     </div>
 </div>
 
