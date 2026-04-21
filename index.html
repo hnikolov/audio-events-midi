@@ -115,9 +115,9 @@
             border: none;
             border-radius: 0;
         }
-        .card-playlist, .card-player { display: none; }
+        .card-playlist, .card-events { display: none; }
         #tab-playlist:checked ~ .mobile-tabs-container .card-playlist { display: block; }
-        #tab-player:checked   ~ .mobile-tabs-container .card-player   { display: block; }
+        #tab-events:checked   ~ .mobile-tabs-container .card-events   { display: block; }
 
         .mobile-tabs-container {
             padding-top: var(--mobile-topbar-height);
@@ -576,30 +576,30 @@
         }
         .tab-bar .tab .icon { transition: fill 0.15s; }
         #tab-playlist:checked ~ .tab-bar label[for="tab-playlist"],
-        #tab-player:checked   ~ .tab-bar label[for="tab-player"] {
+        #tab-events:checked   ~ .tab-bar label[for="tab-events"] {
             color: var(--accent);
         }
         #tab-playlist:checked ~ .tab-bar label[for="tab-playlist"] .icon,
-        #tab-player:checked   ~ .tab-bar label[for="tab-player"] .icon {
+        #tab-events:checked   ~ .tab-bar label[for="tab-events"] .icon {
             fill: var(--accent);
         }
 
         /* ===== STICKY HEADERS ===== */
         .card-playlist .header-row,
-        .card-player #current-title,
-        .card-player .markers-header {
+        .card-events #current-title,
+        .card-events .markers-header {
             position: sticky;
             top: 0;
             z-index: 10;
             background: var(--bg-base);
         }
-        .card-player #current-title {
+        .card-events #current-title {
             z-index: 11;
         }
-        .card-player .markers-header {
+        .card-events .markers-header {
             top: var(--sticky-title-height, 43px);
         }
-        .card-player #current-title {
+        .card-events #current-title {
             margin: 0; display: block;
             padding: 14px 2px 8px;
             font-size: 1.1rem; font-weight: 600;
@@ -660,7 +660,7 @@
 
 <!-- Mobile tab state (CSS-only) -->
 <input type="radio" name="mobile-tab" id="tab-playlist" checked hidden>
-<input type="radio" name="mobile-tab" id="tab-player" hidden>
+<input type="radio" name="mobile-tab" id="tab-events" hidden>
 
 <!-- Fixed Top MIDI Bar -->
 <div id="mobileMidiBar" class="mobile-midi-bar" role="region" aria-label="MIDI connection">
@@ -671,7 +671,7 @@
       </button>
       <div id="infoPopup" class="info-popup">
         <p class="info-heading">Version</p>
-        <p class="info-version" id="infoVersionLabel">v1.2.5</p>
+        <p class="info-version" id="infoVersionLabel">v1.2.6</p>
         <p class="info-heading">Supported MIDI Devices</p>
         <div class="info-device">NUX Mighty Plug Pro</div>
         <div class="info-device">Sonicake Pocket Master</div>
@@ -731,7 +731,7 @@
         </div>
 
         <!-- EVENTS/MARKERS CARD -->
-        <div class="card card-player">
+        <div class="card card-events">
             <h2 id="current-title">Select a song</h2>
             <audio id="audioTrack"></audio>
 
@@ -829,8 +829,8 @@
     <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
     Playlist
   </label>
-  <label for="tab-player" class="tab">
-    <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+    <label for="tab-events" class="tab">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M6 2h2v20H6z"/><path d="M8 3h11l-2.6 4 2.6 4H8z"/></svg>
     Events
   </label>
 </label>
@@ -2554,7 +2554,7 @@ audio.addEventListener('seeked', updateProgressUI);
 playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
 
 /* =================== Tab switching with view transitions ================= */
-const TAB_IDS = ['tab-playlist', 'tab-player'];
+const TAB_IDS = ['tab-playlist', 'tab-events'];
 let currentTabIndex = 0;
 
 function switchTab(newIndex) {
