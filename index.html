@@ -671,7 +671,7 @@
       </button>
       <div id="infoPopup" class="info-popup">
         <p class="info-heading">Version</p>
-        <p class="info-version" id="infoVersionLabel">v1.2.4</p>
+        <p class="info-version" id="infoVersionLabel">v1.2.5</p>
         <p class="info-heading">Supported MIDI Devices</p>
         <div class="info-device">NUX Mighty Plug Pro</div>
         <div class="info-device">Sonicake Pocket Master</div>
@@ -2826,25 +2826,44 @@ async function importSong(file) {
         });
         await putSongs([audioFile]);
 
-        if (metadata.markers && metadata.markers.length) {
-            const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
-            eventMap[finalName] = metadata.markers;
-            localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(eventMap));
-        }
-        if (metadata.volume !== undefined && metadata.volume !== 1.0) {
-            const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
-            volMap[finalName] = metadata.volume;
-            localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap));
-        }
-        if (metadata.speed !== undefined && metadata.speed !== 1.0) {
-            const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
-            speedMap[finalName] = metadata.speed;
-            localStorage.setItem(SPEED_MAP_KEY, JSON.stringify(speedMap));
-        }
-        if (metadata.abLoop) {
-            const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
+        // Always write imported values so overwriting a selected song correctly
+        // replaces existing settings (including clearing markers or AB loop).
+        const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
+        eventMap[finalName] = Array.isArray(metadata.markers) ? metadata.markers : [];
+        localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(eventMap));
+
+        const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
+        volMap[finalName] = Number.isFinite(metadata.volume) ? metadata.volume : 1.0;
+        localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap));
+
+        const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
+        speedMap[finalName] = Number.isFinite(metadata.speed) ? metadata.speed : 1.0;
+        localStorage.setItem(SPEED_MAP_KEY, JSON.stringify(speedMap));
+
+        const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
+        if (metadata.abLoop && typeof metadata.abLoop === 'object') {
             abMap[finalName] = metadata.abLoop;
-            localStorage.setItem(AB_LOOP_MAP_KEY, JSON.stringify(abMap));
+        } else {
+            delete abMap[finalName];
+        }
+        localStorage.setItem(AB_LOOP_MAP_KEY, JSON.stringify(abMap));
+
+        // If the imported song is currently selected, sync the live player state.
+        if (finalName === currentFileName) {
+            const savedVol = volMap[finalName];
+            audio.volume = savedVol;
+            audio.muted = false;
+            volSlider.value = savedVol;
+            const savedRate = speedMap[finalName];
+            audio.playbackRate = savedRate;
+            speedBtn.innerHTML = `${savedRate.toFixed(2)}`;
+            firedEvents.clear();
+            lastTriggeredMarkerTime = null;
+            lastTriggeredMarkerIndex = null;
+            await refreshEventUI();
+            loadABLoop();
+            updateMarkerTicks();
+            updateMuteUI();
         }
 
         await renderPlaylist();
