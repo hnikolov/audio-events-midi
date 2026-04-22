@@ -49,11 +49,19 @@ The metadata block is a UTF-8 JSON object with the following fields:
   "name": "My Song.mp3",
   "type": "audio/mpeg",
   "lastModified": 1713400000000,
-  "markers": [
-    { "time": 12.5, "preset": 1 },
-    { "time": 24.3, "preset": 5 },
-    { "time": 45.1, "preset": 12 }
-  ],
+  "markerData": {
+    "activeId": "default",
+    "sets": {
+      "default": {
+        "name": "Default Set",
+        "events": [
+          { "time": 12.5, "preset": 1 },
+          { "time": 24.3, "preset": 5 },
+          { "time": 45.1, "preset": 12 }
+        ]
+      }
+    }
+  },
   "volume": 0.85,
   "speed": 1.25,
   "abLoop": {

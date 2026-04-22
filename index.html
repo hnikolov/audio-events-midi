@@ -694,7 +694,7 @@
       </button>
       <div id="infoPopup" class="info-popup">
         <p class="info-heading">Version</p>
-        <p class="info-version" id="infoVersionLabel">v1.2.7</p>
+        <p class="info-version" id="infoVersionLabel">v1.2.8</p>
         <p class="info-heading">Supported MIDI Devices</p>
         <div class="info-device">NUX Mighty Plug Pro</div>
         <div class="info-device">Sonicake Pocket Master</div>
@@ -759,8 +759,25 @@
             <audio id="audioTrack"></audio>
 
             <div class="markers-header">
-                <h4>Markers</h4>
-                <button class="btn-primary" onclick="setEvent()">
+                <div style="display:flex;align-items:center;min-width:0;flex:1;position:relative;">
+                    <div id="marker-set-trigger" onclick="toggleMarkerSetDropdown(event)" style="display:flex;align-items:center;flex:1;min-width:0;cursor:pointer;">
+                        <h4 style="margin-right:6px;flex-shrink:0;">Markers:</h4>
+                        <div style="display:flex;align-items:center;flex:1;min-width:0;">
+                            <span id="marker-set-label" style="font-size:1.05rem;font-weight:600;color:var(--text-secondary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden;"></span>
+                        </div>
+                    </div>
+                    <div id="marker-set-list-menu" class="speed-menu" style="left:0;top:100%;min-width:200px;max-height:50vh;overflow-y:auto;transform:translateY(4px);padding:4px;"></div>
+                    <button class="menu-btn" onclick="event.stopPropagation();toggleSetMenu()" aria-label="Set Options" style="margin:0 8px 0 4px;flex-shrink:0;">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                    </button>
+                    <div class="dropdown-menu" id="marker-set-menu" style="left:auto;right:0;top:100%;">
+                        <button onclick="event.stopPropagation();newMarkerSet()">New Empty Set</button>
+                        <button onclick="event.stopPropagation();duplicateMarkerSet()">Duplicate Set</button>
+                        <button onclick="event.stopPropagation();renameMarkerSet()">Rename Set</button>
+                        <button class="danger-item" onclick="event.stopPropagation();deleteMarkerSet()">Delete Set</button>
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="setEvent()" style="flex-shrink:0;">
                   <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                   Add
                 </button>
@@ -1660,7 +1677,16 @@ function setPlaybackRate(rate) {
         localStorage.setItem(SPEED_MAP_KEY, JSON.stringify(map));
     }
 }
-document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.speed-wrapper')) speedMenu.style.display = 'none'; });
+document.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('.speed-wrapper')) {
+        const speedMenu = document.getElementById('speedMenu');
+        if (speedMenu) speedMenu.style.display = 'none';
+    }
+    if (!e.target.closest('#marker-set-trigger') && !e.target.closest('#marker-set-list-menu')) {
+        const listMenu = document.getElementById('marker-set-list-menu');
+        if (listMenu) listMenu.style.display = 'none';
+    }
+});
 document.addEventListener('pointerdown', (e) => {
     if (!e.target.closest('.menu-btn') && !e.target.closest('.dropdown-menu')) {
         document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
@@ -2341,32 +2367,196 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* -------------------------- Markers (with preset) ------------------------ */
-function getEvents() {
+let currentMarkerSetId = 'default';
+
+function getRawMarkerData(songName) {
     const map = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
-    const raw = map[currentFileName] || [];
-    const normalized = normalizeMarkerList(raw);
-
-    const changed = raw.length !== normalized.length || raw.some((evt, idx) => {
-        const norm = normalized[idx];
-        if (!norm) return true;
-        if (typeof evt === 'number') return true;
-        if (!evt || typeof evt !== 'object') return true;
-        return Number(evt.time) !== norm.time
-            || parseInt(evt.preset, 10) !== norm.preset
-            || sanitizeMarkerText(evt.text) !== norm.text;
-    });
-
-    if (changed) {
-        map[currentFileName] = normalized;
+    let data = map[songName];
+    if (!data) return { activeId: 'default', sets: { default: { name: 'Default Set', events: [] } } };
+    
+    // Auto-migrate from array to object
+    if (Array.isArray(data)) {
+        data = {
+            activeId: 'default',
+            sets: {
+                default: { name: 'Default Set', events: data }
+            }
+        };
+        map[songName] = data;
         localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
     }
-
-    return normalized;
+    
+    // Safety fallback
+    if (!data.sets || Object.keys(data.sets).length === 0) {
+        data.sets = { default: { name: 'Default Set', events: [] } };
+        data.activeId = 'default';
+    }
+    if (!data.sets[data.activeId]) {
+        data.activeId = Object.keys(data.sets)[0];
+    }
+    
+    return data;
 }
-function saveEvents(list) {
+
+function saveRawMarkerData(songName, data) {
+    if (!songName) return;
     const map = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
-    map[currentFileName] = normalizeMarkerList(list);
+    for (const key in data.sets) {
+        data.sets[key].events = normalizeMarkerList(data.sets[key].events || []);
+    }
+    map[songName] = data;
     localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
+}
+
+function getEvents() {
+    if (!currentFileName) return [];
+    let data = getRawMarkerData(currentFileName);
+    currentMarkerSetId = data.activeId;
+    updateSetSelector(data);
+    return data.sets[data.activeId].events;
+}
+
+function saveEvents(list) {
+    if (!currentFileName) return;
+    let data = getRawMarkerData(currentFileName);
+    data.sets[data.activeId].events = normalizeMarkerList(list);
+    saveRawMarkerData(currentFileName, data);
+}
+
+function updateSetSelector(data) {
+    const label = document.getElementById('marker-set-label');
+    if (label && data.sets[data.activeId]) {
+        label.textContent = data.sets[data.activeId].name;
+    }
+    const menu = document.getElementById('marker-set-list-menu');
+    if (!menu) return;
+    menu.innerHTML = '';
+    for (const [id, setDef] of Object.entries(data.sets)) {
+        const btn = document.createElement('button');
+        btn.className = 'speed-option';
+        btn.style.justifyContent = 'flex-start';
+        btn.textContent = setDef.name;
+        if (id === data.activeId) btn.classList.add('active');
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            changeMarkerSet(id);
+            menu.style.display = 'none';
+        };
+        menu.appendChild(btn);
+    }
+}
+
+function toggleMarkerSetDropdown(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('marker-set-list-menu');
+    const setMenu = document.getElementById('marker-set-menu');
+    const isOpen = menu.style.display === 'block';
+
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    if (setMenu && setMenu.classList.contains('open')) setMenu.classList.remove('open');
+
+    menu.style.display = isOpen ? 'none' : 'block';
+}
+
+function changeMarkerSet(newId) {
+    if (!currentFileName) return;
+    let data = getRawMarkerData(currentFileName);
+    if (!data.sets[newId]) return;
+    data.activeId = newId;
+    currentMarkerSetId = newId;
+    saveRawMarkerData(currentFileName, data);
+    
+    firedEvents.clear();
+    lastTriggeredMarkerTime = null;
+    lastTriggeredMarkerIndex = null;
+    refreshEventUI();
+}
+
+function toggleSetMenu() {
+    const menu = document.getElementById('marker-set-menu');
+    const allMenus = document.querySelectorAll('.dropdown-menu');
+    allMenus.forEach(m => { if (m !== menu) m.classList.remove('open'); });
+    const listMenu = document.getElementById('marker-set-list-menu');
+    if (listMenu) listMenu.style.display = 'none';
+
+    menu.classList.toggle('open');
+    if (menu.classList.contains('open')) flipMenuIfOverflow(menu);
+}
+
+function newMarkerSet() {
+    document.getElementById('marker-set-menu').classList.remove('open');
+    if (!currentFileName) return;
+    const name = prompt("Enter name for new marker set:");
+    if (!name || name.trim() === '') return;
+    const id = 'set_' + Date.now();
+    let data = getRawMarkerData(currentFileName);
+    data.sets[id] = { name: name.trim(), events: [] };
+    data.activeId = id;
+    saveRawMarkerData(currentFileName, data);
+    
+    firedEvents.clear();
+    lastTriggeredMarkerTime = null;
+    lastTriggeredMarkerIndex = null;
+    refreshEventUI();
+}
+
+function duplicateMarkerSet() {
+    document.getElementById('marker-set-menu').classList.remove('open');
+    if (!currentFileName) return;
+    let data = getRawMarkerData(currentFileName);
+    const currSet = data.sets[data.activeId];
+    const name = prompt("Enter name for duplicated marker set:", currSet.name + " Copy");
+    if (!name || name.trim() === '') return;
+    const id = 'set_' + Date.now();
+    data.sets[id] = { name: name.trim(), events: JSON.parse(JSON.stringify(currSet.events)) };
+    data.activeId = id;
+    saveRawMarkerData(currentFileName, data);
+    
+    firedEvents.clear();
+    lastTriggeredMarkerTime = null;
+    lastTriggeredMarkerIndex = null;
+    refreshEventUI();
+}
+
+function renameMarkerSet() {
+    document.getElementById('marker-set-menu').classList.remove('open');
+    if (!currentFileName) return;
+    let data = getRawMarkerData(currentFileName);
+    const currSet = data.sets[data.activeId];
+    const name = prompt("Enter new name for marker set:", currSet.name);
+    if (!name || name.trim() === '' || name.trim() === currSet.name) return;
+    currSet.name = name.trim();
+    saveRawMarkerData(currentFileName, data);
+    updateSetSelector(data);
+}
+
+function deleteMarkerSet() {
+    document.getElementById('marker-set-menu').classList.remove('open');
+    if (!currentFileName) return;
+    let data = getRawMarkerData(currentFileName);
+    
+    if (Object.keys(data.sets).length <= 1) {
+        if (confirm("This is the only marker set. Clear all markers from it?")) {
+            data.sets[data.activeId].events = [];
+            saveRawMarkerData(currentFileName, data);
+            firedEvents.clear();
+            lastTriggeredMarkerTime = null;
+            lastTriggeredMarkerIndex = null;
+            refreshEventUI();
+        }
+        return;
+    }
+    
+    if (!confirm("Are you sure you want to delete this marker set?")) return;
+    
+    delete data.sets[data.activeId];
+    data.activeId = Object.keys(data.sets)[0];
+    saveRawMarkerData(currentFileName, data);
+    
+    firedEvents.clear();
+    lastTriggeredMarkerTime = null;
+    lastTriggeredMarkerIndex = null;
+    refreshEventUI();
 }
 function formatPreset(preset) {
     let n = parseInt(preset, 10);
@@ -2843,7 +3033,7 @@ async function packAem(songName) {
         name: song.name,
         type: song.type || '',
         lastModified: song.lastModified || Date.now(),
-        markers: normalizeMarkerList(eventMap[songName] || []),
+        markerData: eventMap[songName] || null,
         volume: volMap[songName] !== undefined ? volMap[songName] : 1.0,
         speed: speedMap[songName] !== undefined ? speedMap[songName] : 1.0,
         abLoop: abMap[songName] || null
@@ -2972,7 +3162,14 @@ async function importSong(file) {
         // Always write imported values so overwriting a selected song correctly
         // replaces existing settings (including clearing markers or AB loop).
         const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
-        eventMap[finalName] = normalizeMarkerList(Array.isArray(metadata.markers) ? metadata.markers : []);
+        if (metadata.markerData && typeof metadata.markerData === 'object' && metadata.markerData.sets) {
+            eventMap[finalName] = metadata.markerData;
+        } else {
+            eventMap[finalName] = {
+                activeId: 'default',
+                sets: { default: { name: 'Default Set', events: normalizeMarkerList(Array.isArray(metadata.markers) ? metadata.markers : []) } }
+            };
+        }
         localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(eventMap));
 
         const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
