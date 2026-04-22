@@ -307,9 +307,18 @@
         li.active-event {
             background: var(--amber-dim);
         }
-        .marker-left { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 0.94rem; font-weight: 500; color: var(--text-primary); min-width: 50px; }
-        .marker-middle { flex: 1; text-align: center; min-width: 0; }
-        .marker-right { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+        .marker-left { font-variant-numeric: tabular-nums; font-size: 0.94rem; font-weight: 500; color: var(--text-primary); min-width: 0; }
+        .marker-middle { text-align: center; min-width: 0; }
+        .marker-note {
+            min-width: 0;
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: left;
+        }
+        .marker-right { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
         .preset-badge {
             font-size: 0.83rem; font-weight: 600;
             color: var(--text-primary);
@@ -319,24 +328,38 @@
             padding: 2px 10px;
             letter-spacing: 0.03em;
         }
-        #event-list li { display: flex; align-items: center; gap: 8px; user-select: none; }
-        #event-list .time-input, #event-list .preset-input {
+        #event-list li {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+        }
+        #event-list .time-input, #event-list .preset-input, #event-list .note-input {
             flex: 1 1 0; min-width: 0; width: 0;
             border: 1px solid var(--border); border-radius: var(--radius-sm);
             padding: 8px 10px; font-size: 1rem;
             background: var(--bg-surface); color: var(--text-primary);
             outline: none; transition: border-color 0.15s;
         }
-        #event-list .time-input:focus, #event-list .preset-input:focus {
+        #event-list .time-input:focus, #event-list .preset-input:focus, #event-list .note-input:focus {
             border-color: var(--accent);
             box-shadow: 0 0 0 2px rgba(29,185,84,0.15);
         }
         #event-list li button { flex: 0 0 auto; white-space: nowrap; }
-        #event-list li.editing { flex-wrap: wrap; }
+        #event-list li.editing {
+            grid-template-columns: 1fr 1fr 1fr auto;
+            row-gap: 6px;
+        }
         #event-list li.editing .marker-left,
-        #event-list li.editing .marker-middle { flex: 1 1 0; min-width: 0; }
-        #event-list li.editing .marker-right { flex: 0 0 100%; justify-content: flex-end; padding-top: 6px; }
-        #event-list li.editing .time-input, #event-list li.editing .preset-input {
+        #event-list li.editing .marker-middle,
+        #event-list li.editing .marker-note { flex: 1 1 0; min-width: 0; }
+        #event-list li.editing .marker-right {
+            grid-column: 1 / -1;
+            justify-content: flex-end;
+            padding-top: 2px;
+        }
+        #event-list li.editing .time-input, #event-list li.editing .preset-input, #event-list li.editing .note-input {
             width: 100%; font-size: 1rem; padding: 8px 10px; min-height: 44px;
             border-radius: var(--radius-sm);
         }
@@ -671,7 +694,7 @@
       </button>
       <div id="infoPopup" class="info-popup">
         <p class="info-heading">Version</p>
-        <p class="info-version" id="infoVersionLabel">v1.2.6</p>
+        <p class="info-version" id="infoVersionLabel">v1.2.7</p>
         <p class="info-heading">Supported MIDI Devices</p>
         <div class="info-device">NUX Mighty Plug Pro</div>
         <div class="info-device">Sonicake Pocket Master</div>
@@ -2239,6 +2262,52 @@ function updateMuteUI() {
     const volPct = Math.round(vol * 100);
     volBtn.textContent = vol === 0 ? 'Muted' : `${volPct}%`;
 }
+
+function escapeHtml(text) {
+    const s = String(text ?? '');
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function sanitizeMarkerText(text) {
+    return String(text ?? '').trim().slice(0, 24);
+}
+
+function normalizeMarkerEntry(entry) {
+    if (typeof entry === 'number') {
+        return { time: entry, preset: 1, text: '' };
+    }
+    if (!entry || typeof entry !== 'object') {
+        return null;
+    }
+
+    const time = Number(entry.time);
+    if (!Number.isFinite(time)) {
+        return null;
+    }
+
+    let preset = parseInt(entry.preset, 10);
+    if (isNaN(preset)) preset = 1;
+    preset = Math.min(100, Math.max(1, preset));
+
+    return {
+        time,
+        preset,
+        text: sanitizeMarkerText(entry.text)
+    };
+}
+
+function normalizeMarkerList(rawList) {
+    if (!Array.isArray(rawList)) return [];
+    return rawList
+        .map(normalizeMarkerEntry)
+        .filter(Boolean)
+        .sort((a, b) => a.time - b.time);
+}
 /* Volume control toggle and auto-hide */
 function resetVolumeHideTimer() {
     if (volumeHideTimer) clearTimeout(volumeHideTimer);
@@ -2275,17 +2344,28 @@ document.addEventListener('keydown', (e) => {
 function getEvents() {
     const map = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
     const raw = map[currentFileName] || [];
-    if (raw.length && typeof raw[0] === 'number') {
-        const migrated = raw.map(t => ({ time: t, preset: 1 }));
-        map[currentFileName] = migrated;
+    const normalized = normalizeMarkerList(raw);
+
+    const changed = raw.length !== normalized.length || raw.some((evt, idx) => {
+        const norm = normalized[idx];
+        if (!norm) return true;
+        if (typeof evt === 'number') return true;
+        if (!evt || typeof evt !== 'object') return true;
+        return Number(evt.time) !== norm.time
+            || parseInt(evt.preset, 10) !== norm.preset
+            || sanitizeMarkerText(evt.text) !== norm.text;
+    });
+
+    if (changed) {
+        map[currentFileName] = normalized;
         localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
-        return migrated;
     }
-    return raw;
+
+    return normalized;
 }
 function saveEvents(list) {
     const map = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
-    map[currentFileName] = list.slice().sort((a,b) => a.time - b.time);
+    map[currentFileName] = normalizeMarkerList(list);
     localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
 }
 function formatPreset(preset) {
@@ -2302,9 +2382,11 @@ async function refreshEventUI() {
     events.forEach((evt, i) => {
         const li = document.createElement('li');
         li.id = `row-${i}`;
+                const markerText = escapeHtml(evt.text || '');
         li.innerHTML = `
             <span class="marker-left"><b>${formatClock(evt.time)}</b></span>
             <span class="marker-middle"><span class="preset-badge">${formatPreset(evt.preset)}</span></span>
+                                                <span class="marker-note">${markerText}</span>
             <span class="marker-right">
                 <button class="menu-btn" onclick="event.stopPropagation();toggleMarkerMenu(${i})" aria-label="Options">
                   <svg class="icon icon-sm" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
@@ -2328,6 +2410,8 @@ async function refreshEventUI() {
         });
         list.appendChild(li);
     });
+    const focusIdx = getMarkerFocusIndex();
+    if (focusIdx !== null) setActiveMarkerUIByIndex(focusIdx, false);
     updateMarkerTicks();
 }
 function flipMenuIfOverflow(menu) {
@@ -2363,6 +2447,9 @@ function toggleEdit(idx) {
     <span class="marker-middle" style="text-align:center">
       <input type="number" min="1" max="100" step="1" class="preset-input" id="edit-preset-${idx}" value="${evt.preset}">
     </span>
+        <span class="marker-note">
+            <input type="text" maxlength="24" class="note-input" id="edit-text-${idx}" value="${escapeHtml(evt.text || '')}" placeholder="Description">
+        </span>
     <span class="marker-right">
       <button onclick="saveEdit(${idx})">Save</button>
       <button onclick="refreshEventUI()">Cancel</button>
@@ -2374,12 +2461,13 @@ function saveEdit(idx) {
     const old = events[idx];
     const newTime = parseFloat(document.getElementById(`edit-time-${idx}`).value);
     let newPreset = parseInt(document.getElementById(`edit-preset-${idx}`).value, 10);
+    const newText = sanitizeMarkerText(document.getElementById(`edit-text-${idx}`)?.value);
     if (isNaN(newTime)) return;
     if (isNaN(newPreset)) newPreset = 1;
     newPreset = Math.min(100, Math.max(1, newPreset));
 
     const updated = events.slice();
-    updated[idx] = { time: newTime, preset: newPreset };
+    updated[idx] = { time: newTime, preset: newPreset, text: newText };
     saveEvents(updated);
 
     firedEvents.delete(old.time);
@@ -2395,7 +2483,7 @@ function setEvent() {
     const events = getEvents();
     const now = parseFloat(audio.currentTime.toFixed(1)); // align with deciseconds display
     if (!events.some(e => e.time === now)) {
-        saveEvents([...events, { time: now, preset: 1 }]);
+        saveEvents([...events, { time: now, preset: 1, text: '' }]);
         refreshEventUI();
         updateMarkerTicks();
     }
@@ -2427,15 +2515,19 @@ function updateMarkerTicks() {
         tick.className = 'progress-tick';
         tick.id = `tick-${i}`;
         tick.style.left = `${pct}%`;
-        tick.title = `${formatClock(evt.time)} • ${formatPreset(evt.preset)}`;
+        tick.title = `${formatClock(evt.time)} • ${formatPreset(evt.preset)}${evt.text ? ` • ${evt.text}` : ''}`;
         if (firedEvents.has(evt.time)) tick.classList.add('fired');
         if (lastTriggeredMarkerIndex === i) tick.classList.add('current');
         progressBar.appendChild(tick);
     });
 }
-function setActiveMarkerUIByIndex(i) {
+function setActiveMarkerUIByIndex(i, shouldScroll = true) {
     document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
-    const li = document.getElementById(`row-${i}`); if (li) { li.classList.add('active-event'); scrollIntoGridView(li); }
+    const li = document.getElementById(`row-${i}`);
+    if (li) {
+        li.classList.add('active-event');
+        if (shouldScroll) scrollIntoGridView(li);
+    }
     progressBar.querySelectorAll('.progress-tick').forEach(el => el.classList.remove('current'));
     const tick = document.getElementById(`tick-${i}`); if (tick) tick.classList.add('current');
 }
@@ -2556,9 +2648,56 @@ playlistUI.addEventListener('pointerdown', onPlaylistPointerDown);
 /* =================== Tab switching with view transitions ================= */
 const TAB_IDS = ['tab-playlist', 'tab-events'];
 let currentTabIndex = 0;
+const tabScrollTop = { 0: 0, 1: 0 };
+
+function saveCurrentTabScroll() {
+    const grid = document.querySelector('.grid');
+    if (!grid) return;
+    tabScrollTop[currentTabIndex] = grid.scrollTop;
+}
+
+function restoreTabScroll(tabIndex) {
+    const grid = document.querySelector('.grid');
+    if (!grid) return;
+    grid.scrollTop = tabScrollTop[tabIndex] || 0;
+}
+
+function getMarkerFocusIndex() {
+    const events = getEvents();
+    if (!events.length) return null;
+
+    if (Number.isInteger(lastTriggeredMarkerIndex)
+        && lastTriggeredMarkerIndex >= 0
+        && lastTriggeredMarkerIndex < events.length) {
+        return lastTriggeredMarkerIndex;
+    }
+
+    const nearest = nearestMarkerAtOrBefore(audio.currentTime, EPS_RECONCILE);
+    if (nearest) return nearest.i;
+
+    return 0;
+}
+
+function ensureTabFocusVisible(tabIndex) {
+    if (tabIndex === 0) {
+        const activeItem = playlistUI.querySelector('.playlist-item.active');
+        if (activeItem) scrollIntoGridView(activeItem);
+        return;
+    }
+
+    const focusIdx = getMarkerFocusIndex();
+    if (focusIdx === null) return;
+    setActiveMarkerUIByIndex(focusIdx, true);
+}
 
 function switchTab(newIndex) {
-    if (newIndex === currentTabIndex) return;
+    if (newIndex === currentTabIndex) {
+        requestAnimationFrame(() => ensureTabFocusVisible(newIndex));
+        return;
+    }
+
+    saveCurrentTabScroll();
+
     const radio = document.getElementById(TAB_IDS[newIndex]);
     if (!radio) return;
 
@@ -2566,6 +2705,8 @@ function switchTab(newIndex) {
         radio.checked = true;
         currentTabIndex = newIndex;
         measureStickyTitle();
+        restoreTabScroll(newIndex);
+        requestAnimationFrame(() => ensureTabFocusVisible(newIndex));
         return;
     }
 
@@ -2580,6 +2721,8 @@ function switchTab(newIndex) {
     transition.finished.finally(() => {
         document.documentElement.classList.remove(directionClass);
         measureStickyTitle();
+        restoreTabScroll(newIndex);
+        requestAnimationFrame(() => ensureTabFocusVisible(newIndex));
     });
 }
 
@@ -2627,8 +2770,8 @@ function scrollActiveItemIntoView() {
         const item = playlistUI.querySelector('.playlist-item.active');
         if (item) scrollIntoGridView(item);
     } else {
-        const marker = document.querySelector('#event-list li.active-event');
-        if (marker) scrollIntoGridView(marker);
+        const focusIdx = getMarkerFocusIndex();
+        if (focusIdx !== null) setActiveMarkerUIByIndex(focusIdx, true);
     }
 }
 
@@ -2700,7 +2843,7 @@ async function packAem(songName) {
         name: song.name,
         type: song.type || '',
         lastModified: song.lastModified || Date.now(),
-        markers: eventMap[songName] || [],
+        markers: normalizeMarkerList(eventMap[songName] || []),
         volume: volMap[songName] !== undefined ? volMap[songName] : 1.0,
         speed: speedMap[songName] !== undefined ? speedMap[songName] : 1.0,
         abLoop: abMap[songName] || null
@@ -2829,7 +2972,7 @@ async function importSong(file) {
         // Always write imported values so overwriting a selected song correctly
         // replaces existing settings (including clearing markers or AB loop).
         const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
-        eventMap[finalName] = Array.isArray(metadata.markers) ? metadata.markers : [];
+        eventMap[finalName] = normalizeMarkerList(Array.isArray(metadata.markers) ? metadata.markers : []);
         localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(eventMap));
 
         const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
