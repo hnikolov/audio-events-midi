@@ -536,10 +536,10 @@
             padding: 4px 0;
         }
         .speed-btn-label {
-            min-width: 44px; font-size: 0.83rem;
+            min-width: 52px; font-size: 0.83rem;
             color: var(--text-muted); font-weight: 600;
             font-variant-numeric: tabular-nums;
-            display: inline-flex; align-items: center; justify-content: center;
+            display: inline-flex; align-items: center; justify-content: center; gap: 4px;
             -webkit-user-select: none; user-select: none;
         }
         .speed-menu {
@@ -558,15 +558,15 @@
         .speed-option:active { background: var(--bg-hover); }
         .speed-option.active { font-weight: 700; color: var(--accent); background: var(--accent-dim); }
 
-        /* ===== VOLUME & EQ (STICKY BOTTOM SHEET) ===== */
+        /* ===== VOLUME & SPEED (STICKY BOTTOM SHEET) ===== */
         .volume-wrapper { position: relative; }
-        .volume-overlay {
+        .sheet-overlay {
             position: fixed; inset: 0; background: var(--backdrop-overlay); z-index: 2999;
             opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
         }
-        .volume-overlay.open { opacity: 1; pointer-events: auto; }
+        .sheet-overlay.open { opacity: 1; pointer-events: auto; }
         
-        .volume-popup {
+        .action-sheet {
             position: fixed; bottom: 0; left: 0; right: 0; z-index: 3000;
             background: var(--bg-elevated);
             border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg);
@@ -576,7 +576,28 @@
             display: flex; flex-direction: column;
             padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
         }
-        .volume-popup.open { transform: translateY(0); }
+        .action-sheet.open { transform: translateY(0); }
+
+        .speed-slider-container {
+            display: flex; align-items: center; gap: 12px; margin: 20px 0;
+            font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--text-muted); font-weight: 500;
+        }
+        .speed-slider-container input[type="range"] { flex: 1; margin: 0; padding: 0; accent-color: var(--accent); }
+        
+        .speed-chips-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 8px; align-items: stretch; justify-items: center;
+        }
+        .speed-chip {
+            width: 100%; padding: 10px 0; display: flex; align-items: center; justify-content: center;
+            font-size: 0.85rem; font-weight: 500; font-variant-numeric: tabular-nums;
+            color: var(--text-secondary); background: var(--bg-hover);
+            border: 1px solid transparent; border-radius: var(--radius-sm);
+            cursor: pointer; transition: all 0.15s ease; 
+        }
+        .speed-chip:active { background: var(--border); }
+        .speed-chip.active { color: var(--accent); background: var(--accent-dim); border-color: var(--border); font-weight: 700; }
+        .speed-chip.center-hero { grid-row: span 2; height: 100%; font-size: 0.95rem; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid var(--border); }
         
         .eq-container { display: flex; gap: 20px; align-items: stretch; margin-top: 8px;}
         .eq-presets { display: flex; flex-direction: column; gap: 8px; width: 100px; justify-content: space-between; }
@@ -716,7 +737,7 @@
       </button>
       <div id="infoPopup" class="info-popup">
         <p class="info-heading">Version</p>
-        <p class="info-version" id="infoVersionLabel">v1.2.8</p>
+        <p class="info-version" id="infoVersionLabel">v1.2.9</p>
         <p class="info-heading">Supported MIDI Devices</p>
         <div class="info-device">NUX Mighty Plug Pro</div>
         <div class="info-device">Sonicake Pocket Master</div>
@@ -864,8 +885,10 @@
         <!-- Aux controls: Speed, Loop, AB, Volume, Stop -->
         <div class="controls-container aux-controls" role="group" aria-label="Auxiliary controls">
             <div class="speed-wrapper">
-                <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()" aria-label="Playback speed">1.00</button>
-                <div id="speedMenu" class="speed-menu" role="menu"></div>
+                <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()" aria-label="Playback speed">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:1px"><path d="M12 14l3-3"></path><path d="M3.34 16a10 10 0 1 1 17.32 0"></path></svg>
+                    <span id="speedValueText">1.00</span>
+                </button>
             </div>
             <button id="loopBtn" class="control-btn" onclick="toggleLoop()" aria-label="Toggle loop">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
@@ -873,7 +896,7 @@
             <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABPanel()" aria-label="Toggle A/B loop panel">AB</button>
             <div class="volume-wrapper" id="volumeControl">
                 <button id="volBtn" class="control-btn speed-btn-label" onclick="toggleVolumePanel()" aria-label="Volume">
-                    <svg id="volIcon" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+                    <svg id="volIcon" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:1px"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
                     <span id="volValueText">1.00</span>
                 </button>
             </div>
@@ -885,9 +908,41 @@
     </div>
 </div>
 
+<!-- Shared Action Sheet Overlay -->
+<div id="sheetOverlay" class="sheet-overlay" onclick="closeAllSheets()"></div>
+
+<!-- Speed Bottom Sheet -->
+<div id="speedPopup" class="action-sheet">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary)">Playback Speed</h3>
+        <button class="menu-btn" onclick="toggleSpeedMenu()" aria-label="Close" style="padding:6px">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    </div>
+    
+    <div class="speed-slider-container">
+        <input type="range" id="speed-slider" min="0.5" max="2.0" step="0.05" value="1.0">
+        <span id="speed-slider-val" style="min-width: 36px; text-align: right; color: var(--accent);">1.00</span>
+    </div>
+    
+    <div class="speed-chips-grid">
+        <!-- Row 1 & 2 -->
+        <button class="speed-chip" onclick="setPlaybackRate(0.60)">0.60</button>
+        <button class="speed-chip" onclick="setPlaybackRate(0.70)">0.70</button>
+        <button class="speed-chip center-hero" id="speed-chip-1" onclick="setPlaybackRate(1.00)">1.00</button>
+        <button class="speed-chip" onclick="setPlaybackRate(1.10)">1.10</button>
+        <button class="speed-chip" onclick="setPlaybackRate(1.25)">1.25</button>
+
+        <button class="speed-chip" onclick="setPlaybackRate(0.80)">0.80</button>
+        <button class="speed-chip" onclick="setPlaybackRate(0.90)">0.90</button>
+        <!-- Center hero spans here -->
+        <button class="speed-chip" onclick="setPlaybackRate(1.50)">1.50</button>
+        <button class="speed-chip" onclick="setPlaybackRate(1.75)">1.75</button>
+    </div>
+</div>
+
 <!-- Volume & EQ Bottom Sheet -->
-<div id="volumeOverlay" class="volume-overlay" onclick="toggleVolumePanel()"></div>
-<div id="volumePopup" class="volume-popup">
+<div id="volumePopup" class="action-sheet">
     <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary)">EQ & Volume</h3>
         <button class="menu-btn" onclick="toggleVolumePanel()" aria-label="Close" style="padding:6px">
@@ -1731,58 +1786,72 @@ function updatePlayPauseUI() {
 audio.addEventListener('play', updatePlayPauseUI);
 audio.addEventListener('pause', updatePlayPauseUI);
 
+function closeAllSheets() {
+    document.querySelectorAll('.action-sheet').forEach(sheet => sheet.classList.remove('open'));
+    const overlay = document.getElementById('sheetOverlay');
+    if (overlay) overlay.classList.remove('open');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const speedSlider = document.getElementById('speed-slider');
+    if (speedSlider) {
+        speedSlider.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (Math.abs(val - 1.0) <= 0.05) {
+                val = 1.0;
+                e.target.value = 1.0;
+            }
+            setPlaybackRate(val);
+        });
+    }
+});
+
 function toggleSpeedMenu() {
     if (!audio.src) return;
-    const isOpen = speedMenu.style.display === 'block';
-    if (isOpen) speedMenu.style.display = 'none';
-    // else { buildSpeedMenu(); speedMenu.style.display = 'block'; positionSpeedMenuToAnchor(ANCHOR_RATE); }
-    else { buildSpeedMenu(); speedMenu.style.display = 'block'; }
+    const popup = document.getElementById('speedPopup');
+    const overlay = document.getElementById('sheetOverlay');
+    const isOpen = popup.classList.contains('open');
+    if (isOpen) {
+        closeAllSheets();
+    } else {
+        popup.classList.add('open');
+        overlay.classList.add('open');
+    }
 }
-function buildSpeedMenu() {
-    speedMenu.querySelectorAll('.speed-option').forEach(el => el.remove());
-    AVAILABLE_SPEEDS.forEach(rate => {
-        const btn = document.createElement('button');
-        btn.className = 'speed-option';
-        btn.innerHTML = `${rate.toFixed(2)}`;
-        if (audio.playbackRate === rate) btn.classList.add('active');
-        btn.onclick = () => setPlaybackRate(rate);
-        speedMenu.appendChild(btn);
-    });
-}
-// function positionSpeedMenuToAnchor(anchorRate) {
-//     const wrapper = speedBtn.closest('.speed-wrapper'); if (!wrapper) return;
-//     const wRect = wrapper.getBoundingClientRect();
-//     const bRect = speedBtn.getBoundingClientRect();
-//     const mRect = speedMenu.getBoundingClientRect();
-//     const options = Array.from(speedMenu.querySelectorAll('.speed-option'));
-//     let anchorEl = options.find(el => parseFloat(el.textContent) === anchorRate) ||
-//                    options.find(el => el.classList.contains('active')) ||
-//                    options[Math.floor(options.length/2)];
-//     if (!anchorEl) return;
-//     const oRect = anchorEl.getBoundingClientRect();
-//     const buttonCenterX = (bRect.left - wRect.left) + bRect.width / 2;
-//     const buttonCenterY = (bRect.top  - wRect.top)  + bRect.height / 2;
-//     const optionCenterY = (oRect.top  - mRect.top)  + oRect.height / 2;
-//     const menuLeft = buttonCenterX - (mRect.width / 2);
-//     const menuTop  = buttonCenterY - optionCenterY;
-//     speedMenu.style.left = `${menuLeft}px`;
-//     speedMenu.style.top  = `${menuTop}px`;
-// }
+
 function setPlaybackRate(rate) {
     audio.playbackRate = rate;
-    speedBtn.innerHTML = `${rate.toFixed(2)}`;
-    speedMenu.style.display = 'none';
+    const valText = document.getElementById('speedValueText');
+    if (valText) {
+        valText.textContent = rate.toFixed(2);
+    } else {
+        // Fallback if structure changes
+        speedBtn.innerHTML = `<svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:1px"><path d="M12 14l3-3"></path><path d="M3.34 16a10 10 0 1 1 17.32 0"></path></svg>
+<span id="speedValueText">${rate.toFixed(2)}</span>`;
+    }
+    
+    // Update live slider companion label
+    const sliderVal = document.getElementById('speed-slider-val');
+    if (sliderVal) sliderVal.textContent = rate.toFixed(2);
+    
+    document.getElementById('speed-slider').value = rate;
+    
+    document.querySelectorAll('.speed-chip').forEach(chip => {
+        if (parseFloat(chip.textContent) === rate) {
+            chip.classList.add('active');
+        } else {
+            chip.classList.remove('active');
+        }
+    });
+
     if (currentFileName) {
         const map = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
         map[currentFileName] = rate;
         localStorage.setItem(SPEED_MAP_KEY, JSON.stringify(map));
     }
 }
+
 document.addEventListener('pointerdown', (e) => {
-    if (!e.target.closest('.speed-wrapper')) {
-        const speedMenu = document.getElementById('speedMenu');
-        if (speedMenu) speedMenu.style.display = 'none';
-    }
     if (!e.target.closest('#marker-set-trigger') && !e.target.closest('#marker-set-list-menu')) {
         const listMenu = document.getElementById('marker-set-list-menu');
         if (listMenu) listMenu.style.display = 'none';
@@ -2349,8 +2418,7 @@ async function playSong(name) {
 
     const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
     const savedRate = speedMap[name] !== undefined ? speedMap[name] : 1.0;
-    audio.playbackRate = savedRate;
-    speedBtn.innerHTML = `${savedRate.toFixed(2)}`;
+    setPlaybackRate(savedRate);
 
     firedEvents.clear();
     lastTriggeredMarkerTime = null;
@@ -2376,12 +2444,13 @@ async function playSong(name) {
 /* -------------------------------- VOLUME & EQ -------------------------------- */
 function toggleVolumePanel() {
     const popup = document.getElementById('volumePopup');
-    const overlay = document.getElementById('volumeOverlay');
+    const overlay = document.getElementById('sheetOverlay');
     const isOpen = popup.classList.contains('open');
     if (isOpen) {
-        popup.classList.remove('open'); overlay.classList.remove('open');
+        closeAllSheets();
     } else {
-        popup.classList.add('open'); overlay.classList.add('open');
+        popup.classList.add('open'); 
+        overlay.classList.add('open');
     }
 }
 
@@ -2969,8 +3038,7 @@ audio.addEventListener('loadedmetadata', () => {
 
     const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
     const savedRate = currentFileName ? (speedMap[currentFileName] ?? audio.playbackRate) : audio.playbackRate;
-    audio.playbackRate = savedRate;
-    speedBtn.innerHTML = `${savedRate.toFixed(2)}`;
+    setPlaybackRate(savedRate);
 
     renderABButtons();
 });
@@ -3344,9 +3412,8 @@ async function importSong(file) {
             audio.volume = savedVol;
             audio.muted = false;
             volSlider.value = savedVol;
-            const savedRate = speedMap[finalName];
-            audio.playbackRate = savedRate;
-            speedBtn.innerHTML = `${savedRate.toFixed(2)}`;
+            const savedRate = speedMap[finalName] ?? 1.0;
+            setPlaybackRate(savedRate);
             firedEvents.clear();
             lastTriggeredMarkerTime = null;
             lastTriggeredMarkerIndex = null;
