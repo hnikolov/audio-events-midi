@@ -2443,6 +2443,7 @@ async function playSong(name) {
 
 /* -------------------------------- VOLUME & EQ -------------------------------- */
 function toggleVolumePanel() {
+    if (!audio.src) return;
     const popup = document.getElementById('volumePopup');
     const overlay = document.getElementById('sheetOverlay');
     const isOpen = popup.classList.contains('open');
