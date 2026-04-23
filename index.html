@@ -558,6 +558,70 @@
         .speed-option:active { background: var(--bg-hover); }
         .speed-option.active { font-weight: 700; color: var(--accent); background: var(--accent-dim); }
 
+        /* ===== MARKER SET TOP SHEET ===== */
+        .marker-top-sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            z-index: 4001;
+            background: var(--bg-elevated);
+            border-bottom-left-radius: var(--radius-lg);
+            border-bottom-right-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            border-bottom: 1px solid var(--border);
+            transform: translateY(calc(-100% - 8px));
+            transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease;
+            opacity: 0;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .marker-top-sheet.open {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .marker-set-sheet-list {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            padding: 8px;
+            min-height: 0;
+        }
+        .marker-set-row {
+            justify-content: flex-start;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-height: 44px;
+        }
+        .marker-set-sheet-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 0 10px;
+        }
+        .marker-set-sheet-footer {
+            flex: 0 0 auto;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 8px;
+            padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+            background: var(--bg-elevated);
+            border-top: 1px solid var(--border-light);
+        }
+        .marker-set-chip {
+            min-height: 40px;
+            padding: 8px 0;
+        }
+        .marker-set-chip.danger {
+            color: var(--danger);
+        }
+        .marker-set-chip-spacer {
+            pointer-events: none;
+            opacity: 0;
+            cursor: default;
+        }
+
         /* ===== VOLUME & SPEED (STICKY BOTTOM SHEET) ===== */
         .volume-wrapper { position: relative; }
         .sheet-overlay {
@@ -802,23 +866,16 @@
             <audio id="audioTrack"></audio>
 
             <div class="markers-header">
-                <div style="display:flex;align-items:center;min-width:0;flex:1;position:relative;">
+                <div style="display:flex;align-items:center;min-width:0;flex:1;">
                     <div id="marker-set-trigger" onclick="toggleMarkerSetDropdown(event)" style="display:flex;align-items:center;flex:1;min-width:0;cursor:pointer;">
                         <h4 style="margin-right:6px;flex-shrink:0;">Markers:</h4>
                         <div style="display:flex;align-items:center;flex:1;min-width:0;">
                             <span id="marker-set-label" style="font-size:1.05rem;font-weight:600;color:var(--text-secondary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden;"></span>
                         </div>
                     </div>
-                    <div id="marker-set-list-menu" class="speed-menu" style="left:0;top:100%;min-width:200px;max-height:50vh;overflow-y:auto;transform:translateY(4px);padding:4px;"></div>
-                    <button class="menu-btn" onclick="event.stopPropagation();toggleSetMenu()" aria-label="Set Options" style="margin:0 8px 0 4px;flex-shrink:0;">
+                    <button class="menu-btn" onclick="event.stopPropagation();toggleSetMenu(event)" aria-label="Set Options" style="margin:0 8px 0 4px;flex-shrink:0;">
                         <svg class="icon icon-sm" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
                     </button>
-                    <div class="dropdown-menu" id="marker-set-menu" style="left:auto;right:0;top:100%;">
-                        <button onclick="event.stopPropagation();newMarkerSet()">New Empty Set</button>
-                        <button onclick="event.stopPropagation();duplicateMarkerSet()">Duplicate Set</button>
-                        <button onclick="event.stopPropagation();renameMarkerSet()">Rename Set</button>
-                        <button class="danger-item" onclick="event.stopPropagation();deleteMarkerSet()">Delete Set</button>
-                    </div>
                 </div>
                 <button class="btn-primary" onclick="setEvent()" style="flex-shrink:0;">
                   <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -910,6 +967,7 @@
 
 <!-- Shared Action Sheet Overlay -->
 <div id="sheetOverlay" class="sheet-overlay" onclick="closeAllSheets()"></div>
+<div id="marker-set-sheet" class="marker-top-sheet" aria-label="Marker set menu"></div>
 
 <!-- Speed Bottom Sheet -->
 <div id="speedPopup" class="action-sheet">
@@ -1788,6 +1846,8 @@ audio.addEventListener('pause', updatePlayPauseUI);
 
 function closeAllSheets() {
     document.querySelectorAll('.action-sheet').forEach(sheet => sheet.classList.remove('open'));
+    const markerSheet = document.getElementById('marker-set-sheet');
+    if (markerSheet) markerSheet.classList.remove('open');
     const overlay = document.getElementById('sheetOverlay');
     if (overlay) overlay.classList.remove('open');
 }
@@ -1851,12 +1911,6 @@ function setPlaybackRate(rate) {
     }
 }
 
-document.addEventListener('pointerdown', (e) => {
-    if (!e.target.closest('#marker-set-trigger') && !e.target.closest('#marker-set-list-menu')) {
-        const listMenu = document.getElementById('marker-set-list-menu');
-        if (listMenu) listMenu.style.display = 'none';
-    }
-});
 document.addEventListener('pointerdown', (e) => {
     if (!e.target.closest('.menu-btn') && !e.target.closest('.dropdown-menu')) {
         document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
@@ -2642,34 +2696,99 @@ function updateSetSelector(data) {
     if (label && data.sets[data.activeId]) {
         label.textContent = data.sets[data.activeId].name;
     }
-    const menu = document.getElementById('marker-set-list-menu');
-    if (!menu) return;
-    menu.innerHTML = '';
-    for (const [id, setDef] of Object.entries(data.sets)) {
-        const btn = document.createElement('button');
-        btn.className = 'speed-option';
-        btn.style.justifyContent = 'flex-start';
-        btn.textContent = setDef.name;
-        if (id === data.activeId) btn.classList.add('active');
-        btn.onclick = (e) => {
+    const sheet = document.getElementById('marker-set-sheet');
+    if (!sheet) return;
+
+    const rows = Object.entries(data.sets).map(([id, setDef]) => {
+        const activeClass = id === data.activeId ? ' active' : '';
+        return `<button type="button" class="speed-option marker-set-row${activeClass}" data-set-id="${escapeHtml(id)}">${escapeHtml(setDef.name)}</button>`;
+    }).join('');
+
+    sheet.innerHTML = `
+        <div class="marker-set-sheet-list">${rows}</div>
+        <div class="marker-set-sheet-divider"></div>
+        <div class="marker-set-sheet-footer">
+            <button type="button" class="speed-chip marker-set-chip" data-marker-action="new">New</button>
+            <button type="button" class="speed-chip marker-set-chip" data-marker-action="duplicate">Duplicate</button>
+            <button type="button" class="speed-chip marker-set-chip" data-marker-action="rename">Rename</button>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <button type="button" class="speed-chip marker-set-chip danger" data-marker-action="delete">Delete</button>
+        </div>
+    `;
+
+    if (!sheet.dataset.bound) {
+        sheet.addEventListener('click', (e) => {
             e.stopPropagation();
-            changeMarkerSet(id);
-            menu.style.display = 'none';
-        };
-        menu.appendChild(btn);
+            const setRow = e.target.closest('[data-set-id]');
+            if (setRow) {
+                changeMarkerSet(setRow.dataset.setId);
+                return;
+            }
+
+            const actionEl = e.target.closest('[data-marker-action]');
+            if (!actionEl) return;
+
+            const action = actionEl.dataset.markerAction;
+            if (action === 'new') newMarkerSet();
+            else if (action === 'duplicate') duplicateMarkerSet();
+            else if (action === 'rename') renameMarkerSet();
+            else if (action === 'delete') deleteMarkerSet();
+        });
+        sheet.dataset.bound = '1';
     }
+
+    if (sheet.classList.contains('open')) {
+        positionMarkerSetSheet();
+    }
+}
+
+function positionMarkerSetSheet() {
+    const sheet = document.getElementById('marker-set-sheet');
+    const header = document.querySelector('.card-events .markers-header');
+    if (!sheet || !header) return;
+
+    const headerRect = header.getBoundingClientRect();
+    const top = Math.max(0, Math.round(headerRect.bottom));
+    const rootStyles = getComputedStyle(document.documentElement);
+    const playerBarH = parseFloat(rootStyles.getPropertyValue('--mobile-playerbar-height')) || 160;
+    const tabBarH = parseFloat(rootStyles.getPropertyValue('--mobile-tab-height')) || 56;
+    const maxHeight = Math.max(180, Math.floor(window.innerHeight - top - playerBarH - tabBarH - 10));
+
+    sheet.style.top = `${top}px`;
+    sheet.style.maxHeight = `${maxHeight}px`;
+}
+
+window.addEventListener('resize', () => {
+    const sheet = document.getElementById('marker-set-sheet');
+    if (sheet && sheet.classList.contains('open')) positionMarkerSetSheet();
+}, { passive: true });
+
+const markerSheetScrollHost = document.querySelector('.grid');
+if (markerSheetScrollHost) {
+    markerSheetScrollHost.addEventListener('scroll', () => {
+        const sheet = document.getElementById('marker-set-sheet');
+        if (sheet && sheet.classList.contains('open')) positionMarkerSetSheet();
+    }, { passive: true });
 }
 
 function toggleMarkerSetDropdown(e) {
     if (e) e.stopPropagation();
-    const menu = document.getElementById('marker-set-list-menu');
-    const setMenu = document.getElementById('marker-set-menu');
-    const isOpen = menu.style.display === 'block';
+    if (!currentFileName) return;
+    const sheet = document.getElementById('marker-set-sheet');
+    const overlay = document.getElementById('sheetOverlay');
+    if (!sheet || !overlay) return;
 
+    const isOpen = sheet.classList.contains('open');
+    if (isOpen) {
+        closeAllSheets();
+        return;
+    }
+
+    document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
     document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
-    if (setMenu && setMenu.classList.contains('open')) setMenu.classList.remove('open');
-
-    menu.style.display = isOpen ? 'none' : 'block';
+    positionMarkerSetSheet();
+    sheet.classList.add('open');
+    overlay.classList.add('open');
 }
 
 function changeMarkerSet(newId) {
@@ -2687,18 +2806,10 @@ function changeMarkerSet(newId) {
 }
 
 function toggleSetMenu() {
-    const menu = document.getElementById('marker-set-menu');
-    const allMenus = document.querySelectorAll('.dropdown-menu');
-    allMenus.forEach(m => { if (m !== menu) m.classList.remove('open'); });
-    const listMenu = document.getElementById('marker-set-list-menu');
-    if (listMenu) listMenu.style.display = 'none';
-
-    menu.classList.toggle('open');
-    if (menu.classList.contains('open')) flipMenuIfOverflow(menu);
+    toggleMarkerSetDropdown();
 }
 
 function newMarkerSet() {
-    document.getElementById('marker-set-menu').classList.remove('open');
     if (!currentFileName) return;
     const name = prompt("Enter name for new marker set:");
     if (!name || name.trim() === '') return;
@@ -2715,7 +2826,6 @@ function newMarkerSet() {
 }
 
 function duplicateMarkerSet() {
-    document.getElementById('marker-set-menu').classList.remove('open');
     if (!currentFileName) return;
     let data = getRawMarkerData(currentFileName);
     const currSet = data.sets[data.activeId];
@@ -2733,7 +2843,6 @@ function duplicateMarkerSet() {
 }
 
 function renameMarkerSet() {
-    document.getElementById('marker-set-menu').classList.remove('open');
     if (!currentFileName) return;
     let data = getRawMarkerData(currentFileName);
     const currSet = data.sets[data.activeId];
@@ -2745,7 +2854,6 @@ function renameMarkerSet() {
 }
 
 function deleteMarkerSet() {
-    document.getElementById('marker-set-menu').classList.remove('open');
     if (!currentFileName) return;
     let data = getRawMarkerData(currentFileName);
     
@@ -3220,12 +3328,6 @@ document.querySelectorAll('.tab-bar .tab').forEach((label, i) => {
         }
     }, { passive: true });
 })();
-
-document.addEventListener('pointerdown', (e) => {
-    if (!e.target.closest('.menu-btn') && !e.target.closest('.dropdown-menu')) {
-        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
-    }
-});
 
 /* ========================== .aem Export / Import ========================== */
 const AEM_MAGIC = new Uint8Array([0x41, 0x45, 0x4D, 0x49]); // "AEMI"
