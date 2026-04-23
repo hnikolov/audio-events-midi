@@ -549,7 +549,7 @@
             padding: 4px; display: none; z-index: 2000; min-width: 56px;
         }
         .speed-option {
-            display: flex; align-items: center; justify-content: center;
+            display: flex; align-items: center; justify-content: left;
             font-size: 0.88rem; color: var(--text-secondary); font-weight: 500;
             padding: 9px 12px; border-radius: var(--radius-sm);
             border: none; background: transparent; width: 100%; cursor: pointer;
@@ -558,18 +558,40 @@
         .speed-option:active { background: var(--bg-hover); }
         .speed-option.active { font-weight: 700; color: var(--accent); background: var(--accent-dim); }
 
-        /* ===== VOLUME SLIDER ===== */
+        /* ===== VOLUME & EQ (STICKY BOTTOM SHEET) ===== */
         .volume-wrapper { position: relative; }
-        .volume-popup {
-            position: absolute; background: var(--bg-elevated);
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-lg); border: 1px solid var(--border);
-            padding: 10px 22px; display: none; z-index: 2000;
-            left: 50%; transform: translateX(-50%);
+        .volume-overlay {
+            position: fixed; inset: 0; background: var(--backdrop-overlay); z-index: 2999;
+            opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
         }
-        #vol-slider {
+        .volume-overlay.open { opacity: 1; pointer-events: auto; }
+        
+        .volume-popup {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 3000;
+            background: var(--bg-elevated);
+            border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg);
+            box-shadow: var(--glass-shadow); border-top: 1px solid var(--border);
+            padding: 16px 20px 24px;
+            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+            display: flex; flex-direction: column;
+            padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+        }
+        .volume-popup.open { transform: translateY(0); }
+        
+        .eq-container { display: flex; gap: 20px; align-items: stretch; margin-top: 8px;}
+        .eq-presets { display: flex; flex-direction: column; gap: 8px; width: 100px; justify-content: space-between; }
+        .eq-sliders { display: flex; flex: 1; justify-content: space-around; align-items: center; }
+        .eq-slider-col {
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+            font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; font-variant-numeric: tabular-nums;
+        }
+        .eq-val-label {
+            display: block; min-width: 44px; text-align: center; white-space: nowrap;
+        }
+        
+        .v-slider {
             writing-mode: vertical-lr; direction: rtl;
-            width: 4px; height: 100px;
+            width: 8px; height: 120px; margin: 0;
             background: transparent; cursor: pointer;
             accent-color: var(--accent);
         }
@@ -638,9 +660,9 @@
             .ab-drag { top: -16px; bottom: -16px; }
             .control-btn { width: 52px; height: 52px; }
             .control-btn.play-btn { width: 60px; height: 60px; }
-            #vol-slider { height: 80px; }
-            #vol-slider::-webkit-slider-thumb { height: 18px; width: 18px; }
-            #vol-slider::-moz-range-thumb { height: 18px; width: 18px; border: none; }
+            .v-slider { height: 130px; }
+            .v-slider::-webkit-slider-thumb { height: 20px; width: 20px; }
+            .v-slider::-moz-range-thumb { height: 20px; width: 20px; border: none; }
         }
 
         /* ===== LANDSCAPE BLOCKER ===== */
@@ -850,16 +872,68 @@
             </button>
             <button id="abEnableBtn" class="control-btn ab-btn" onclick="toggleABPanel()" aria-label="Toggle A/B loop panel">AB</button>
             <div class="volume-wrapper" id="volumeControl">
-                <button id="volBtn" class="control-btn speed-btn-label" aria-label="Volume">100%</button>
-                <div id="volumePopup" class="volume-popup">
-                    <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume slider">
-                </div>
+                <button id="volBtn" class="control-btn speed-btn-label" onclick="toggleVolumePanel()" aria-label="Volume">
+                    <svg id="volIcon" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+                    <span id="volValueText">1.00</span>
+                </button>
             </div>
             <button class="control-btn" onclick="stopAudio()" aria-label="Stop">
               <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
             </button>
         </div>
 
+    </div>
+</div>
+
+<!-- Volume & EQ Bottom Sheet -->
+<div id="volumeOverlay" class="volume-overlay" onclick="toggleVolumePanel()"></div>
+<div id="volumePopup" class="volume-popup">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary)">EQ & Volume</h3>
+        <button class="menu-btn" onclick="toggleVolumePanel()" aria-label="Close" style="padding:6px">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    </div>
+    <div class="eq-container">
+        <div class="eq-presets">
+            <button class="speed-option" onclick="applyEqPreset('flat')" style="justify-content: flex-start; gap: 8px; padding-left: 0;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 3 12 L 21 12" /></svg> Flat
+            </button>
+            <button class="speed-option" onclick="applyEqPreset('acoustic')" style="justify-content: flex-start; gap: 8px; padding-left: 0;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 3 15 C 8 15 9 7 12 7 C 15 7 16 15 21 15" /></svg> Acoustic
+            </button>
+            <button class="speed-option" onclick="applyEqPreset('scooped')" style="justify-content: flex-start; gap: 8px; padding-left: 0;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 3 9 C 8 9 9 17 12 17 C 15 17 16 9 21 9" /></svg> Scooped
+            </button>
+            <button class="speed-option" onclick="applyEqPreset('bass')" style="justify-content: flex-start; gap: 8px; padding-left: 0;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 3 7 C 10 7 14 17 21 17" /></svg> Bass
+            </button>
+            <button class="speed-option" onclick="applyEqPreset('treble')" style="justify-content: flex-start; gap: 8px; padding-left: 0;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 3 17 C 10 17 14 7 21 7" /></svg> Treble
+            </button>
+        </div>
+        <div class="eq-sliders">
+            <div class="eq-slider-col">
+                <span>B</span>
+                <input type="range" class="v-slider" id="eq-bass" min="-12" max="12" step="0.5" value="0">
+                <span id="eq-bass-val" class="eq-val-label">0</span>
+            </div>
+            <div class="eq-slider-col">
+                <span>M</span>
+                <input type="range" class="v-slider" id="eq-mid" min="-12" max="12" step="0.5" value="0">
+                <span id="eq-mid-val" class="eq-val-label">0</span>
+            </div>
+            <div class="eq-slider-col">
+                <span>T</span>
+                <input type="range" class="v-slider" id="eq-treble" min="-12" max="12" step="0.5" value="0">
+                <span id="eq-treble-val" class="eq-val-label">0</span>
+            </div>
+            <div class="eq-slider-col">
+                <span>Vol</span>
+                <input type="range" class="v-slider" id="vol-slider" min="0" max="2" step="0.01" value="1">
+                <span id="eq-vol-val" class="eq-val-label" style="color:var(--accent)">1.00</span>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1167,6 +1241,13 @@ const EVENT_MAP_KEY = 'audio_events_map_v1';
 const VOLUME_MAP_KEY = 'audio_volume_map_v1';
 const AB_LOOP_MAP_KEY = 'audio_ab_loop_map_v1';
 const SPEED_MAP_KEY = 'audio_speed_map_v1';
+const EQ_MAP_KEY = 'audio_eq_map_v1';
+
+const volValueText = document.getElementById('volValueText');
+const volIcon = document.getElementById('volIcon');
+const eqBassSlider = document.getElementById('eq-bass');
+const eqMidSlider = document.getElementById('eq-mid');
+const eqTrebleSlider = document.getElementById('eq-treble');
 
 // playlist order storage
 const ORDER_KEY = 'audio_playlist_order_v1';
@@ -1244,6 +1325,26 @@ let pointerOffsetPct = 0;
 
 let scrubStartTime = null;
 let scrubTargetTime = null;
+
+let audioCtx = null;
+let audioGraph = null;
+
+function initWebAudio() {
+    if (audioCtx) return;
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    try {
+        audioCtx = new AudioContext();
+        const source = audioCtx.createMediaElementSource(audio);
+        const bass = audioCtx.createBiquadFilter(); bass.type = "lowshelf"; bass.frequency.value = 250;
+        const mid = audioCtx.createBiquadFilter(); mid.type = "peaking"; mid.frequency.value = 1000; mid.Q.value = 1;
+        const treble = audioCtx.createBiquadFilter(); treble.type = "highshelf"; treble.frequency.value = 4000;
+        const gain = audioCtx.createGain(); gain.gain.value = 1.0;
+        
+        source.connect(bass); bass.connect(mid); mid.connect(treble); treble.connect(gain); gain.connect(audioCtx.destination);
+        audioGraph = { ctx: audioCtx, source, bass, mid, treble, gain };
+    } catch(e) { console.error("WebAudio block", e); }
+}
 
 const MIN_GAP_SEC = 0.05;
 const AVAILABLE_SPEEDS = [0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5, 1.75, 2.0];
@@ -2228,12 +2329,23 @@ async function playSong(name) {
     activeBlobUrl = URL.createObjectURL(song.data);
     audio.src = activeBlobUrl;
 
+    if (!audioCtx) initWebAudio();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
     const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
     const savedVol = volMap[name] !== undefined ? volMap[name] : 1.0;
-    audio.volume = savedVol;
+    audio.volume = 1.0; // Native volume must stay at max
     audio.muted = false;
     volSlider.value = savedVol;
-    volBtn.textContent = `${Math.round(savedVol * 100)}%`;
+    if (audioGraph) audioGraph.gain.gain.value = savedVol;
+    updateMuteUI();
+
+    const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
+    const savedEq = eqMap[name] || { bass: 0, mid: 0, treble: 0 };
+    eqBassSlider.value = savedEq.bass;
+    eqMidSlider.value = savedEq.mid;
+    eqTrebleSlider.value = savedEq.treble;
+    applyEqToNodes();
 
     const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
     const savedRate = speedMap[name] !== undefined ? speedMap[name] : 1.0;
@@ -2261,32 +2373,95 @@ async function playSong(name) {
     }));
 }
 
-/* -------------------------------- VOLUME -------------------------------- */
-const volumeControl = document.getElementById('volumeControl');
-const volumePopup = document.getElementById('volumePopup');
-const volBtn = document.getElementById('volBtn');
-let volumeHideTimer = null;
+/* -------------------------------- VOLUME & EQ -------------------------------- */
+function toggleVolumePanel() {
+    const popup = document.getElementById('volumePopup');
+    const overlay = document.getElementById('volumeOverlay');
+    const isOpen = popup.classList.contains('open');
+    if (isOpen) {
+        popup.classList.remove('open'); overlay.classList.remove('open');
+    } else {
+        popup.classList.add('open'); overlay.classList.add('open');
+    }
+}
+
+function updateMuteUI() {
+    const vol = parseFloat(volSlider.value);
+    if (!volValueText) return;
+    volValueText.textContent = vol.toFixed(2);
+    document.getElementById('eq-vol-val').textContent = vol.toFixed(2);
+    
+    if (vol === 0) {
+        volIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>`; // X
+    } else if (vol < 0.5) {
+        volIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>`; // 1 wave
+    } else {
+        volIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>`; // 2 waves
+    }
+}
 
 volSlider.oninput = (e) => {
-    audio.volume = e.target.value;
-    resetVolumeHideTimer();
-};
-
-audio.addEventListener('volumechange', () => {
-    const vol = audio.volume;
-    volSlider.value = vol;
+    let val = parseFloat(e.target.value);
+    
+    // Snap to precisely 1.00 if handled near the middle
+    if (Math.abs(val - 1.0) <= 0.05) {
+        val = 1.0;
+        e.target.value = 1.0;
+    }
+    
+    if (audioGraph) audioGraph.gain.gain.value = val;
     updateMuteUI();
     if (currentFileName) {
         const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
-        volMap[currentFileName] = vol;
+        volMap[currentFileName] = val;
         localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap));
     }
-});
+};
 
-function updateMuteUI() {
-    const vol = audio.volume;
-    const volPct = Math.round(vol * 100);
-    volBtn.textContent = vol === 0 ? 'Muted' : `${volPct}%`;
+function applyEqToNodes(e) {
+    if (e && e.target) {
+        let v = parseFloat(e.target.value);
+        if (Math.abs(v) <= 0.6) {
+            e.target.value = 0;
+        }
+    }
+    
+    const b = parseFloat(eqBassSlider.value), m = parseFloat(eqMidSlider.value), t = parseFloat(eqTrebleSlider.value);
+    
+    function formatEq(val) {
+        if (val === 0) return "0";
+        if (val === 12) return "+12";
+        if (val === -12) return "-12";
+        return (val > 0 ? "+" : "") + val.toFixed(1);
+    }
+    
+    document.getElementById('eq-bass-val').textContent = formatEq(b);
+    document.getElementById('eq-mid-val').textContent = formatEq(m);
+    document.getElementById('eq-treble-val').textContent = formatEq(t);
+    
+    if (audioGraph) {
+        audioGraph.bass.gain.value = b;
+        audioGraph.mid.gain.value = m;
+        audioGraph.treble.gain.value = t;
+    }
+    if (currentFileName) {
+        const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
+        eqMap[currentFileName] = { bass: b, mid: m, treble: t };
+        localStorage.setItem(EQ_MAP_KEY, JSON.stringify(eqMap));
+    }
+}
+
+[eqBassSlider, eqMidSlider, eqTrebleSlider].forEach(el => el.oninput = applyEqToNodes);
+
+function applyEqPreset(type) {
+    let b=0, m=0, t=0;
+    if (type==='acoustic') { b=-2; m=4; t=-2; }
+    else if (type==='scooped') { b=4; m=-4; t=4; }
+    else if (type==='bass') { b=6; m=0; t=-2; }
+    else if (type==='treble') { b=-2; m=0; t=6; }
+    
+    eqBassSlider.value = b; eqMidSlider.value = m; eqTrebleSlider.value = t;
+    applyEqToNodes();
 }
 
 function escapeHtml(text) {
@@ -2334,37 +2509,6 @@ function normalizeMarkerList(rawList) {
         .filter(Boolean)
         .sort((a, b) => a.time - b.time);
 }
-/* Volume control toggle and auto-hide */
-function resetVolumeHideTimer() {
-    if (volumeHideTimer) clearTimeout(volumeHideTimer);
-    volumePopup.style.display = 'block';
-    volumeHideTimer = setTimeout(() => {
-        volumePopup.style.display = 'none';
-        volumeHideTimer = null;
-    }, 1500);
-}
-volBtn.addEventListener('click', (e) => {
-    if (!audio.src) return;
-    e.stopPropagation();
-    resetVolumeHideTimer();
-    volSlider.focus();
-});
-
-/* Collapse volume control when clicking outside */
-document.addEventListener('pointerdown', (e) => {
-    if (!e.target.closest('.volume-wrapper') && volumePopup.style.display === 'block') {
-        volumePopup.style.display = 'none';
-        if (volumeHideTimer) { clearTimeout(volumeHideTimer); volumeHideTimer = null; }
-    }
-});
-
-/* Collapse when pressing Escape */
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && volumePopup.style.display === 'block') {
-        volumePopup.style.display = 'none';
-        if (volumeHideTimer) { clearTimeout(volumeHideTimer); volumeHideTimer = null; }
-    }
-});
 
 /* -------------------------- Markers (with preset) ------------------------ */
 let currentMarkerSetId = 'default';
@@ -3027,6 +3171,7 @@ async function packAem(songName) {
     const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
     const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
     const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
+    const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
 
     const metadata = {
         version: AEM_VERSION,
@@ -3036,7 +3181,8 @@ async function packAem(songName) {
         markerData: eventMap[songName] || null,
         volume: volMap[songName] !== undefined ? volMap[songName] : 1.0,
         speed: speedMap[songName] !== undefined ? speedMap[songName] : 1.0,
-        abLoop: abMap[songName] || null
+        abLoop: abMap[songName] || null,
+        eq: eqMap[songName] || { bass: 0, mid: 0, treble: 0 }
     };
 
     const metaJson = new TextEncoder().encode(JSON.stringify(metadata));
@@ -3175,6 +3321,10 @@ async function importSong(file) {
         const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
         volMap[finalName] = Number.isFinite(metadata.volume) ? metadata.volume : 1.0;
         localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap));
+        
+        const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
+        eqMap[finalName] = metadata.eq || { bass: 0, mid: 0, treble: 0 };
+        localStorage.setItem(EQ_MAP_KEY, JSON.stringify(eqMap));
 
         const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
         speedMap[finalName] = Number.isFinite(metadata.speed) ? metadata.speed : 1.0;

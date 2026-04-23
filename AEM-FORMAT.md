@@ -69,6 +69,11 @@ The metadata block is a UTF-8 JSON object with the following fields:
     "visible": true,
     "a": 12.5,
     "b": 45.1
+  },
+  "eq": {
+    "bass": 4.5,
+    "mid": -2.0,
+    "treble": 6.0
   }
 }
 ```
@@ -84,8 +89,12 @@ The metadata block is a UTF-8 JSON object with the following fields:
 | `markers`        | array          | no       | `[]`    | Array of marker objects |
 | `markers[].time` | number         | yes      | —       | Marker position in seconds (e.g. `12.5`) |
 | `markers[].preset` | number       | yes      | —       | MIDI preset number (1–100). 1–50 = P01–P50, 51–100 = F01–F50 |
-| `volume`         | number         | no       | `1.0`   | Playback volume (0.0–1.0) |
+| `volume`         | number         | no       | `1.0`   | Playback volume gain (0.0 to 2.0) |
 | `speed`          | number         | no       | `1.0`   | Playback speed (e.g. `0.8`, `1.0`, `1.5`) |
+| `eq`             | object         | no       | `0,0,0` | 3-band equalizer settings |
+| `eq.bass`        | number         | no       | `0`     | Lowshelf filter gain in dB (-12.0 to 12.0) |
+| `eq.mid`         | number         | no       | `0`     | Peaking filter gain in dB (-12.0 to 12.0) |
+| `eq.treble`      | number         | no       | `0`     | Highshelf filter gain in dB (-12.0 to 12.0) |
 | `abLoop`         | object \| null | no       | `null`  | A/B loop settings, or null if none |
 | `abLoop.enabled` | boolean        | —        | `false` | Whether A/B looping is active |
 | `abLoop.visible` | boolean        | —        | `true`  | Whether A/B overlay is shown on the progress bar |
