@@ -47,6 +47,8 @@
             --mobile-tab-height: 56px;
             --mobile-playerbar-height: 160px;
             --mobile-topbar-height: 0px;
+            --playlist-header-min-height: 58px;
+            --markers-header-min-height: 50px;
         }
 
         /* ===== LIGHT THEME ===== */
@@ -218,6 +220,7 @@
         .header-row {
             display: flex; justify-content: space-between; align-items: center;
             padding: 14px 0 10px;
+            min-height: var(--playlist-header-min-height);
             -webkit-user-select: none; user-select: none;
         }
         .header-row h3 { margin: 0; font-size: 1.21rem; font-weight: 700; }
@@ -292,6 +295,7 @@
         .markers-header {
             display: flex; justify-content: space-between; align-items: center;
             padding: 8px 2px;
+            min-height: var(--markers-header-min-height);
             -webkit-user-select: none; user-select: none;
         }
         .markers-header h4 { margin: 0; font-size: 1.05rem; font-weight: 600; color: var(--text-secondary); }
@@ -613,6 +617,10 @@
             min-height: 40px;
             padding: 8px 0;
         }
+        .marker-set-chip:disabled {
+            opacity: 0.45;
+            pointer-events: none;
+        }
         .marker-set-chip.danger {
             color: var(--danger);
         }
@@ -621,6 +629,134 @@
             opacity: 0;
             cursor: default;
         }
+        .song-menu-chip {
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
+        .playset-modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px 12px 12px;
+        }
+        .playset-modal-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .playset-modal-title-row {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: center;
+            gap: 10px;
+        }
+        .playset-modal-title-row .playset-modal-input {
+            padding: 8px 10px;
+            min-width: 0;
+        }
+        .playset-modal-subtitle {
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .playset-modal-input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            padding: 10px 12px;
+            font-size: 0.94rem;
+            outline: none;
+        }
+        .playset-modal-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(29,185,84,0.15);
+        }
+        .playset-modal-section-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .playset-modal-song-list {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: var(--bg-surface);
+            max-height: 240px;
+            overflow-y: auto;
+        }
+        .playset-modal-song-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 10px;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+        .playset-modal-song-row:last-child { border-bottom: none; }
+        .playset-modal-song-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .playset-icon-btn {
+            border: 1px solid var(--border);
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            border-radius: var(--radius-sm);
+            min-width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+        .playset-icon-btn:disabled {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+        .playset-icon-btn.danger {
+            color: var(--danger);
+        }
+        .playset-modal-empty {
+            padding: 12px;
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+        }
+        .playset-target-row {
+            justify-content: space-between;
+        }
+        .playset-target-row .arrow {
+            color: var(--text-muted);
+            margin-left: 8px;
+        }
+        .playset-add-picker {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--bg-surface);
+            max-height: 180px;
+            overflow-y: auto;
+        }
+        .playset-add-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 10px;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+        .playset-add-row:last-child { border-bottom: none; }
 
         /* ===== VOLUME & SPEED (STICKY BOTTOM SHEET) ===== */
         .volume-wrapper { position: relative; }
@@ -801,7 +937,7 @@
       </button>
       <div id="infoPopup" class="info-popup">
         <p class="info-heading">Version</p>
-        <p class="info-version" id="infoVersionLabel">v1.2.10</p>
+        <p class="info-version" id="infoVersionLabel">v1.2.11</p>
         <p class="info-heading">Supported MIDI Devices</p>
         <div class="info-device">NUX Mighty Plug Pro</div>
         <div class="info-device">Sonicake Pocket Master</div>
@@ -843,8 +979,15 @@
         <!-- PLAYLIST CARD -->
         <div class="card card-playlist">
             <div class="header-row">
-                <h4>Playlist</h4>
-                <div style="display:flex;gap:8px;align-items:center">
+                                <div style="display:flex;align-items:center;min-width:0;flex:1;margin-right:8px;">
+                                    <div id="playset-trigger" onclick="togglePlaysetDropdown(event)" style="display:flex;align-items:center;flex:1;min-width:0;cursor:pointer;">
+                                        <h4 style="margin-right:6px;flex-shrink:0;">Playlist:</h4>
+                                        <div style="display:flex;align-items:center;flex:1;min-width:0;">
+                                            <span id="playset-label" style="font-size:1.05rem;font-weight:600;color:var(--text-secondary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden;">All songs</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="playlist-header-actions" style="display:flex;gap:8px;align-items:center">
                   <input type="file" id="importInput" accept=".aem" style="display:none">
                   <label for="importInput" class="btn-primary" style="cursor:pointer;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border)">
                     <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -852,7 +995,7 @@
                   <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
                   <label for="fileInput" class="btn-primary" style="cursor:pointer">
                     <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Add
+                    <!-- Add -->
                   </label>
                 </div>
             </div>
@@ -875,7 +1018,7 @@
                 </div>
                 <button class="btn-primary" onclick="setEvent()" style="flex-shrink:0;">
                   <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  Add
+                  <!-- Add -->
                 </button>
             </div>
             <ul id="event-list"></ul>
@@ -963,6 +1106,8 @@
 
 <!-- Shared Action Sheet Overlay -->
 <div id="sheetOverlay" class="sheet-overlay" onclick="closeAllSheets()"></div>
+<div id="song-menu-sheet" class="marker-top-sheet" aria-label="Song menu"></div>
+<div id="playset-sheet" class="marker-top-sheet" aria-label="Playsets menu"></div>
 <div id="marker-set-sheet" class="marker-top-sheet" aria-label="Marker set menu"></div>
 
 <!-- Speed Bottom Sheet -->
@@ -1187,31 +1332,176 @@ async function renameSongInDB(oldName) {
         store.put({ ...song, name: newName });
         
         tx.oncomplete = async () => {
-                    if (currentFileName === oldName) {
+            if (currentFileName === oldName) {
                 currentFileName = newName;
                 document.getElementById('current-title').textContent = newName;
-                const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
-                if (volMap[oldName] !== undefined) { volMap[newName] = volMap[oldName]; delete volMap[oldName]; localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap)); }
-                const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
-                if (speedMap[oldName] !== undefined) { speedMap[newName] = speedMap[oldName]; delete speedMap[oldName]; localStorage.setItem(SPEED_MAP_KEY, JSON.stringify(speedMap)); }
-                const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
-                if (eventMap[oldName] !== undefined) { eventMap[newName] = eventMap[oldName]; delete eventMap[oldName]; localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(eventMap)); }
-                const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
-                if (abMap[oldName] !== undefined) { abMap[newName] = abMap[oldName]; delete abMap[oldName]; localStorage.setItem(AB_LOOP_MAP_KEY, JSON.stringify(abMap)); }
             }
+
+            const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
+            if (volMap[oldName] !== undefined) {
+                volMap[newName] = volMap[oldName];
+                delete volMap[oldName];
+                localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap));
+            }
+
+            const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
+            if (speedMap[oldName] !== undefined) {
+                speedMap[newName] = speedMap[oldName];
+                delete speedMap[oldName];
+                localStorage.setItem(SPEED_MAP_KEY, JSON.stringify(speedMap));
+            }
+
+            const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
+            if (eventMap[oldName] !== undefined) {
+                eventMap[newName] = eventMap[oldName];
+                delete eventMap[oldName];
+                localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(eventMap));
+            }
+
+            const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
+            if (abMap[oldName] !== undefined) {
+                abMap[newName] = abMap[oldName];
+                delete abMap[oldName];
+                localStorage.setItem(AB_LOOP_MAP_KEY, JSON.stringify(abMap));
+            }
+
+            const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
+            if (eqMap[oldName] !== undefined) {
+                eqMap[newName] = eqMap[oldName];
+                delete eqMap[oldName];
+                localStorage.setItem(EQ_MAP_KEY, JSON.stringify(eqMap));
+            }
+
             renameInOrder(oldName, newName);
+            renameSongReferencesInPlaysets(oldName, newName);
             await renderPlaylist();
         };
     }
 }
-function togglePlaylistMenu(e, songName, menuId) {
-    const menu = document.getElementById(menuId);
-    const allMenus = document.querySelectorAll('#playlist-ui .dropdown-menu');
-    allMenus.forEach(m => {
-        if (m.id !== menuId) m.classList.remove('open');
-    });
-    menu.classList.toggle('open');
-    if (menu.classList.contains('open')) flipMenuIfOverflow(menu);
+let songMenuContext = { songName: null, rowEl: null };
+
+async function removeSongByName(songName) {
+    if (!songName) return;
+    if (!confirm(`Remove ${songName}?`)) return;
+    const ok = await removeSongFromDB(songName);
+    if (ok) {
+        removeSongReferencesFromPlaysets(songName);
+        if (currentFileName === songName) {
+            audio.src = "";
+            currentFileName = "";
+            firedEvents.clear();
+            lastTriggeredMarkerTime = null;
+            lastTriggeredMarkerIndex = null;
+            activeBlobUrl = safeRevoke(activeBlobUrl);
+            updateMarkerTicks();
+        }
+        await renderPlaylist();
+    }
+}
+
+function renderSongMenuSheet(songName) {
+    const sheet = document.getElementById('song-menu-sheet');
+    if (!sheet) return;
+
+    const isAllSongsContext = isAllSongsListSelected();
+    const actionHtml = isAllSongsContext
+        ? `
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="rename">Rename</button>
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="export">Export</button>
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="add-to-playset">Add to ...</button>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip danger" data-song-action="delete">Delete</button>
+        `
+        : `
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="add-to-playset">Add to ...</button>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip danger" data-song-action="remove-from-playset">Delete</button>
+        `;
+
+    sheet.innerHTML = `
+        <div class="marker-set-sheet-list" style="padding:10px 12px 8px;">
+            <div style="font-size:0.95rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(songName || '')}</div>
+        </div>
+        <div class="marker-set-sheet-divider"></div>
+        <div class="marker-set-sheet-footer">
+            ${actionHtml}
+        </div>
+    `;
+
+    if (!sheet.dataset.bound) {
+        sheet.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const actionEl = e.target.closest('[data-song-action]');
+            if (!actionEl) return;
+
+            const action = actionEl.dataset.songAction;
+            const song = songMenuContext.songName;
+            if (!song) return;
+
+            if (action === 'rename') {
+                closeAllSheets();
+                await renameSongInDB(song);
+            } else if (action === 'export') {
+                closeAllSheets();
+                await exportSong(song);
+            } else if (action === 'add-to-playset') {
+                openPlaysetModal({
+                    mode: 'add-to',
+                    songName: song
+                });
+            } else if (action === 'delete') {
+                closeAllSheets();
+                await removeSongByName(song);
+            } else if (action === 'remove-from-playset') {
+                closeAllSheets();
+                await removeSongFromCurrentPlaysetByName(song);
+            }
+        });
+        sheet.dataset.bound = '1';
+    }
+}
+
+function positionSongMenuSheet() {
+    const sheet = document.getElementById('song-menu-sheet');
+    const row = songMenuContext.rowEl;
+    if (!sheet || !row || !row.isConnected) return;
+
+    const rowRect = row.getBoundingClientRect();
+    const top = Math.max(0, Math.round(rowRect.bottom));
+    const rootStyles = getComputedStyle(document.documentElement);
+    const playerBarH = parseFloat(rootStyles.getPropertyValue('--mobile-playerbar-height')) || 160;
+    const tabBarH = parseFloat(rootStyles.getPropertyValue('--mobile-tab-height')) || 56;
+    const maxHeight = Math.max(160, Math.floor(window.innerHeight - top - playerBarH - tabBarH - 10));
+
+    sheet.style.top = `${top}px`;
+    sheet.style.maxHeight = `${maxHeight}px`;
+}
+
+function togglePlaylistMenu(e, songName, rowEl) {
+    if (e) e.stopPropagation();
+    const sheet = document.getElementById('song-menu-sheet');
+    const overlay = document.getElementById('sheetOverlay');
+    if (!sheet || !overlay) return;
+
+    const isSameOpen = sheet.classList.contains('open') && songMenuContext.songName === songName;
+    if (isSameOpen) {
+        closeAllSheets();
+        return;
+    }
+
+    songMenuContext = { songName, rowEl };
+    document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const playsetSheet = document.getElementById('playset-sheet');
+    if (playsetSheet) playsetSheet.classList.remove('open');
+    const markerSheet = document.getElementById('marker-set-sheet');
+    if (markerSheet) markerSheet.classList.remove('open');
+    renderSongMenuSheet(songName);
+    positionSongMenuSheet();
+    sheet.classList.add('open');
+    overlay.classList.add('open');
 }
 
 /* ---------- drag-to-reorder logic (drag handle approach) ---------- */
@@ -1299,7 +1589,7 @@ function finishDrag() {
             let finalIdx = targetIdx;
             if (targetIdx > dragSrcIdx) finalIdx = targetIdx - 1;
             if (finalIdx !== dragSrcIdx) {
-                moveInOrder(dragSrcIdx, finalIdx);
+                moveInCurrentListOrder(dragSrcIdx, finalIdx);
                 renderPlaylist();
                 recentlyDragged = true;
                 setTimeout(() => { recentlyDragged = false; }, 150);
@@ -1454,10 +1744,6 @@ function initWebAudio() {
         audioGraph = { ctx: audioCtx, source, bass, mid, treble, gain };
     } catch(e) { console.error("WebAudio block", e); }
 }
-
-const MIN_GAP_SEC = 0.05;
-const AVAILABLE_SPEEDS = [0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5, 1.75, 2.0];
-// const ANCHOR_RATE = 2.0;
 
 /* =============================== Helpers ================================ */
 function configureGhostPreview({ fillColor, fillOpacity, lineColor, lineOpacity } = {}) {
@@ -1842,10 +2128,18 @@ audio.addEventListener('pause', updatePlayPauseUI);
 
 function closeAllSheets() {
     document.querySelectorAll('.action-sheet').forEach(sheet => sheet.classList.remove('open'));
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet) songSheet.classList.remove('open');
+    const playsetSheet = document.getElementById('playset-sheet');
+    if (playsetSheet) playsetSheet.classList.remove('open');
     const markerSheet = document.getElementById('marker-set-sheet');
     if (markerSheet) markerSheet.classList.remove('open');
     const overlay = document.getElementById('sheetOverlay');
     if (overlay) overlay.classList.remove('open');
+    playsetModalState.mode = null;
+    playsetModalState.sourceSongName = '';
+    playsetModalState.anchorEl = null;
+    playsetModalState.draft = null;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1860,6 +2154,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setPlaybackRate(val);
         });
     }
+    updatePlaysetLabel();
+    renderPlaysetSheet();
 });
 
 function toggleSpeedMenu() {
@@ -1974,13 +2270,13 @@ function updatePlayModeUI() {
 
 async function getNextSongInPlaylist() {
     if (!currentFileName) return null;
-    const order = getPlaylistOrder();
+    const order = getCurrentPlayableOrder();
     if (!order.length) return null;
     
     const currentIndex = order.indexOf(currentFileName);
-    if (currentIndex === -1) return null; // current song not in playlist
+    if (currentIndex === -1) return order[0];
     
-    const nextIndex = (currentIndex + 1) % order.length; // wrap to start if at end
+    const nextIndex = (currentIndex + 1) % order.length;
     return order[nextIndex];
 }
 
@@ -1991,10 +2287,13 @@ async function prevTrack() {
         seekToTime(0);
         return;
     }
-    const order = getPlaylistOrder();
+    const order = getCurrentPlayableOrder();
     if (!order.length) return;
     const idx = order.indexOf(currentFileName);
-    if (idx === -1) return;
+    if (idx === -1) {
+        await playSong(order[0]);
+        return;
+    }
     const prevIdx = (idx - 1 + order.length) % order.length;
     await playSong(order[prevIdx]);
 }
@@ -2031,16 +2330,9 @@ audio.addEventListener('ended', async () => {
     
     if (playMode === 'queue') {
         const nextSong = await getNextSongInPlaylist();
-        if (nextSong && nextSong !== currentFileName) {
+        if (nextSong) {
             console.log('Queue: Playing next song:', nextSong);
             await playSong(nextSong);
-        } else if (nextSong === currentFileName) {
-            // At end of playlist, restart from beginning
-            const order = getPlaylistOrder();
-            if (order.length > 0) {
-                console.log('Queue: Restarting from first song');
-                await playSong(order[0]);
-            }
         }
     } else if (playMode === 'loop') {
         // audio.loop = true handles this natively
@@ -2051,6 +2343,8 @@ audio.addEventListener('ended', async () => {
         updatePlayPauseUI();
     }
 });
+
+const MIN_GAP_SEC = 0.05;
 
 /* ============================ A/B Loop Controls ========================== */
 function isABValid() { return abLoop.a !== null && abLoop.b !== null && abLoop.b > abLoop.a; }
@@ -2350,15 +2644,34 @@ async function renderPlaylist() {
     try {
         const songs = await getAllSongs();
         if (!Array.isArray(songs) || !songs.length) {
+            syncPlaysetStateWithSongs([]);
+            updatePlaysetLabel();
             playlistUI.innerHTML = "<div style='padding:10px'>Empty</div>";
             return;
         }
-        
-        const order = reconcileOrderWithSongs(songs);
-        songs.sort((a,b) => order.indexOf(a.name) - order.indexOf(b.name));
+
+        const allSongsOrder = reconcileOrderWithSongs(songs);
+        syncPlaysetStateWithSongs(allSongsOrder);
+        updatePlaysetLabel();
+
+        const songByName = new Map(songs.map(song => [song.name, song]));
+        const selectedListId = getSelectedListId();
+        const visibleOrder = getSongsForList(selectedListId).filter(name => songByName.has(name));
+
+        if (!visibleOrder.length) {
+            if (selectedListId === ALL_SONGS_LIST_ID) {
+                playlistUI.innerHTML = "<div style='padding:10px'>Empty</div>";
+            } else {
+                const current = getCurrentPlayset();
+                playlistUI.innerHTML = `<div style='padding:10px'>${escapeHtml(current?.name || 'Playset')} is empty</div>`;
+            }
+            return;
+        }
+
+        const visibleSongs = visibleOrder.map(name => songByName.get(name)).filter(Boolean);
 
         playlistUI.innerHTML = "";
-        songs.forEach((song, idx) => {
+        visibleSongs.forEach((song, idx) => {
             const row = document.createElement('div');
             row.className = `playlist-item ${song.name === currentFileName ? 'active' : ''}`;
             row.style.position = 'relative';
@@ -2372,55 +2685,10 @@ async function renderPlaylist() {
             menuBtn.title = 'Options';
             menuBtn.onclick = (e) => {
                 e.stopPropagation();
-                togglePlaylistMenu(e, song.name, `menu-${idx}`);
+                togglePlaylistMenu(e, song.name, row);
             };
 
-            const menu = document.createElement('div');
-            menu.className = 'dropdown-menu';
-            menu.id = `menu-${idx}`;
-            
-            const renameBtn = document.createElement('button');
-            renameBtn.textContent = 'Rename';
-            renameBtn.onclick = async (e) => {
-                e.stopPropagation();
-                await renameSongInDB(song.name);
-            };
-            
-            const removeBtn = document.createElement('button');
-            removeBtn.textContent = 'Remove';
-            removeBtn.className = 'danger-item';
-            removeBtn.onclick = async (e) => {
-                e.stopPropagation();
-                if (confirm(`Remove ${song.name}?`)) {
-                    const ok = await removeSongFromDB(song.name);
-                    if (ok) {
-                        if (currentFileName === song.name) {
-                            audio.src = "";
-                            currentFileName = "";
-                            firedEvents.clear();
-                            lastTriggeredMarkerTime = null;
-                            lastTriggeredMarkerIndex = null;
-                            activeBlobUrl = safeRevoke(activeBlobUrl);
-                            updateMarkerTicks();
-                        }
-                        await renderPlaylist();
-                    }
-                }
-            };
-            
-            const exportBtn = document.createElement('button');
-            exportBtn.textContent = 'Export';
-            exportBtn.onclick = async (e) => {
-                e.stopPropagation();
-                menu.classList.remove('open');
-                await exportSong(song.name);
-            };
-
-            menu.appendChild(renameBtn);
-            menu.appendChild(exportBtn);
-            menu.appendChild(removeBtn);
-
-            row.onclick = (e) => { if (!isDraggingItem && !recentlyDragged && !menu.classList.contains('open')) playSong(song.name); };
+            row.onclick = (e) => { if (!isDraggingItem && !recentlyDragged) playSong(song.name); };
 
             const dragHandle = document.createElement('div');
             dragHandle.className = 'drag-handle';
@@ -2429,7 +2697,6 @@ async function renderPlaylist() {
             row.appendChild(dragHandle);
             row.appendChild(label);
             row.appendChild(menuBtn);
-            row.appendChild(menu);
             playlistUI.appendChild(row);
         });
     } catch (err) {
@@ -2630,6 +2897,978 @@ function normalizeMarkerList(rawList) {
         .sort((a, b) => a.time - b.time);
 }
 
+/* ----------------------------- Playsets --------------------------------- */
+const PLAYSET_STATE_KEY = 'audio_playset_state_v1';
+const PLAYSET_STATE_VERSION = 1;
+const ALL_SONGS_LIST_ID = 'all-songs';
+
+let currentPlaysetId = ALL_SONGS_LIST_ID;
+
+function normalizeSongNameList(list) {
+    const seen = new Set();
+    return (Array.isArray(list) ? list : [])
+        .map(name => String(name || '').trim())
+        .filter(name => {
+            if (!name || seen.has(name)) return false;
+            seen.add(name);
+            return true;
+        });
+}
+
+function getAllSongsOrder() {
+    return normalizeSongNameList(getPlaylistOrder());
+}
+
+function saveAllSongsOrder(order) {
+    savePlaylistOrder(normalizeSongNameList(order));
+}
+
+function createSeedCustomPlaysets() {
+    const now = Date.now();
+    return [
+        { id: 'warmup', name: 'Warmup Set', songNames: ['Song A', 'Song B'], createdAt: now + 1, updatedAt: now + 1 },
+        { id: 'gig-night', name: 'Gig Night', songNames: ['Song C'], createdAt: now + 2, updatedAt: now + 2 },
+        { id: 'practice-b', name: 'Practice B', songNames: [], createdAt: now + 3, updatedAt: now + 3 }
+    ];
+}
+
+function createDefaultPlaysetState() {
+    return {
+        version: PLAYSET_STATE_VERSION,
+        selectedListId: ALL_SONGS_LIST_ID,
+        customPlaysets: createSeedCustomPlaysets(),
+        updatedAt: Date.now()
+    };
+}
+
+function normalizePlaysetState(raw) {
+    const fallback = createDefaultPlaysetState();
+    if (!raw || typeof raw !== 'object') return fallback;
+
+    const usedIds = new Set();
+    const customPlaysets = (Array.isArray(raw.customPlaysets) ? raw.customPlaysets : [])
+        .map((setDef, idx) => {
+            const idCandidate = String(setDef?.id || '').trim();
+            const id = idCandidate && idCandidate !== ALL_SONGS_LIST_ID
+                ? idCandidate
+                : `set_${Date.now().toString(36)}_${idx}`;
+            const name = String(setDef?.name || '').trim();
+            if (!name) return null;
+            if (usedIds.has(id)) return null;
+            usedIds.add(id);
+            return {
+                id,
+                name,
+                songNames: normalizeSongNameList(setDef?.songNames),
+                createdAt: Number.isFinite(setDef?.createdAt) ? setDef.createdAt : Date.now(),
+                updatedAt: Number.isFinite(setDef?.updatedAt) ? setDef.updatedAt : Date.now()
+            };
+        })
+        .filter(Boolean);
+
+    const selectedListIdRaw = String(raw.selectedListId || '').trim();
+    const selectedListId = selectedListIdRaw === ALL_SONGS_LIST_ID || customPlaysets.some(p => p.id === selectedListIdRaw)
+        ? selectedListIdRaw
+        : ALL_SONGS_LIST_ID;
+
+    return {
+        version: PLAYSET_STATE_VERSION,
+        selectedListId,
+        customPlaysets,
+        updatedAt: Number.isFinite(raw.updatedAt) ? raw.updatedAt : Date.now()
+    };
+}
+
+function loadPlaysetState() {
+    const serialized = localStorage.getItem(PLAYSET_STATE_KEY);
+    if (!serialized) {
+        const fallback = createDefaultPlaysetState();
+        localStorage.setItem(PLAYSET_STATE_KEY, JSON.stringify(fallback));
+        currentPlaysetId = fallback.selectedListId;
+        return fallback;
+    }
+
+    try {
+        const raw = JSON.parse(serialized);
+        const state = normalizePlaysetState(raw);
+        currentPlaysetId = state.selectedListId;
+        return state;
+    } catch {
+        const fallback = createDefaultPlaysetState();
+        localStorage.setItem(PLAYSET_STATE_KEY, JSON.stringify(fallback));
+        currentPlaysetId = fallback.selectedListId;
+        return fallback;
+    }
+}
+
+function savePlaysetState(state) {
+    const normalized = normalizePlaysetState(state);
+    normalized.updatedAt = Date.now();
+    localStorage.setItem(PLAYSET_STATE_KEY, JSON.stringify(normalized));
+    currentPlaysetId = normalized.selectedListId;
+    return normalized;
+}
+
+function migratePlaysetStateIfNeeded(songNames) {
+    if (!localStorage.getItem(PLAYSET_STATE_KEY)) {
+        savePlaysetState(createDefaultPlaysetState());
+    }
+    return syncPlaysetStateWithSongs(songNames);
+}
+
+function syncPlaysetStateWithSongs(songNames) {
+    const validSongs = new Set(normalizeSongNameList(songNames));
+    const state = loadPlaysetState();
+    let changed = false;
+
+    state.customPlaysets = state.customPlaysets.map(setDef => {
+        const filtered = normalizeSongNameList(setDef.songNames).filter(song => validSongs.has(song));
+        if (filtered.length !== setDef.songNames.length) changed = true;
+        if (filtered.some((song, idx) => song !== setDef.songNames[idx])) changed = true;
+        return {
+            ...setDef,
+            songNames: filtered
+        };
+    });
+
+    if (state.selectedListId !== ALL_SONGS_LIST_ID && !state.customPlaysets.some(setDef => setDef.id === state.selectedListId)) {
+        state.selectedListId = ALL_SONGS_LIST_ID;
+        changed = true;
+    }
+
+    if (changed) return savePlaysetState(state);
+    currentPlaysetId = state.selectedListId;
+    return state;
+}
+
+function getSelectedListId() {
+    return loadPlaysetState().selectedListId;
+}
+
+function setSelectedListId(id) {
+    const state = loadPlaysetState();
+    const targetId = String(id || '').trim();
+    if (targetId === ALL_SONGS_LIST_ID || state.customPlaysets.some(setDef => setDef.id === targetId)) {
+        state.selectedListId = targetId;
+    } else {
+        state.selectedListId = ALL_SONGS_LIST_ID;
+    }
+    savePlaysetState(state);
+}
+
+function getCustomPlaysets() {
+    return loadPlaysetState().customPlaysets.slice();
+}
+
+function getAllPlaysetsForUi() {
+    return [
+        { id: ALL_SONGS_LIST_ID, name: 'All songs', permanent: true },
+        ...getCustomPlaysets().map(setDef => ({ id: setDef.id, name: setDef.name, permanent: false }))
+    ];
+}
+
+function getPlaysetById(playsetId) {
+    return getAllPlaysetsForUi().find(setDef => setDef.id === playsetId) || null;
+}
+
+function isAllSongsListSelected() {
+    return getSelectedListId() === ALL_SONGS_LIST_ID;
+}
+
+function getSongsForList(listId) {
+    if (listId === ALL_SONGS_LIST_ID) return getAllSongsOrder();
+    const setDef = getCustomPlaysets().find(p => p.id === listId);
+    return setDef ? setDef.songNames.slice() : [];
+}
+
+function getCurrentPlayableOrder() {
+    return getSongsForList(getSelectedListId());
+}
+
+function createPlaysetId() {
+    const existing = new Set(getCustomPlaysets().map(setDef => setDef.id));
+    let id = '';
+    do {
+        id = `set_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    } while (existing.has(id));
+    return id;
+}
+
+function isPlaysetNameTaken(name, excludedId = null) {
+    const normalized = String(name || '').trim().toLowerCase();
+    if (!normalized) return false;
+    return getAllPlaysetsForUi().some(setDef => (
+        setDef.id !== excludedId &&
+        String(setDef.name || '').trim().toLowerCase() === normalized
+    ));
+}
+
+function createPlayset(name, initialSongNames = []) {
+    const trimmedName = String(name || '').trim();
+    if (!trimmedName || isPlaysetNameTaken(trimmedName)) return null;
+
+    const allSongs = new Set(getAllSongsOrder());
+    const songNames = normalizeSongNameList(initialSongNames).filter(song => allSongs.has(song));
+
+    const state = loadPlaysetState();
+    const id = createPlaysetId();
+    const now = Date.now();
+    state.customPlaysets.push({
+        id,
+        name: trimmedName,
+        songNames,
+        createdAt: now,
+        updatedAt: now
+    });
+    savePlaysetState(state);
+    return id;
+}
+
+function updatePlayset(playsetId, patch = {}) {
+    if (!playsetId || playsetId === ALL_SONGS_LIST_ID) return false;
+
+    const state = loadPlaysetState();
+    const setDef = state.customPlaysets.find(p => p.id === playsetId);
+    if (!setDef) return false;
+
+    if (patch.name !== undefined) {
+        const trimmedName = String(patch.name || '').trim();
+        if (!trimmedName || isPlaysetNameTaken(trimmedName, playsetId)) return false;
+        setDef.name = trimmedName;
+    }
+
+    if (patch.songNames !== undefined) {
+        const allowed = new Set(getAllSongsOrder());
+        setDef.songNames = normalizeSongNameList(patch.songNames).filter(song => allowed.has(song));
+    }
+
+    setDef.updatedAt = Date.now();
+    savePlaysetState(state);
+    return true;
+}
+
+function deletePlayset(playsetId) {
+    if (!playsetId || playsetId === ALL_SONGS_LIST_ID) return false;
+    const state = loadPlaysetState();
+    const next = state.customPlaysets.filter(setDef => setDef.id !== playsetId);
+    if (next.length === state.customPlaysets.length) return false;
+    state.customPlaysets = next;
+    if (state.selectedListId === playsetId) state.selectedListId = ALL_SONGS_LIST_ID;
+    savePlaysetState(state);
+    return true;
+}
+
+function addSongToPlayset(playsetId, songName) {
+    if (!playsetId || playsetId === ALL_SONGS_LIST_ID || !songName) return false;
+
+    const state = loadPlaysetState();
+    const setDef = state.customPlaysets.find(p => p.id === playsetId);
+    if (!setDef) return false;
+
+    const allowed = new Set(getAllSongsOrder());
+    if (!allowed.has(songName)) return false;
+    if (!setDef.songNames.includes(songName)) setDef.songNames.push(songName);
+    setDef.updatedAt = Date.now();
+    savePlaysetState(state);
+    return true;
+}
+
+function removeSongFromPlayset(playsetId, songName) {
+    if (!playsetId || playsetId === ALL_SONGS_LIST_ID || !songName) return false;
+    const state = loadPlaysetState();
+    const setDef = state.customPlaysets.find(p => p.id === playsetId);
+    if (!setDef) return false;
+    const before = setDef.songNames.length;
+    setDef.songNames = setDef.songNames.filter(song => song !== songName);
+    if (before !== setDef.songNames.length) {
+        setDef.updatedAt = Date.now();
+        savePlaysetState(state);
+        return true;
+    }
+    return false;
+}
+
+function renameSongReferencesInPlaysets(oldName, newName) {
+    if (!oldName || !newName || oldName === newName) return;
+    const state = loadPlaysetState();
+    let changed = false;
+
+    state.customPlaysets = state.customPlaysets.map(setDef => {
+        const mapped = setDef.songNames.map(song => (song === oldName ? newName : song));
+        const deduped = normalizeSongNameList(mapped);
+        if (deduped.length !== setDef.songNames.length || deduped.some((song, idx) => song !== setDef.songNames[idx])) {
+            changed = true;
+            return { ...setDef, songNames: deduped, updatedAt: Date.now() };
+        }
+        return setDef;
+    });
+
+    if (changed) savePlaysetState(state);
+}
+
+function removeSongReferencesFromPlaysets(songName) {
+    if (!songName) return;
+    const state = loadPlaysetState();
+    let changed = false;
+
+    state.customPlaysets = state.customPlaysets.map(setDef => {
+        const nextSongs = setDef.songNames.filter(song => song !== songName);
+        if (nextSongs.length !== setDef.songNames.length) {
+            changed = true;
+            return { ...setDef, songNames: nextSongs, updatedAt: Date.now() };
+        }
+        return setDef;
+    });
+
+    if (changed) savePlaysetState(state);
+}
+
+function moveInCustomPlaysetOrder(playsetId, from, to) {
+    if (!playsetId || playsetId === ALL_SONGS_LIST_ID) return;
+    const state = loadPlaysetState();
+    const setDef = state.customPlaysets.find(p => p.id === playsetId);
+    if (!setDef) return;
+
+    const order = setDef.songNames.slice();
+    if (from < 0 || to < 0 || from >= order.length || to >= order.length || from === to) return;
+    const item = order.splice(from, 1)[0];
+    if (!item) return;
+    order.splice(to, 0, item);
+
+    setDef.songNames = order;
+    setDef.updatedAt = Date.now();
+    savePlaysetState(state);
+}
+
+function moveInCurrentListOrder(from, to) {
+    const selected = getSelectedListId();
+    if (selected === ALL_SONGS_LIST_ID) {
+        moveInOrder(from, to);
+        return;
+    }
+    moveInCustomPlaysetOrder(selected, from, to);
+}
+
+function makePlaysetNameUnique(desiredName, existingNames) {
+    const existingLower = new Set(existingNames.map(name => String(name || '').trim().toLowerCase()));
+    let base = String(desiredName || '').trim();
+    if (!base) base = 'Imported Playset';
+    if (!existingLower.has(base.toLowerCase())) return base;
+    let counter = 1;
+    let candidate = '';
+    do {
+        candidate = `${base} (${counter})`;
+        counter++;
+    } while (existingLower.has(candidate.toLowerCase()));
+    return candidate;
+}
+
+function getCustomPlaysetById(playsetId) {
+    return getCustomPlaysets().find(setDef => setDef.id === playsetId) || null;
+}
+
+function sanitizeFilename(name, fallback) {
+    const cleaned = String(name || fallback || 'export').replace(/[^a-zA-Z0-9._\-() ]/g, '_').trim();
+    return cleaned || fallback || 'export';
+}
+
+async function exportPlaysetById(playsetId) {
+    const setDef = getCustomPlaysetById(playsetId);
+    if (!setDef) return;
+
+    const payload = {
+        version: 1,
+        name: setDef.name,
+        songNames: setDef.songNames.slice(),
+        createdAt: setDef.createdAt || Date.now(),
+        updatedAt: setDef.updatedAt || Date.now()
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const fileName = `${sanitizeFilename(setDef.name, 'playset')}.aeps.json`;
+
+    if (window.showSaveFilePicker) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: fileName,
+                types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps.json'] } }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+        }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+async function importPlaysetDefinitionFile(file) {
+    if (!file) return false;
+    let payload = null;
+
+    try {
+        const text = await file.text();
+        payload = JSON.parse(text);
+    } catch {
+        alert('Import failed: invalid playset file.');
+        return false;
+    }
+
+    const importedName = String(payload?.name || '').trim();
+    if (!importedName) {
+        alert('Import failed: missing playset name.');
+        return false;
+    }
+
+    const allowedSongs = new Set(getAllSongsOrder());
+    const sourceSongs = normalizeSongNameList(payload?.songNames);
+    const filteredSongs = sourceSongs.filter(song => allowedSongs.has(song));
+    const skippedCount = sourceSongs.length - filteredSongs.length;
+
+    const state = loadPlaysetState();
+    const existingByName = state.customPlaysets.find(setDef => setDef.name.trim().toLowerCase() === importedName.toLowerCase());
+
+    if (existingByName) {
+        const overwrite = confirm(`Playset "${importedName}" already exists.\n\nPress OK to overwrite it, or Cancel to import as a copy.`);
+        if (overwrite) {
+            existingByName.name = importedName;
+            existingByName.songNames = filteredSongs;
+            existingByName.updatedAt = Date.now();
+            savePlaysetState(state);
+            if (skippedCount > 0) alert(`Imported with ${skippedCount} missing song(s) skipped.`);
+            return true;
+        }
+
+        const suggestedName = makePlaysetNameUnique(importedName, state.customPlaysets.map(setDef => setDef.name));
+        const userName = prompt('Enter a name for imported playset:', suggestedName);
+        if (userName === null) return false;
+        const finalName = String(userName || '').trim();
+        if (!finalName) return false;
+        if (isPlaysetNameTaken(finalName)) {
+            alert(`A playset named "${finalName}" already exists.`);
+            return false;
+        }
+
+        createPlayset(finalName, filteredSongs);
+        if (skippedCount > 0) alert(`Imported with ${skippedCount} missing song(s) skipped.`);
+        return true;
+    }
+
+    createPlayset(importedName, filteredSongs);
+    if (skippedCount > 0) alert(`Imported with ${skippedCount} missing song(s) skipped.`);
+    return true;
+}
+
+let playsetImportInput = null;
+function ensurePlaysetImportInput() {
+    if (playsetImportInput) return playsetImportInput;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.aeps.json,application/json';
+    input.style.display = 'none';
+    input.addEventListener('click', () => { input.value = ''; });
+    input.addEventListener('change', async () => {
+        const file = input.files?.[0];
+        input.value = '';
+        if (!file) return;
+        const imported = await importPlaysetDefinitionFile(file);
+        if (imported) {
+            updatePlaysetLabel();
+            renderPlaysetSheet();
+            await renderPlaylist();
+        }
+    });
+    document.body.appendChild(input);
+    playsetImportInput = input;
+    return playsetImportInput;
+}
+
+async function promptImportPlaysetDefinition() {
+    if (window.showOpenFilePicker) {
+        try {
+            const [handle] = await window.showOpenFilePicker({
+                multiple: false,
+                types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps.json'] } }]
+            });
+            if (!handle) return;
+            const file = await handle.getFile();
+            const imported = await importPlaysetDefinitionFile(file);
+            if (imported) {
+                updatePlaysetLabel();
+                renderPlaysetSheet();
+                await renderPlaylist();
+            }
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+        }
+    }
+
+    ensurePlaysetImportInput().click();
+}
+
+async function removeSongFromCurrentPlaysetByName(songName) {
+    const selected = getSelectedListId();
+    if (selected === ALL_SONGS_LIST_ID) return false;
+    if (!songName) return false;
+    if (!confirm(`Remove ${songName} from ${getCurrentPlayset().name}?`)) return false;
+    const removed = removeSongFromPlayset(selected, songName);
+    if (removed) {
+        await renderPlaylist();
+    }
+    return removed;
+}
+
+const playsetModalState = {
+    mode: null,
+    sourceSongName: '',
+    anchorEl: null,
+    draft: null
+};
+
+function getCurrentPlayset() {
+    const selected = getSelectedListId();
+    currentPlaysetId = selected;
+    return getPlaysetById(selected) || { id: ALL_SONGS_LIST_ID, name: 'All songs', permanent: true };
+}
+
+function getAllKnownSongNamesForUi() {
+    const fromOrder = getAllSongsOrder();
+    if (fromOrder.length) return fromOrder;
+
+    const fromCustom = getCustomPlaysets()
+        .flatMap(setDef => setDef.songNames || [])
+        .filter(Boolean);
+    if (fromCustom.length) return normalizeSongNameList(fromCustom);
+
+    return [];
+}
+
+function getEditablePlaysetId(defaultId) {
+    if (defaultId && defaultId !== ALL_SONGS_LIST_ID && getCustomPlaysets().some(p => p.id === defaultId)) {
+        return defaultId;
+    }
+    const exact = getCustomPlaysets().find(p => p.id === defaultId);
+    if (exact) return exact.id;
+    const fallback = getCustomPlaysets()[0];
+    return fallback ? fallback.id : null;
+}
+
+function createDraftFromPlayset(playsetId, { prefillSong = '' } = {}) {
+    const allSongs = getAllKnownSongNamesForUi();
+    const selected = playsetId ? getCustomPlaysetById(playsetId) : null;
+    const baseSongs = playsetId ? getSongsForList(playsetId).slice() : [];
+    if (prefillSong && !baseSongs.includes(prefillSong)) baseSongs.push(prefillSong);
+
+    return {
+        playsetId,
+        name: selected ? selected.name : '',
+        songs: baseSongs,
+        availableSongs: allSongs
+    };
+}
+
+function getPlaysetAnchorForMode(mode, fallbackAnchor = null) {
+    const topBarAnchor = document.getElementById('mobileMidiBar');
+    const headerAnchor = document.querySelector('.card-playlist .header-row');
+    if (mode === 'add-to' || mode === 'edit' || mode === 'new') {
+        return topBarAnchor || headerAnchor;
+    }
+    return fallbackAnchor || headerAnchor;
+}
+
+function capturePlaysetScrollState(sheet) {
+    const sheetList = sheet?.querySelector('.marker-set-sheet-list');
+    const addPicker = sheet?.querySelector('.playset-add-picker');
+    return {
+        listDistanceFromBottom: sheetList
+            ? (sheetList.scrollHeight - sheetList.scrollTop - sheetList.clientHeight)
+            : null,
+        pickerScrollTop: addPicker ? addPicker.scrollTop : null
+    };
+}
+
+function restorePlaysetScrollState(sheet, state) {
+    if (!sheet || !state) return;
+
+    const nextSheetList = sheet.querySelector('.marker-set-sheet-list');
+    if (nextSheetList && state.listDistanceFromBottom !== null) {
+        const nextTop = nextSheetList.scrollHeight - nextSheetList.clientHeight - state.listDistanceFromBottom;
+        nextSheetList.scrollTop = Math.max(0, nextTop);
+    }
+
+    const nextAddPicker = sheet.querySelector('.playset-add-picker');
+    if (nextAddPicker && state.pickerScrollTop !== null) {
+        const maxPickerTop = Math.max(0, nextAddPicker.scrollHeight - nextAddPicker.clientHeight);
+        nextAddPicker.scrollTop = Math.min(state.pickerScrollTop, maxPickerTop);
+    }
+}
+
+function openPlaysetModal({ mode, playsetId = null, songName = '', anchorEl = null } = {}) {
+    const sheet = document.getElementById('playset-sheet');
+    const overlay = document.getElementById('sheetOverlay');
+    if (!sheet || !overlay) return;
+
+    const currentMode = mode || 'selector';
+
+    playsetModalState.mode = currentMode;
+    playsetModalState.sourceSongName = songName || '';
+    playsetModalState.anchorEl = getPlaysetAnchorForMode(currentMode, anchorEl);
+
+    if (currentMode === 'selector') {
+        playsetModalState.draft = null;
+    } else if (currentMode === 'add-to') {
+        playsetModalState.draft = null;
+    } else if (currentMode === 'new') {
+        playsetModalState.draft = createDraftFromPlayset(null, { prefillSong: songName || '' });
+    } else {
+        const editableId = getEditablePlaysetId(playsetId || getSelectedListId());
+        if (!editableId) {
+            playsetModalState.mode = 'new';
+            playsetModalState.draft = createDraftFromPlayset(null, { prefillSong: songName || '' });
+        } else {
+            playsetModalState.draft = createDraftFromPlayset(editableId);
+        }
+    }
+
+    document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet) songSheet.classList.remove('open');
+    const markerSheet = document.getElementById('marker-set-sheet');
+    if (markerSheet) markerSheet.classList.remove('open');
+
+    renderPlaysetSheet();
+    positionPlaysetSheet();
+    sheet.classList.add('open');
+    overlay.classList.add('open');
+}
+
+function updatePlaysetLabel() {
+    currentPlaysetId = getSelectedListId();
+    const label = document.getElementById('playset-label');
+    const playlistActions = document.getElementById('playlist-header-actions');
+    const current = getCurrentPlayset();
+    if (label && current) label.textContent = current.name;
+    if (playlistActions) {
+        playlistActions.style.display = (current && current.id === ALL_SONGS_LIST_ID) ? 'flex' : 'none';
+    }
+}
+
+function renderPlaysetSheet() {
+    const sheet = document.getElementById('playset-sheet');
+    if (!sheet) return;
+
+    const mode = playsetModalState.mode;
+    const sourceSong = playsetModalState.sourceSongName;
+    let bodyHtml = '';
+    let footerHtml = '';
+
+    if (!mode || mode === 'selector') {
+        const current = getCurrentPlayset();
+        const rows = getAllPlaysetsForUi().map(setDef => {
+            const activeClass = setDef.id === getSelectedListId() ? ' active' : '';
+            return `<button type="button" class="speed-option marker-set-row${activeClass}" data-playset-id="${escapeHtml(setDef.id)}">${escapeHtml(setDef.name)}</button>`;
+        }).join('');
+
+        const actionDisabled = current?.permanent ? ' disabled' : '';
+
+        bodyHtml = `<div class="marker-set-sheet-list">${rows}</div>`;
+        footerHtml = `
+            <div class="marker-set-sheet-divider"></div>
+            <div class="marker-set-sheet-footer">
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="edit"${actionDisabled}>Edit</button>
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="export"${actionDisabled}>Export</button>
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="import">Import</button>
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="new">New</button>
+                <button type="button" class="speed-chip marker-set-chip danger" data-playset-action="delete"${actionDisabled}>Delete</button>
+            </div>
+        `;
+    } else if (mode === 'add-to') {
+        const rows = getCustomPlaysets()
+            .map(setDef => `<button type="button" class="speed-option marker-set-row playset-target-row" data-playset-target="${escapeHtml(setDef.id)}"><span>${escapeHtml(setDef.name)}</span><span class="arrow">></span></button>`)
+            .join('');
+
+        bodyHtml = `
+            <div class="marker-set-sheet-list">
+                <div class="playset-modal-body">
+                    <div class="playset-modal-title">Add To Playset</div>
+                    <div class="playset-modal-subtitle">Song: "${escapeHtml(sourceSong || '')}"</div>
+                    <div class="playset-modal-section-title">Available Playsets</div>
+                    <div class="playset-modal-song-list">${rows || '<div class="playset-modal-empty">No matching playsets.</div>'}</div>
+                </div>
+            </div>
+        `;
+        footerHtml = `
+            <div class="marker-set-sheet-divider"></div>
+            <div class="marker-set-sheet-footer">
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="new">New</button>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="close">Close</button>
+            </div>
+        `;
+    } else {
+        const isNew = mode === 'new';
+        const draft = playsetModalState.draft || createDraftFromPlayset(null);
+        const title = isNew ? 'New Playset' : 'Edit Playset';
+
+        const songRows = draft.songs.map((song, idx) => `
+            <div class="playset-modal-song-row">
+                <span>${escapeHtml(song)}</span>
+                <span class="playset-modal-song-actions">
+                    <button type="button" class="playset-icon-btn danger" data-playset-action="remove-song" data-song-index="${idx}">-</button>
+                </span>
+            </div>
+        `).join('');
+
+        const pickerRows = draft.availableSongs
+            .filter(song => !draft.songs.includes(song))
+            .map(song => `
+                <div class="playset-add-row">
+                    <span>${escapeHtml(song)}</span>
+                    <button type="button" class="playset-icon-btn" data-playset-action="add-song" data-song-name="${escapeHtml(song)}">+</button>
+                </div>
+            `).join('');
+
+        bodyHtml = `
+            <div class="marker-set-sheet-list">
+                <div class="playset-modal-body">
+                    <div class="playset-modal-title-row">
+                        <div class="playset-modal-title">${title}</div>
+                        <input class="playset-modal-input" type="text" value="${escapeHtml(draft.name)}" placeholder="${isNew ? 'Enter playset name' : 'Playset name'}" data-playset-input="name" />
+                    </div>
+                    <div class="playset-modal-section-title">Songs In Playset</div>
+                    <div class="playset-modal-song-list">${songRows || '<div class="playset-modal-empty">No songs yet.</div>'}</div>
+                    <div class="playset-modal-section-title">Add Songs</div>
+                    <div class="playset-add-picker">${pickerRows || '<div class="playset-modal-empty">No available songs.</div>'}</div>
+                </div>
+            </div>
+        `;
+
+        const saveDisabled = !draft.name.trim() ? ' disabled' : '';
+        footerHtml = `
+            <div class="marker-set-sheet-divider"></div>
+            <div class="marker-set-sheet-footer">
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="save"${saveDisabled}>Save</button>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="close">Close</button>
+            </div>
+        `;
+    }
+
+    sheet.innerHTML = `${bodyHtml}${footerHtml}`;
+
+    if (!sheet.dataset.bound) {
+        sheet.addEventListener('click', async (e) => {
+            e.stopPropagation();
+
+            const rowEl = e.target.closest('[data-playset-id]');
+            const actionEl = e.target.closest('[data-playset-action]');
+            const targetEl = e.target.closest('[data-playset-target]');
+
+            if (rowEl && (!playsetModalState.mode || playsetModalState.mode === 'selector')) {
+                setSelectedListId(rowEl.dataset.playsetId);
+                updatePlaysetLabel();
+                if (getSelectedListId() === ALL_SONGS_LIST_ID) {
+                    closeAllSheets();
+                    await renderPlaylist();
+                    return;
+                }
+                renderPlaysetSheet();
+                await renderPlaylist();
+                return;
+            }
+
+            if (targetEl && playsetModalState.mode === 'add-to') {
+                const targetId = targetEl.dataset.playsetTarget;
+                const song = playsetModalState.sourceSongName;
+                if (targetId && song) {
+                    addSongToPlayset(targetId, song);
+                }
+                updatePlaysetLabel();
+                closeAllSheets();
+                return;
+            }
+
+            if (!actionEl) return;
+            const action = actionEl.dataset.playsetAction;
+
+            if (action === 'close') {
+                closeAllSheets();
+                return;
+            }
+
+            if (!playsetModalState.mode || playsetModalState.mode === 'selector') {
+                if (action === 'edit') {
+                    openPlaysetModal({
+                        mode: 'edit',
+                        playsetId: getSelectedListId(),
+                        anchorEl: playsetModalState.anchorEl
+                    });
+                    return;
+                }
+                if (action === 'import') {
+                    await promptImportPlaysetDefinition();
+                    return;
+                }
+                if (action === 'new') {
+                    openPlaysetModal({
+                        mode: 'new',
+                        anchorEl: playsetModalState.anchorEl
+                    });
+                    return;
+                }
+                if (action === 'export') {
+                    const current = getCurrentPlayset();
+                    if (current && !current.permanent) {
+                        await exportPlaysetById(current.id);
+                    }
+                    return;
+                }
+                if (action === 'delete') {
+                    const current = getCurrentPlayset();
+                    if (!current || current.permanent) return;
+                    if (!confirm(`Delete playset "${current.name}"?`)) return;
+                    deletePlayset(current.id);
+                    updatePlaysetLabel();
+                    renderPlaysetSheet();
+                    await renderPlaylist();
+                    return;
+                }
+            }
+
+            if (playsetModalState.mode === 'add-to') {
+                if (action === 'new') {
+                    openPlaysetModal({
+                        mode: 'new',
+                        songName: playsetModalState.sourceSongName,
+                        anchorEl: playsetModalState.anchorEl
+                    });
+                }
+                return;
+            }
+
+            const draft = playsetModalState.draft;
+            if (!draft) return;
+
+            if (action === 'remove-song') {
+                const idx = Number(actionEl.dataset.songIndex);
+                if (Number.isInteger(idx) && idx >= 0 && idx < draft.songs.length) {
+                    const scrollState = capturePlaysetScrollState(sheet);
+
+                    draft.songs.splice(idx, 1);
+                    renderPlaysetSheet();
+                    restorePlaysetScrollState(sheet, scrollState);
+                }
+                return;
+            }
+
+            if (action === 'add-song') {
+                const song = actionEl.dataset.songName || '';
+                if (song && !draft.songs.includes(song)) {
+                    const scrollState = capturePlaysetScrollState(sheet);
+
+                    draft.songs.push(song);
+                    renderPlaysetSheet();
+                    restorePlaysetScrollState(sheet, scrollState);
+                }
+                return;
+            }
+
+            if (action === 'save') {
+                const name = draft.name.trim();
+                if (!name) return;
+
+                const editingId = playsetModalState.mode === 'new' ? null : draft.playsetId;
+                if (isPlaysetNameTaken(name, editingId)) {
+                    alert(`A playset named "${name}" already exists.`);
+                    return;
+                }
+
+                if (playsetModalState.mode === 'new') {
+                    const id = createPlayset(name, draft.songs.slice());
+                    if (!id) return;
+                    setSelectedListId(id);
+                } else {
+                    const updated = updatePlayset(draft.playsetId, { name, songNames: draft.songs.slice() });
+                    if (!updated) return;
+                    setSelectedListId(draft.playsetId);
+                }
+
+                updatePlaysetLabel();
+                closeAllSheets();
+                await renderPlaylist();
+                return;
+            }
+        });
+
+        sheet.addEventListener('input', (e) => {
+            const inputEl = e.target.closest('[data-playset-input]');
+            if (!inputEl) return;
+
+            const key = inputEl.dataset.playsetInput;
+            if (key === 'name') {
+                if (playsetModalState.draft) {
+                    playsetModalState.draft.name = inputEl.value;
+                    const saveBtn = sheet.querySelector('[data-playset-action="save"]');
+                    if (saveBtn) saveBtn.disabled = !playsetModalState.draft.name.trim();
+                }
+            }
+        });
+
+        sheet.dataset.bound = '1';
+    }
+
+    if (sheet.classList.contains('open')) positionPlaysetSheet();
+}
+
+function positionPlaysetSheet() {
+    const sheet = document.getElementById('playset-sheet');
+    const anchor = playsetModalState.anchorEl || document.querySelector('.card-playlist .header-row');
+    if (!sheet || !anchor || !anchor.isConnected) return;
+
+    const headerRect = anchor.getBoundingClientRect();
+    const top = Math.max(0, Math.round(headerRect.bottom));
+    const rootStyles = getComputedStyle(document.documentElement);
+    const playerBarH = parseFloat(rootStyles.getPropertyValue('--mobile-playerbar-height')) || 160;
+    const tabBarH = parseFloat(rootStyles.getPropertyValue('--mobile-tab-height')) || 56;
+    const maxHeight = Math.max(320, Math.floor(window.innerHeight - top - playerBarH - tabBarH - 10));
+
+    sheet.style.top = `${top}px`;
+    sheet.style.maxHeight = `${maxHeight}px`;
+}
+
+function togglePlaysetDropdown(e) {
+    if (e) e.stopPropagation();
+    const sheet = document.getElementById('playset-sheet');
+    if (!sheet) return;
+
+    const isOpen = sheet.classList.contains('open');
+    if (isOpen) {
+        closeAllSheets();
+        return;
+    }
+
+    openPlaysetModal({
+        mode: 'selector',
+        anchorEl: getPlaysetAnchorForMode('selector')
+    });
+}
+
 /* -------------------------- Markers (with preset) ------------------------ */
 let currentMarkerSetId = 'default';
 
@@ -2755,15 +3994,23 @@ function positionMarkerSetSheet() {
 }
 
 window.addEventListener('resize', () => {
-    const sheet = document.getElementById('marker-set-sheet');
-    if (sheet && sheet.classList.contains('open')) positionMarkerSetSheet();
+    const markerSheet = document.getElementById('marker-set-sheet');
+    if (markerSheet && markerSheet.classList.contains('open')) positionMarkerSetSheet();
+    const playsetSheet = document.getElementById('playset-sheet');
+    if (playsetSheet && playsetSheet.classList.contains('open')) positionPlaysetSheet();
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet && songSheet.classList.contains('open')) positionSongMenuSheet();
 }, { passive: true });
 
-const markerSheetScrollHost = document.querySelector('.grid');
-if (markerSheetScrollHost) {
-    markerSheetScrollHost.addEventListener('scroll', () => {
-        const sheet = document.getElementById('marker-set-sheet');
-        if (sheet && sheet.classList.contains('open')) positionMarkerSetSheet();
+const sheetScrollHost = document.querySelector('.grid');
+if (sheetScrollHost) {
+    sheetScrollHost.addEventListener('scroll', () => {
+        const markerSheet = document.getElementById('marker-set-sheet');
+        if (markerSheet && markerSheet.classList.contains('open')) positionMarkerSetSheet();
+        const playsetSheet = document.getElementById('playset-sheet');
+        if (playsetSheet && playsetSheet.classList.contains('open')) positionPlaysetSheet();
+        const songSheet = document.getElementById('song-menu-sheet');
+        if (songSheet && songSheet.classList.contains('open')) positionSongMenuSheet();
     }, { passive: true });
 }
 
@@ -2782,6 +4029,10 @@ function toggleMarkerSetDropdown(e) {
 
     document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
     document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet) songSheet.classList.remove('open');
+    const playsetSheet = document.getElementById('playset-sheet');
+    if (playsetSheet) playsetSheet.classList.remove('open');
     positionMarkerSetSheet();
     sheet.classList.add('open');
     overlay.classList.add('open');
@@ -3540,6 +4791,11 @@ importInput.onchange = async () => {
 /* ============================== Initialize DB ============================= */
 (async function init() {
     db = await openDB();
+    const songs = await getAllSongs();
+    const order = reconcileOrderWithSongs(songs || []);
+    migratePlaysetStateIfNeeded(order);
+    updatePlaysetLabel();
+    renderPlaysetSheet();
     await renderPlaylist();
 })();
 
