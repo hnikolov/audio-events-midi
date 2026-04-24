@@ -1699,10 +1699,6 @@ function initWebAudio() {
     } catch(e) { console.error("WebAudio block", e); }
 }
 
-const MIN_GAP_SEC = 0.05;
-const AVAILABLE_SPEEDS = [0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5, 1.75, 2.0];
-// const ANCHOR_RATE = 2.0;
-
 /* =============================== Helpers ================================ */
 function configureGhostPreview({ fillColor, fillOpacity, lineColor, lineOpacity } = {}) {
     const root = document.documentElement;
@@ -2097,8 +2093,6 @@ function closeAllSheets() {
     playsetModalState.mode = null;
     playsetModalState.sourceSongName = '';
     playsetModalState.anchorEl = null;
-    playsetModalState.showSongPicker = currentMode === 'edit' || currentMode === 'new';
-    playsetModalState.filterQuery = '';
     playsetModalState.draft = null;
 }
 
@@ -2307,6 +2301,8 @@ audio.addEventListener('ended', async () => {
         updatePlayPauseUI();
     }
 });
+
+const MIN_GAP_SEC = 0.05;
 
 /* ============================ A/B Loop Controls ========================== */
 function isABValid() { return abLoop.a !== null && abLoop.b !== null && abLoop.b > abLoop.a; }
@@ -2858,8 +2854,6 @@ const playsetModalState = {
     mode: null,
     sourceSongName: '',
     anchorEl: null,
-    showSongPicker: false,
-    filterQuery: '',
     draft: null
 };
 
@@ -2900,23 +2894,69 @@ function createDraftFromPlayset(playsetId, { prefillSong = '' } = {}) {
     };
 }
 
+function getPlaysetAnchorForMode(mode, fallbackAnchor = null) {
+    const topBarAnchor = document.getElementById('mobileMidiBar');
+    const headerAnchor = document.querySelector('.card-playlist .header-row');
+    if (mode === 'add-to' || mode === 'edit' || mode === 'new') {
+        return topBarAnchor || headerAnchor;
+    }
+    return fallbackAnchor || headerAnchor;
+}
+
+function capturePlaysetScrollState(sheet) {
+    const sheetList = sheet?.querySelector('.marker-set-sheet-list');
+    const addPicker = sheet?.querySelector('.playset-add-picker');
+    return {
+        listDistanceFromBottom: sheetList
+            ? (sheetList.scrollHeight - sheetList.scrollTop - sheetList.clientHeight)
+            : null,
+        pickerScrollTop: addPicker ? addPicker.scrollTop : null
+    };
+}
+
+function restorePlaysetScrollState(sheet, state) {
+    if (!sheet || !state) return;
+
+    const nextSheetList = sheet.querySelector('.marker-set-sheet-list');
+    if (nextSheetList && state.listDistanceFromBottom !== null) {
+        const nextTop = nextSheetList.scrollHeight - nextSheetList.clientHeight - state.listDistanceFromBottom;
+        nextSheetList.scrollTop = Math.max(0, nextTop);
+    }
+
+    const nextAddPicker = sheet.querySelector('.playset-add-picker');
+    if (nextAddPicker && state.pickerScrollTop !== null) {
+        const maxPickerTop = Math.max(0, nextAddPicker.scrollHeight - nextAddPicker.clientHeight);
+        nextAddPicker.scrollTop = Math.min(state.pickerScrollTop, maxPickerTop);
+    }
+}
+
+function isPlaysetNameTaken(name, excludedId = null) {
+    const normalized = String(name || '').trim().toLowerCase();
+    if (!normalized) return false;
+    return playsetUiSets.some(setDef => (
+        setDef.id !== excludedId &&
+        String(setDef.name || '').trim().toLowerCase() === normalized
+    ));
+}
+
+function createPlaysetId() {
+    let id = '';
+    do {
+        id = `set_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    } while (playsetUiSets.some(setDef => setDef.id === id));
+    return id;
+}
+
 function openPlaysetModal({ mode, playsetId = null, songName = '', anchorEl = null } = {}) {
     const sheet = document.getElementById('playset-sheet');
     const overlay = document.getElementById('sheetOverlay');
     if (!sheet || !overlay) return;
 
     const currentMode = mode || 'selector';
-    const topBarAnchor = document.getElementById('mobileMidiBar');
-    const headerAnchor = document.querySelector('.card-playlist .header-row');
 
     playsetModalState.mode = currentMode;
     playsetModalState.sourceSongName = songName || '';
-    // Edit/New/Add-to anchor below fixed top MIDI bar to save vertical space.
-    playsetModalState.anchorEl = (currentMode === 'add-to' || currentMode === 'edit' || currentMode === 'new')
-        ? (topBarAnchor || headerAnchor)
-        : (anchorEl || headerAnchor);
-    playsetModalState.showSongPicker = false;
-    playsetModalState.filterQuery = '';
+    playsetModalState.anchorEl = getPlaysetAnchorForMode(currentMode, anchorEl);
 
     if (currentMode === 'selector') {
         playsetModalState.draft = null;
@@ -2997,7 +3037,6 @@ function renderPlaysetSheet() {
                 <div class="playset-modal-body">
                     <div class="playset-modal-title">Add To Playset</div>
                     <div class="playset-modal-subtitle">Song: "${escapeHtml(sourceSong || '')}"</div>
-                    <!-- <input class="playset-modal-input" type="text" placeholder="Search playsets..." value="${escapeHtml(playsetModalState.filterQuery)}" data-playset-input="filter" /> -->
                     <div class="playset-modal-section-title">Available Playsets</div>
                     <div class="playset-modal-song-list">${rows || '<div class="playset-modal-empty">No matching playsets.</div>'}</div>
                 </div>
@@ -3046,7 +3085,6 @@ function renderPlaysetSheet() {
                     <div class="playset-modal-section-title">Songs In Playset</div>
                     <div class="playset-modal-song-list">${songRows || '<div class="playset-modal-empty">No songs yet.</div>'}</div>
                     <div class="playset-modal-section-title">Add Songs</div>
-                    <!-- <input class="playset-modal-input" type="text" placeholder="Search songs..." value="${escapeHtml(playsetModalState.filterQuery)}" data-playset-input="filter" /> -->
                     <div class="playset-add-picker">${pickerRows || '<div class="playset-modal-empty">No available songs.</div>'}</div>
                 </div>
             </div>
@@ -3147,27 +3185,11 @@ function renderPlaysetSheet() {
             if (action === 'remove-song') {
                 const idx = Number(actionEl.dataset.songIndex);
                 if (Number.isInteger(idx) && idx >= 0 && idx < draft.songs.length) {
-                    const sheetList = sheet.querySelector('.marker-set-sheet-list');
-                    const addPicker = sheet.querySelector('.playset-add-picker');
-                    const listDistanceFromBottom = sheetList
-                        ? (sheetList.scrollHeight - sheetList.scrollTop - sheetList.clientHeight)
-                        : null;
-                    const pickerScrollTop = addPicker ? addPicker.scrollTop : null;
+                    const scrollState = capturePlaysetScrollState(sheet);
 
                     draft.songs.splice(idx, 1);
                     renderPlaysetSheet();
-
-                    const nextSheetList = sheet.querySelector('.marker-set-sheet-list');
-                    if (nextSheetList && listDistanceFromBottom !== null) {
-                        const nextTop = nextSheetList.scrollHeight - nextSheetList.clientHeight - listDistanceFromBottom;
-                        nextSheetList.scrollTop = Math.max(0, nextTop);
-                    }
-
-                    const nextAddPicker = sheet.querySelector('.playset-add-picker');
-                    if (nextAddPicker && pickerScrollTop !== null) {
-                        const maxPickerTop = Math.max(0, nextAddPicker.scrollHeight - nextAddPicker.clientHeight);
-                        nextAddPicker.scrollTop = Math.min(pickerScrollTop, maxPickerTop);
-                    }
+                    restorePlaysetScrollState(sheet, scrollState);
                 }
                 return;
             }
@@ -3175,27 +3197,11 @@ function renderPlaysetSheet() {
             if (action === 'add-song') {
                 const song = actionEl.dataset.songName || '';
                 if (song && !draft.songs.includes(song)) {
-                    const sheetList = sheet.querySelector('.marker-set-sheet-list');
-                    const addPicker = sheet.querySelector('.playset-add-picker');
-                    const listDistanceFromBottom = sheetList
-                        ? (sheetList.scrollHeight - sheetList.scrollTop - sheetList.clientHeight)
-                        : null;
-                    const pickerScrollTop = addPicker ? addPicker.scrollTop : null;
+                    const scrollState = capturePlaysetScrollState(sheet);
 
                     draft.songs.push(song);
                     renderPlaysetSheet();
-
-                    const nextSheetList = sheet.querySelector('.marker-set-sheet-list');
-                    if (nextSheetList && listDistanceFromBottom !== null) {
-                        const nextTop = nextSheetList.scrollHeight - nextSheetList.clientHeight - listDistanceFromBottom;
-                        nextSheetList.scrollTop = Math.max(0, nextTop);
-                    }
-
-                    const nextAddPicker = sheet.querySelector('.playset-add-picker');
-                    if (nextAddPicker && pickerScrollTop !== null) {
-                        const maxPickerTop = Math.max(0, nextAddPicker.scrollHeight - nextAddPicker.clientHeight);
-                        nextAddPicker.scrollTop = Math.min(pickerScrollTop, maxPickerTop);
-                    }
+                    restorePlaysetScrollState(sheet, scrollState);
                 }
                 return;
             }
@@ -3204,8 +3210,14 @@ function renderPlaysetSheet() {
                 const name = draft.name.trim();
                 if (!name) return;
 
+                const editingId = playsetModalState.mode === 'new' ? null : draft.playsetId;
+                if (isPlaysetNameTaken(name, editingId)) {
+                    alert(`A playset named "${name}" already exists.`);
+                    return;
+                }
+
                 if (playsetModalState.mode === 'new') {
-                    const id = 'set_' + Date.now();
+                    const id = createPlaysetId();
                     playsetUiSets.push({ id, name, permanent: false });
                     playsetUiSongMap[id] = draft.songs.slice();
                     currentPlaysetId = id;
@@ -3273,13 +3285,8 @@ function togglePlaysetDropdown(e) {
 
     openPlaysetModal({
         mode: 'selector',
-        anchorEl: document.querySelector('.card-playlist .header-row')
+        anchorEl: getPlaysetAnchorForMode('selector')
     });
-}
-
-function togglePlaysetMenu(e) {
-    if (e) e.stopPropagation();
-    togglePlaysetDropdown();
 }
 
 /* -------------------------- Markers (with preset) ------------------------ */
