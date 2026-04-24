@@ -629,6 +629,10 @@
             opacity: 0;
             cursor: default;
         }
+        .song-menu-chip {
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
 
         /* ===== VOLUME & SPEED (STICKY BOTTOM SHEET) ===== */
         .volume-wrapper { position: relative; }
@@ -978,6 +982,7 @@
 
 <!-- Shared Action Sheet Overlay -->
 <div id="sheetOverlay" class="sheet-overlay" onclick="closeAllSheets()"></div>
+<div id="song-menu-sheet" class="marker-top-sheet" aria-label="Song menu"></div>
 <div id="playset-sheet" class="marker-top-sheet" aria-label="Playsets menu"></div>
 <div id="marker-set-sheet" class="marker-top-sheet" aria-label="Marker set menu"></div>
 
@@ -1220,14 +1225,110 @@ async function renameSongInDB(oldName) {
         };
     }
 }
-function togglePlaylistMenu(e, songName, menuId) {
-    const menu = document.getElementById(menuId);
-    const allMenus = document.querySelectorAll('#playlist-ui .dropdown-menu');
-    allMenus.forEach(m => {
-        if (m.id !== menuId) m.classList.remove('open');
-    });
-    menu.classList.toggle('open');
-    if (menu.classList.contains('open')) flipMenuIfOverflow(menu);
+let songMenuContext = { songName: null, rowEl: null };
+
+async function removeSongByName(songName) {
+    if (!songName) return;
+    if (!confirm(`Remove ${songName}?`)) return;
+    const ok = await removeSongFromDB(songName);
+    if (ok) {
+        if (currentFileName === songName) {
+            audio.src = "";
+            currentFileName = "";
+            firedEvents.clear();
+            lastTriggeredMarkerTime = null;
+            lastTriggeredMarkerIndex = null;
+            activeBlobUrl = safeRevoke(activeBlobUrl);
+            updateMarkerTicks();
+        }
+        await renderPlaylist();
+    }
+}
+
+function renderSongMenuSheet(songName) {
+    const sheet = document.getElementById('song-menu-sheet');
+    if (!sheet) return;
+
+    sheet.innerHTML = `
+        <div class="marker-set-sheet-list" style="padding:10px 12px 8px;">
+            <div style="font-size:0.95rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(songName || '')}</div>
+        </div>
+        <div class="marker-set-sheet-divider"></div>
+        <div class="marker-set-sheet-footer">
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="rename">Rename</button>
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="export">Export</button>
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="add-to-playset">Add to ...</button>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip danger" data-song-action="delete">Delete</button>
+        </div>
+    `;
+
+    if (!sheet.dataset.bound) {
+        sheet.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const actionEl = e.target.closest('[data-song-action]');
+            if (!actionEl) return;
+
+            const action = actionEl.dataset.songAction;
+            const song = songMenuContext.songName;
+            if (!song) return;
+
+            if (action === 'rename') {
+                closeAllSheets();
+                await renameSongInDB(song);
+            } else if (action === 'export') {
+                closeAllSheets();
+                await exportSong(song);
+            } else if (action === 'add-to-playset') {
+                console.info('[song-menu-ui] placeholder action: add-to-playset, song:', song);
+            } else if (action === 'delete') {
+                closeAllSheets();
+                await removeSongByName(song);
+            }
+        });
+        sheet.dataset.bound = '1';
+    }
+}
+
+function positionSongMenuSheet() {
+    const sheet = document.getElementById('song-menu-sheet');
+    const row = songMenuContext.rowEl;
+    if (!sheet || !row || !row.isConnected) return;
+
+    const rowRect = row.getBoundingClientRect();
+    const top = Math.max(0, Math.round(rowRect.bottom));
+    const rootStyles = getComputedStyle(document.documentElement);
+    const playerBarH = parseFloat(rootStyles.getPropertyValue('--mobile-playerbar-height')) || 160;
+    const tabBarH = parseFloat(rootStyles.getPropertyValue('--mobile-tab-height')) || 56;
+    const maxHeight = Math.max(160, Math.floor(window.innerHeight - top - playerBarH - tabBarH - 10));
+
+    sheet.style.top = `${top}px`;
+    sheet.style.maxHeight = `${maxHeight}px`;
+}
+
+function togglePlaylistMenu(e, songName, rowEl) {
+    if (e) e.stopPropagation();
+    const sheet = document.getElementById('song-menu-sheet');
+    const overlay = document.getElementById('sheetOverlay');
+    if (!sheet || !overlay) return;
+
+    const isSameOpen = sheet.classList.contains('open') && songMenuContext.songName === songName;
+    if (isSameOpen) {
+        closeAllSheets();
+        return;
+    }
+
+    songMenuContext = { songName, rowEl };
+    document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const playsetSheet = document.getElementById('playset-sheet');
+    if (playsetSheet) playsetSheet.classList.remove('open');
+    const markerSheet = document.getElementById('marker-set-sheet');
+    if (markerSheet) markerSheet.classList.remove('open');
+    renderSongMenuSheet(songName);
+    positionSongMenuSheet();
+    sheet.classList.add('open');
+    overlay.classList.add('open');
 }
 
 /* ---------- drag-to-reorder logic (drag handle approach) ---------- */
@@ -1858,6 +1959,8 @@ audio.addEventListener('pause', updatePlayPauseUI);
 
 function closeAllSheets() {
     document.querySelectorAll('.action-sheet').forEach(sheet => sheet.classList.remove('open'));
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet) songSheet.classList.remove('open');
     const playsetSheet = document.getElementById('playset-sheet');
     if (playsetSheet) playsetSheet.classList.remove('open');
     const markerSheet = document.getElementById('marker-set-sheet');
@@ -2392,55 +2495,10 @@ async function renderPlaylist() {
             menuBtn.title = 'Options';
             menuBtn.onclick = (e) => {
                 e.stopPropagation();
-                togglePlaylistMenu(e, song.name, `menu-${idx}`);
+                togglePlaylistMenu(e, song.name, row);
             };
 
-            const menu = document.createElement('div');
-            menu.className = 'dropdown-menu';
-            menu.id = `menu-${idx}`;
-            
-            const renameBtn = document.createElement('button');
-            renameBtn.textContent = 'Rename';
-            renameBtn.onclick = async (e) => {
-                e.stopPropagation();
-                await renameSongInDB(song.name);
-            };
-            
-            const removeBtn = document.createElement('button');
-            removeBtn.textContent = 'Remove';
-            removeBtn.className = 'danger-item';
-            removeBtn.onclick = async (e) => {
-                e.stopPropagation();
-                if (confirm(`Remove ${song.name}?`)) {
-                    const ok = await removeSongFromDB(song.name);
-                    if (ok) {
-                        if (currentFileName === song.name) {
-                            audio.src = "";
-                            currentFileName = "";
-                            firedEvents.clear();
-                            lastTriggeredMarkerTime = null;
-                            lastTriggeredMarkerIndex = null;
-                            activeBlobUrl = safeRevoke(activeBlobUrl);
-                            updateMarkerTicks();
-                        }
-                        await renderPlaylist();
-                    }
-                }
-            };
-            
-            const exportBtn = document.createElement('button');
-            exportBtn.textContent = 'Export';
-            exportBtn.onclick = async (e) => {
-                e.stopPropagation();
-                menu.classList.remove('open');
-                await exportSong(song.name);
-            };
-
-            menu.appendChild(renameBtn);
-            menu.appendChild(exportBtn);
-            menu.appendChild(removeBtn);
-
-            row.onclick = (e) => { if (!isDraggingItem && !recentlyDragged && !menu.classList.contains('open')) playSong(song.name); };
+            row.onclick = (e) => { if (!isDraggingItem && !recentlyDragged) playSong(song.name); };
 
             const dragHandle = document.createElement('div');
             dragHandle.className = 'drag-handle';
@@ -2449,7 +2507,6 @@ async function renderPlaylist() {
             row.appendChild(dragHandle);
             row.appendChild(label);
             row.appendChild(menuBtn);
-            row.appendChild(menu);
             playlistUI.appendChild(row);
         });
     } catch (err) {
@@ -2758,6 +2815,8 @@ function togglePlaysetDropdown(e) {
 
     document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
     document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet) songSheet.classList.remove('open');
     const markerSheet = document.getElementById('marker-set-sheet');
     if (markerSheet) markerSheet.classList.remove('open');
     renderPlaysetSheet();
@@ -2900,6 +2959,8 @@ window.addEventListener('resize', () => {
     if (markerSheet && markerSheet.classList.contains('open')) positionMarkerSetSheet();
     const playsetSheet = document.getElementById('playset-sheet');
     if (playsetSheet && playsetSheet.classList.contains('open')) positionPlaysetSheet();
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet && songSheet.classList.contains('open')) positionSongMenuSheet();
 }, { passive: true });
 
 const sheetScrollHost = document.querySelector('.grid');
@@ -2909,6 +2970,8 @@ if (sheetScrollHost) {
         if (markerSheet && markerSheet.classList.contains('open')) positionMarkerSetSheet();
         const playsetSheet = document.getElementById('playset-sheet');
         if (playsetSheet && playsetSheet.classList.contains('open')) positionPlaysetSheet();
+        const songSheet = document.getElementById('song-menu-sheet');
+        if (songSheet && songSheet.classList.contains('open')) positionSongMenuSheet();
     }, { passive: true });
 }
 
@@ -2927,6 +2990,8 @@ function toggleMarkerSetDropdown(e) {
 
     document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
     document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet) songSheet.classList.remove('open');
     const playsetSheet = document.getElementById('playset-sheet');
     if (playsetSheet) playsetSheet.classList.remove('open');
     positionMarkerSetSheet();
