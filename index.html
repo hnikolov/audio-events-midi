@@ -613,6 +613,10 @@
             min-height: 40px;
             padding: 8px 0;
         }
+        .marker-set-chip:disabled {
+            opacity: 0.45;
+            pointer-events: none;
+        }
         .marker-set-chip.danger {
             color: var(--danger);
         }
@@ -843,7 +847,14 @@
         <!-- PLAYLIST CARD -->
         <div class="card card-playlist">
             <div class="header-row">
-                <h4>Playlist</h4>
+                                <div style="display:flex;align-items:center;min-width:0;flex:1;margin-right:8px;">
+                                    <div id="playset-trigger" onclick="togglePlaysetDropdown(event)" style="display:flex;align-items:center;flex:1;min-width:0;cursor:pointer;">
+                                        <h4 style="margin-right:6px;flex-shrink:0;">Playlist:</h4>
+                                        <div style="display:flex;align-items:center;flex:1;min-width:0;">
+                                            <span id="playset-label" style="font-size:1.05rem;font-weight:600;color:var(--text-secondary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden;">All songs</span>
+                                        </div>
+                                    </div>
+                                </div>
                 <div style="display:flex;gap:8px;align-items:center">
                   <input type="file" id="importInput" accept=".aem" style="display:none">
                   <label for="importInput" class="btn-primary" style="cursor:pointer;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border)">
@@ -963,6 +974,7 @@
 
 <!-- Shared Action Sheet Overlay -->
 <div id="sheetOverlay" class="sheet-overlay" onclick="closeAllSheets()"></div>
+<div id="playset-sheet" class="marker-top-sheet" aria-label="Playsets menu"></div>
 <div id="marker-set-sheet" class="marker-top-sheet" aria-label="Marker set menu"></div>
 
 <!-- Speed Bottom Sheet -->
@@ -1842,6 +1854,8 @@ audio.addEventListener('pause', updatePlayPauseUI);
 
 function closeAllSheets() {
     document.querySelectorAll('.action-sheet').forEach(sheet => sheet.classList.remove('open'));
+    const playsetSheet = document.getElementById('playset-sheet');
+    if (playsetSheet) playsetSheet.classList.remove('open');
     const markerSheet = document.getElementById('marker-set-sheet');
     if (markerSheet) markerSheet.classList.remove('open');
     const overlay = document.getElementById('sheetOverlay');
@@ -1860,6 +1874,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setPlaybackRate(val);
         });
     }
+    updatePlaysetLabel();
+    renderPlaysetSheet();
 });
 
 function toggleSpeedMenu() {
@@ -2630,6 +2646,116 @@ function normalizeMarkerList(rawList) {
         .sort((a, b) => a.time - b.time);
 }
 
+/* -------------------------- Playsets (UI-only) --------------------------- */
+let currentPlaysetId = 'all-songs';
+const playsetUiSets = [
+    { id: 'all-songs', name: 'All songs', permanent: true },
+    { id: 'warmup', name: 'Warmup Set', permanent: false },
+    { id: 'gig-night', name: 'Gig Night', permanent: false },
+    { id: 'practice-b', name: 'Practice B', permanent: false }
+];
+
+function getCurrentPlayset() {
+    return playsetUiSets.find(p => p.id === currentPlaysetId) || playsetUiSets[0];
+}
+
+function updatePlaysetLabel() {
+    const label = document.getElementById('playset-label');
+    const current = getCurrentPlayset();
+    if (label && current) label.textContent = current.name;
+}
+
+function renderPlaysetSheet() {
+    const sheet = document.getElementById('playset-sheet');
+    if (!sheet) return;
+
+    const current = getCurrentPlayset();
+    const rows = playsetUiSets.map(setDef => {
+        const activeClass = setDef.id === currentPlaysetId ? ' active' : '';
+        return `<button type="button" class="speed-option marker-set-row${activeClass}" data-playset-id="${escapeHtml(setDef.id)}">${escapeHtml(setDef.name)}</button>`;
+    }).join('');
+
+    const disableRename = current?.permanent ? ' disabled' : '';
+    const disableDelete = current?.permanent ? ' disabled' : '';
+
+    sheet.innerHTML = `
+        <div class="marker-set-sheet-list">${rows}</div>
+        <div class="marker-set-sheet-divider"></div>
+        <div class="marker-set-sheet-footer">
+            <button type="button" class="speed-chip marker-set-chip" data-playset-action="rename"${disableRename}>Rename</button>
+            <button type="button" class="speed-chip marker-set-chip" data-playset-action="duplicate">Duplicate</button>
+            <button type="button" class="speed-chip marker-set-chip" data-playset-action="export">Export</button>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <button type="button" class="speed-chip marker-set-chip danger" data-playset-action="delete"${disableDelete}>Delete</button>
+        </div>
+    `;
+
+    if (!sheet.dataset.bound) {
+        sheet.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            const row = e.target.closest('[data-playset-id]');
+            if (row) {
+                currentPlaysetId = row.dataset.playsetId;
+                updatePlaysetLabel();
+                renderPlaysetSheet();
+                return;
+            }
+
+            const actionEl = e.target.closest('[data-playset-action]');
+            if (!actionEl) return;
+            const action = actionEl.dataset.playsetAction;
+            console.info('[playsets-ui] placeholder action:', action, 'playset:', getCurrentPlayset()?.name || '');
+        });
+        sheet.dataset.bound = '1';
+    }
+
+    if (sheet.classList.contains('open')) positionPlaysetSheet();
+}
+
+function positionPlaysetSheet() {
+    const sheet = document.getElementById('playset-sheet');
+    const header = document.querySelector('.card-playlist .header-row');
+    if (!sheet || !header) return;
+
+    const headerRect = header.getBoundingClientRect();
+    const top = Math.max(0, Math.round(headerRect.bottom));
+    const rootStyles = getComputedStyle(document.documentElement);
+    const playerBarH = parseFloat(rootStyles.getPropertyValue('--mobile-playerbar-height')) || 160;
+    const tabBarH = parseFloat(rootStyles.getPropertyValue('--mobile-tab-height')) || 56;
+    const maxHeight = Math.max(180, Math.floor(window.innerHeight - top - playerBarH - tabBarH - 10));
+
+    sheet.style.top = `${top}px`;
+    sheet.style.maxHeight = `${maxHeight}px`;
+}
+
+function togglePlaysetDropdown(e) {
+    if (e) e.stopPropagation();
+    const sheet = document.getElementById('playset-sheet');
+    const overlay = document.getElementById('sheetOverlay');
+    if (!sheet || !overlay) return;
+
+    const isOpen = sheet.classList.contains('open');
+    if (isOpen) {
+        closeAllSheets();
+        return;
+    }
+
+    document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const markerSheet = document.getElementById('marker-set-sheet');
+    if (markerSheet) markerSheet.classList.remove('open');
+    renderPlaysetSheet();
+    positionPlaysetSheet();
+    sheet.classList.add('open');
+    overlay.classList.add('open');
+}
+
+function togglePlaysetMenu(e) {
+    if (e) e.stopPropagation();
+    togglePlaysetDropdown();
+}
+
 /* -------------------------- Markers (with preset) ------------------------ */
 let currentMarkerSetId = 'default';
 
@@ -2755,15 +2881,19 @@ function positionMarkerSetSheet() {
 }
 
 window.addEventListener('resize', () => {
-    const sheet = document.getElementById('marker-set-sheet');
-    if (sheet && sheet.classList.contains('open')) positionMarkerSetSheet();
+    const markerSheet = document.getElementById('marker-set-sheet');
+    if (markerSheet && markerSheet.classList.contains('open')) positionMarkerSetSheet();
+    const playsetSheet = document.getElementById('playset-sheet');
+    if (playsetSheet && playsetSheet.classList.contains('open')) positionPlaysetSheet();
 }, { passive: true });
 
-const markerSheetScrollHost = document.querySelector('.grid');
-if (markerSheetScrollHost) {
-    markerSheetScrollHost.addEventListener('scroll', () => {
-        const sheet = document.getElementById('marker-set-sheet');
-        if (sheet && sheet.classList.contains('open')) positionMarkerSetSheet();
+const sheetScrollHost = document.querySelector('.grid');
+if (sheetScrollHost) {
+    sheetScrollHost.addEventListener('scroll', () => {
+        const markerSheet = document.getElementById('marker-set-sheet');
+        if (markerSheet && markerSheet.classList.contains('open')) positionMarkerSetSheet();
+        const playsetSheet = document.getElementById('playset-sheet');
+        if (playsetSheet && playsetSheet.classList.contains('open')) positionPlaysetSheet();
     }, { passive: true });
 }
 
@@ -2782,6 +2912,8 @@ function toggleMarkerSetDropdown(e) {
 
     document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
     document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const playsetSheet = document.getElementById('playset-sheet');
+    if (playsetSheet) playsetSheet.classList.remove('open');
     positionMarkerSetSheet();
     sheet.classList.add('open');
     overlay.classList.add('open');
