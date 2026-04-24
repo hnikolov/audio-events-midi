@@ -633,6 +633,130 @@
             font-size: 0.78rem;
             white-space: nowrap;
         }
+        .playset-modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px 12px 12px;
+        }
+        .playset-modal-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .playset-modal-title-row {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: center;
+            gap: 10px;
+        }
+        .playset-modal-title-row .playset-modal-input {
+            padding: 8px 10px;
+            min-width: 0;
+        }
+        .playset-modal-subtitle {
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .playset-modal-input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            padding: 10px 12px;
+            font-size: 0.94rem;
+            outline: none;
+        }
+        .playset-modal-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(29,185,84,0.15);
+        }
+        .playset-modal-section-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .playset-modal-song-list {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: var(--bg-surface);
+            max-height: 240px;
+            overflow-y: auto;
+        }
+        .playset-modal-song-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 10px;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+        .playset-modal-song-row:last-child { border-bottom: none; }
+        .playset-modal-song-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .playset-icon-btn {
+            border: 1px solid var(--border);
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            border-radius: var(--radius-sm);
+            min-width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+        .playset-icon-btn:disabled {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+        .playset-icon-btn.danger {
+            color: var(--danger);
+        }
+        .playset-modal-empty {
+            padding: 12px;
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+        }
+        .playset-target-row {
+            justify-content: space-between;
+        }
+        .playset-target-row .arrow {
+            color: var(--text-muted);
+            margin-left: 8px;
+        }
+        .playset-add-picker {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--bg-surface);
+            max-height: 180px;
+            overflow-y: auto;
+        }
+        .playset-add-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 10px;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+        .playset-add-row:last-child { border-bottom: none; }
 
         /* ===== VOLUME & SPEED (STICKY BOTTOM SHEET) ===== */
         .volume-wrapper { position: relative; }
@@ -1280,7 +1404,10 @@ function renderSongMenuSheet(songName) {
                 closeAllSheets();
                 await exportSong(song);
             } else if (action === 'add-to-playset') {
-                console.info('[song-menu-ui] placeholder action: add-to-playset, song:', song);
+                openPlaysetModal({
+                    mode: 'add-to',
+                    songName: song
+                });
             } else if (action === 'delete') {
                 closeAllSheets();
                 await removeSongByName(song);
@@ -1967,6 +2094,12 @@ function closeAllSheets() {
     if (markerSheet) markerSheet.classList.remove('open');
     const overlay = document.getElementById('sheetOverlay');
     if (overlay) overlay.classList.remove('open');
+    playsetModalState.mode = null;
+    playsetModalState.sourceSongName = '';
+    playsetModalState.anchorEl = null;
+    playsetModalState.showSongPicker = currentMode === 'edit' || currentMode === 'new';
+    playsetModalState.filterQuery = '';
+    playsetModalState.draft = null;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2715,9 +2848,103 @@ const playsetUiSets = [
     { id: 'gig-night', name: 'Gig Night', permanent: false },
     { id: 'practice-b', name: 'Practice B', permanent: false }
 ];
+const playsetUiSongMap = {
+    'all-songs': [],
+    'warmup': ['Song A', 'Song B'],
+    'gig-night': ['Song C'],
+    'practice-b': []
+};
+const playsetModalState = {
+    mode: null,
+    sourceSongName: '',
+    anchorEl: null,
+    showSongPicker: false,
+    filterQuery: '',
+    draft: null
+};
 
 function getCurrentPlayset() {
     return playsetUiSets.find(p => p.id === currentPlaysetId) || playsetUiSets[0];
+}
+
+function getAllKnownSongNamesForUi() {
+    const fromPlaylist = Array.from(document.querySelectorAll('#playlist-ui .playlist-item > span'))
+        .map(el => (el.textContent || '').trim())
+        .filter(Boolean);
+    if (fromPlaylist.length) return Array.from(new Set(fromPlaylist));
+
+    const fromOrder = getPlaylistOrder().filter(Boolean);
+    if (fromOrder.length) return Array.from(new Set(fromOrder));
+
+    return ['Song A', 'Song B', 'Song C', 'Song D'];
+}
+
+function getEditablePlaysetId(defaultId) {
+    const exact = playsetUiSets.find(p => p.id === defaultId && !p.permanent);
+    if (exact) return exact.id;
+    const fallback = playsetUiSets.find(p => !p.permanent);
+    return fallback ? fallback.id : null;
+}
+
+function createDraftFromPlayset(playsetId, { prefillSong = '' } = {}) {
+    const allSongs = getAllKnownSongNamesForUi();
+    const selected = playsetUiSets.find(p => p.id === playsetId);
+    const baseSongs = (playsetUiSongMap[playsetId] || []).slice();
+    if (prefillSong && !baseSongs.includes(prefillSong)) baseSongs.push(prefillSong);
+
+    return {
+        playsetId,
+        name: selected ? selected.name : '',
+        songs: baseSongs,
+        availableSongs: allSongs
+    };
+}
+
+function openPlaysetModal({ mode, playsetId = null, songName = '', anchorEl = null } = {}) {
+    const sheet = document.getElementById('playset-sheet');
+    const overlay = document.getElementById('sheetOverlay');
+    if (!sheet || !overlay) return;
+
+    const currentMode = mode || 'selector';
+    const topBarAnchor = document.getElementById('mobileMidiBar');
+    const headerAnchor = document.querySelector('.card-playlist .header-row');
+
+    playsetModalState.mode = currentMode;
+    playsetModalState.sourceSongName = songName || '';
+    // Edit/New/Add-to anchor below fixed top MIDI bar to save vertical space.
+    playsetModalState.anchorEl = (currentMode === 'add-to' || currentMode === 'edit' || currentMode === 'new')
+        ? (topBarAnchor || headerAnchor)
+        : (anchorEl || headerAnchor);
+    playsetModalState.showSongPicker = false;
+    playsetModalState.filterQuery = '';
+
+    if (currentMode === 'selector') {
+        playsetModalState.draft = null;
+    } else if (currentMode === 'add-to') {
+        playsetModalState.draft = null;
+    } else if (currentMode === 'new') {
+        playsetModalState.draft = createDraftFromPlayset(null, { prefillSong: songName || '' });
+    } else {
+        const editableId = getEditablePlaysetId(playsetId || currentPlaysetId);
+        if (!editableId) {
+            playsetModalState.mode = 'new';
+            playsetModalState.draft = createDraftFromPlayset(null, { prefillSong: songName || '' });
+        } else {
+            playsetModalState.draft = createDraftFromPlayset(editableId);
+        }
+    }
+
+    document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet) songSheet.classList.remove('open');
+    const markerSheet = document.getElementById('marker-set-sheet');
+    if (markerSheet) markerSheet.classList.remove('open');
+
+    renderPlaysetSheet();
+    positionPlaysetSheet();
+    sheet.classList.add('open');
+    overlay.classList.add('open');
 }
 
 function updatePlaysetLabel() {
@@ -2734,37 +2961,122 @@ function renderPlaysetSheet() {
     const sheet = document.getElementById('playset-sheet');
     if (!sheet) return;
 
-    const current = getCurrentPlayset();
-    const rows = playsetUiSets.map(setDef => {
-        const activeClass = setDef.id === currentPlaysetId ? ' active' : '';
-        return `<button type="button" class="speed-option marker-set-row${activeClass}" data-playset-id="${escapeHtml(setDef.id)}">${escapeHtml(setDef.name)}</button>`;
-    }).join('');
+    const mode = playsetModalState.mode;
+    const sourceSong = playsetModalState.sourceSongName;
+    let bodyHtml = '';
+    let footerHtml = '';
 
-    const actionDisabled = current?.permanent ? ' disabled' : '';
+    if (!mode || mode === 'selector') {
+        const current = getCurrentPlayset();
+        const rows = playsetUiSets.map(setDef => {
+            const activeClass = setDef.id === currentPlaysetId ? ' active' : '';
+            return `<button type="button" class="speed-option marker-set-row${activeClass}" data-playset-id="${escapeHtml(setDef.id)}">${escapeHtml(setDef.name)}</button>`;
+        }).join('');
 
-    const footerHtml = `
-        <div class="marker-set-sheet-divider"></div>
-        <div class="marker-set-sheet-footer">
-            <button type="button" class="speed-chip marker-set-chip" data-playset-action="edit"${actionDisabled}>Edit</button>
-            <button type="button" class="speed-chip marker-set-chip" data-playset-action="export"${actionDisabled}>Export</button>
-            <button type="button" class="speed-chip marker-set-chip" data-playset-action="new">New</button>
-            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
-            <button type="button" class="speed-chip marker-set-chip danger" data-playset-action="delete"${actionDisabled}>Delete</button>
-        </div>
-    `;
+        const actionDisabled = current?.permanent ? ' disabled' : '';
 
-    sheet.innerHTML = `
-        <div class="marker-set-sheet-list">${rows}</div>
-        ${footerHtml}
-    `;
+        bodyHtml = `<div class="marker-set-sheet-list">${rows}</div>`;
+        footerHtml = `
+            <div class="marker-set-sheet-divider"></div>
+            <div class="marker-set-sheet-footer">
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="edit"${actionDisabled}>Edit</button>
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="export"${actionDisabled}>Export</button>
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="new">New</button>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <button type="button" class="speed-chip marker-set-chip danger" data-playset-action="delete"${actionDisabled}>Delete</button>
+            </div>
+        `;
+    } else if (mode === 'add-to') {
+        const rows = playsetUiSets
+            .filter(setDef => !setDef.permanent)
+            .map(setDef => `<button type="button" class="speed-option marker-set-row playset-target-row" data-playset-target="${escapeHtml(setDef.id)}"><span>${escapeHtml(setDef.name)}</span><span class="arrow">></span></button>`)
+            .join('');
+
+        bodyHtml = `
+            <div class="marker-set-sheet-list">
+                <div class="playset-modal-body">
+                    <div class="playset-modal-title">Add To Playset</div>
+                    <div class="playset-modal-subtitle">Song: "${escapeHtml(sourceSong || '')}"</div>
+                    <!-- <input class="playset-modal-input" type="text" placeholder="Search playsets..." value="${escapeHtml(playsetModalState.filterQuery)}" data-playset-input="filter" /> -->
+                    <div class="playset-modal-section-title">Available Playsets</div>
+                    <div class="playset-modal-song-list">${rows || '<div class="playset-modal-empty">No matching playsets.</div>'}</div>
+                </div>
+            </div>
+        `;
+        footerHtml = `
+            <div class="marker-set-sheet-divider"></div>
+            <div class="marker-set-sheet-footer">
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="new">New</button>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="close">Close</button>
+            </div>
+        `;
+    } else {
+        const isNew = mode === 'new';
+        const draft = playsetModalState.draft || createDraftFromPlayset(null);
+        const title = isNew ? 'New Playset' : 'Edit Playset';
+
+        const songRows = draft.songs.map((song, idx) => `
+            <div class="playset-modal-song-row">
+                <span>${escapeHtml(song)}</span>
+                <span class="playset-modal-song-actions">
+                    <button type="button" class="playset-icon-btn danger" data-playset-action="remove-song" data-song-index="${idx}">-</button>
+                </span>
+            </div>
+        `).join('');
+
+        const pickerRows = draft.availableSongs
+            .filter(song => !draft.songs.includes(song))
+            .map(song => `
+                <div class="playset-add-row">
+                    <span>${escapeHtml(song)}</span>
+                    <button type="button" class="playset-icon-btn" data-playset-action="add-song" data-song-name="${escapeHtml(song)}">+</button>
+                </div>
+            `).join('');
+
+        bodyHtml = `
+            <div class="marker-set-sheet-list">
+                <div class="playset-modal-body">
+                    <div class="playset-modal-title-row">
+                        <div class="playset-modal-title">${title}</div>
+                        <input class="playset-modal-input" type="text" value="${escapeHtml(draft.name)}" placeholder="${isNew ? 'Enter playset name' : 'Playset name'}" data-playset-input="name" />
+                    </div>
+                    <div class="playset-modal-section-title">Songs In Playset</div>
+                    <div class="playset-modal-song-list">${songRows || '<div class="playset-modal-empty">No songs yet.</div>'}</div>
+                    <div class="playset-modal-section-title">Add Songs</div>
+                    <!-- <input class="playset-modal-input" type="text" placeholder="Search songs..." value="${escapeHtml(playsetModalState.filterQuery)}" data-playset-input="filter" /> -->
+                    <div class="playset-add-picker">${pickerRows || '<div class="playset-modal-empty">No available songs.</div>'}</div>
+                </div>
+            </div>
+        `;
+
+        const saveDisabled = !draft.name.trim() ? ' disabled' : '';
+        footerHtml = `
+            <div class="marker-set-sheet-divider"></div>
+            <div class="marker-set-sheet-footer">
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="save"${saveDisabled}>Save</button>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <button type="button" class="speed-chip marker-set-chip" data-playset-action="close">Close</button>
+            </div>
+        `;
+    }
+
+    sheet.innerHTML = `${bodyHtml}${footerHtml}`;
 
     if (!sheet.dataset.bound) {
         sheet.addEventListener('click', (e) => {
             e.stopPropagation();
 
-            const row = e.target.closest('[data-playset-id]');
-            if (row) {
-                currentPlaysetId = row.dataset.playsetId;
+            const rowEl = e.target.closest('[data-playset-id]');
+            const actionEl = e.target.closest('[data-playset-action]');
+            const targetEl = e.target.closest('[data-playset-target]');
+
+            if (rowEl && (!playsetModalState.mode || playsetModalState.mode === 'selector')) {
+                currentPlaysetId = rowEl.dataset.playsetId;
                 updatePlaysetLabel();
                 if (currentPlaysetId === 'all-songs') {
                     closeAllSheets();
@@ -2774,11 +3086,158 @@ function renderPlaysetSheet() {
                 return;
             }
 
-            const actionEl = e.target.closest('[data-playset-action]');
+            if (targetEl && playsetModalState.mode === 'add-to') {
+                const targetId = targetEl.dataset.playsetTarget;
+                const song = playsetModalState.sourceSongName;
+                if (targetId && song) {
+                    const list = playsetUiSongMap[targetId] || [];
+                    if (!list.includes(song)) list.push(song);
+                    playsetUiSongMap[targetId] = list;
+                }
+                currentPlaysetId = targetId;
+                updatePlaysetLabel();
+                closeAllSheets();
+                return;
+            }
+
             if (!actionEl) return;
             const action = actionEl.dataset.playsetAction;
-            console.info('[playsets-ui] placeholder action:', action, 'playset:', getCurrentPlayset()?.name || '');
+
+            if (action === 'close') {
+                closeAllSheets();
+                return;
+            }
+
+            if (!playsetModalState.mode || playsetModalState.mode === 'selector') {
+                if (action === 'edit') {
+                    openPlaysetModal({
+                        mode: 'edit',
+                        playsetId: currentPlaysetId,
+                        anchorEl: playsetModalState.anchorEl
+                    });
+                    return;
+                }
+                if (action === 'new') {
+                    openPlaysetModal({
+                        mode: 'new',
+                        anchorEl: playsetModalState.anchorEl
+                    });
+                    return;
+                }
+                if (action === 'export' || action === 'delete') {
+                    console.info('[playsets-ui] placeholder action:', action, 'playset:', getCurrentPlayset()?.name || '');
+                    return;
+                }
+            }
+
+            if (playsetModalState.mode === 'add-to') {
+                if (action === 'new') {
+                    openPlaysetModal({
+                        mode: 'new',
+                        songName: playsetModalState.sourceSongName,
+                        anchorEl: playsetModalState.anchorEl
+                    });
+                }
+                return;
+            }
+
+            const draft = playsetModalState.draft;
+            if (!draft) return;
+
+            if (action === 'remove-song') {
+                const idx = Number(actionEl.dataset.songIndex);
+                if (Number.isInteger(idx) && idx >= 0 && idx < draft.songs.length) {
+                    const sheetList = sheet.querySelector('.marker-set-sheet-list');
+                    const addPicker = sheet.querySelector('.playset-add-picker');
+                    const listDistanceFromBottom = sheetList
+                        ? (sheetList.scrollHeight - sheetList.scrollTop - sheetList.clientHeight)
+                        : null;
+                    const pickerScrollTop = addPicker ? addPicker.scrollTop : null;
+
+                    draft.songs.splice(idx, 1);
+                    renderPlaysetSheet();
+
+                    const nextSheetList = sheet.querySelector('.marker-set-sheet-list');
+                    if (nextSheetList && listDistanceFromBottom !== null) {
+                        const nextTop = nextSheetList.scrollHeight - nextSheetList.clientHeight - listDistanceFromBottom;
+                        nextSheetList.scrollTop = Math.max(0, nextTop);
+                    }
+
+                    const nextAddPicker = sheet.querySelector('.playset-add-picker');
+                    if (nextAddPicker && pickerScrollTop !== null) {
+                        const maxPickerTop = Math.max(0, nextAddPicker.scrollHeight - nextAddPicker.clientHeight);
+                        nextAddPicker.scrollTop = Math.min(pickerScrollTop, maxPickerTop);
+                    }
+                }
+                return;
+            }
+
+            if (action === 'add-song') {
+                const song = actionEl.dataset.songName || '';
+                if (song && !draft.songs.includes(song)) {
+                    const sheetList = sheet.querySelector('.marker-set-sheet-list');
+                    const addPicker = sheet.querySelector('.playset-add-picker');
+                    const listDistanceFromBottom = sheetList
+                        ? (sheetList.scrollHeight - sheetList.scrollTop - sheetList.clientHeight)
+                        : null;
+                    const pickerScrollTop = addPicker ? addPicker.scrollTop : null;
+
+                    draft.songs.push(song);
+                    renderPlaysetSheet();
+
+                    const nextSheetList = sheet.querySelector('.marker-set-sheet-list');
+                    if (nextSheetList && listDistanceFromBottom !== null) {
+                        const nextTop = nextSheetList.scrollHeight - nextSheetList.clientHeight - listDistanceFromBottom;
+                        nextSheetList.scrollTop = Math.max(0, nextTop);
+                    }
+
+                    const nextAddPicker = sheet.querySelector('.playset-add-picker');
+                    if (nextAddPicker && pickerScrollTop !== null) {
+                        const maxPickerTop = Math.max(0, nextAddPicker.scrollHeight - nextAddPicker.clientHeight);
+                        nextAddPicker.scrollTop = Math.min(pickerScrollTop, maxPickerTop);
+                    }
+                }
+                return;
+            }
+
+            if (action === 'save') {
+                const name = draft.name.trim();
+                if (!name) return;
+
+                if (playsetModalState.mode === 'new') {
+                    const id = 'set_' + Date.now();
+                    playsetUiSets.push({ id, name, permanent: false });
+                    playsetUiSongMap[id] = draft.songs.slice();
+                    currentPlaysetId = id;
+                } else {
+                    const setDef = playsetUiSets.find(p => p.id === draft.playsetId);
+                    if (setDef && !setDef.permanent) {
+                        setDef.name = name;
+                        playsetUiSongMap[draft.playsetId] = draft.songs.slice();
+                        currentPlaysetId = draft.playsetId;
+                    }
+                }
+
+                updatePlaysetLabel();
+                closeAllSheets();
+                return;
+            }
         });
+
+        sheet.addEventListener('input', (e) => {
+            const inputEl = e.target.closest('[data-playset-input]');
+            if (!inputEl) return;
+
+            const key = inputEl.dataset.playsetInput;
+            if (key === 'name') {
+                if (playsetModalState.draft) {
+                    playsetModalState.draft.name = inputEl.value;
+                    const saveBtn = sheet.querySelector('[data-playset-action="save"]');
+                    if (saveBtn) saveBtn.disabled = !playsetModalState.draft.name.trim();
+                }
+            }
+        });
+
         sheet.dataset.bound = '1';
     }
 
@@ -2787,15 +3246,15 @@ function renderPlaysetSheet() {
 
 function positionPlaysetSheet() {
     const sheet = document.getElementById('playset-sheet');
-    const header = document.querySelector('.card-playlist .header-row');
-    if (!sheet || !header) return;
+    const anchor = playsetModalState.anchorEl || document.querySelector('.card-playlist .header-row');
+    if (!sheet || !anchor || !anchor.isConnected) return;
 
-    const headerRect = header.getBoundingClientRect();
+    const headerRect = anchor.getBoundingClientRect();
     const top = Math.max(0, Math.round(headerRect.bottom));
     const rootStyles = getComputedStyle(document.documentElement);
     const playerBarH = parseFloat(rootStyles.getPropertyValue('--mobile-playerbar-height')) || 160;
     const tabBarH = parseFloat(rootStyles.getPropertyValue('--mobile-tab-height')) || 56;
-    const maxHeight = Math.max(180, Math.floor(window.innerHeight - top - playerBarH - tabBarH - 10));
+    const maxHeight = Math.max(320, Math.floor(window.innerHeight - top - playerBarH - tabBarH - 10));
 
     sheet.style.top = `${top}px`;
     sheet.style.maxHeight = `${maxHeight}px`;
@@ -2804,8 +3263,7 @@ function positionPlaysetSheet() {
 function togglePlaysetDropdown(e) {
     if (e) e.stopPropagation();
     const sheet = document.getElementById('playset-sheet');
-    const overlay = document.getElementById('sheetOverlay');
-    if (!sheet || !overlay) return;
+    if (!sheet) return;
 
     const isOpen = sheet.classList.contains('open');
     if (isOpen) {
@@ -2813,16 +3271,10 @@ function togglePlaysetDropdown(e) {
         return;
     }
 
-    document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
-    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
-    const songSheet = document.getElementById('song-menu-sheet');
-    if (songSheet) songSheet.classList.remove('open');
-    const markerSheet = document.getElementById('marker-set-sheet');
-    if (markerSheet) markerSheet.classList.remove('open');
-    renderPlaysetSheet();
-    positionPlaysetSheet();
-    sheet.classList.add('open');
-    overlay.classList.add('open');
+    openPlaysetModal({
+        mode: 'selector',
+        anchorEl: document.querySelector('.card-playlist .header-row')
+    });
 }
 
 function togglePlaysetMenu(e) {
