@@ -47,6 +47,8 @@
             --mobile-tab-height: 56px;
             --mobile-playerbar-height: 160px;
             --mobile-topbar-height: 0px;
+            --playlist-header-min-height: 58px;
+            --markers-header-min-height: 50px;
         }
 
         /* ===== LIGHT THEME ===== */
@@ -218,6 +220,7 @@
         .header-row {
             display: flex; justify-content: space-between; align-items: center;
             padding: 14px 0 10px;
+            min-height: var(--playlist-header-min-height);
             -webkit-user-select: none; user-select: none;
         }
         .header-row h3 { margin: 0; font-size: 1.21rem; font-weight: 700; }
@@ -292,6 +295,7 @@
         .markers-header {
             display: flex; justify-content: space-between; align-items: center;
             padding: 8px 2px;
+            min-height: var(--markers-header-min-height);
             -webkit-user-select: none; user-select: none;
         }
         .markers-header h4 { margin: 0; font-size: 1.05rem; font-weight: 600; color: var(--text-secondary); }
@@ -855,7 +859,7 @@
                                         </div>
                                     </div>
                                 </div>
-                <div style="display:flex;gap:8px;align-items:center">
+                                <div id="playlist-header-actions" style="display:flex;gap:8px;align-items:center">
                   <input type="file" id="importInput" accept=".aem" style="display:none">
                   <label for="importInput" class="btn-primary" style="cursor:pointer;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border)">
                     <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -863,7 +867,7 @@
                   <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
                   <label for="fileInput" class="btn-primary" style="cursor:pointer">
                     <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Add
+                    <!-- Add -->
                   </label>
                 </div>
             </div>
@@ -886,7 +890,7 @@
                 </div>
                 <button class="btn-primary" onclick="setEvent()" style="flex-shrink:0;">
                   <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  Add
+                  <!-- Add -->
                 </button>
             </div>
             <ul id="event-list"></ul>
@@ -2661,8 +2665,12 @@ function getCurrentPlayset() {
 
 function updatePlaysetLabel() {
     const label = document.getElementById('playset-label');
+    const playlistActions = document.getElementById('playlist-header-actions');
     const current = getCurrentPlayset();
     if (label && current) label.textContent = current.name;
+    if (playlistActions) {
+        playlistActions.style.display = (current && current.id === 'all-songs') ? 'flex' : 'none';
+    }
 }
 
 function renderPlaysetSheet() {
@@ -2675,19 +2683,22 @@ function renderPlaysetSheet() {
         return `<button type="button" class="speed-option marker-set-row${activeClass}" data-playset-id="${escapeHtml(setDef.id)}">${escapeHtml(setDef.name)}</button>`;
     }).join('');
 
-    const disableRename = current?.permanent ? ' disabled' : '';
-    const disableDelete = current?.permanent ? ' disabled' : '';
+    const actionDisabled = current?.permanent ? ' disabled' : '';
+
+    const footerHtml = `
+        <div class="marker-set-sheet-divider"></div>
+        <div class="marker-set-sheet-footer">
+            <button type="button" class="speed-chip marker-set-chip" data-playset-action="rename"${actionDisabled}>Rename</button>
+            <button type="button" class="speed-chip marker-set-chip" data-playset-action="duplicate"${actionDisabled}>Duplicate</button>
+            <button type="button" class="speed-chip marker-set-chip" data-playset-action="export"${actionDisabled}>Export</button>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <button type="button" class="speed-chip marker-set-chip danger" data-playset-action="delete"${actionDisabled}>Delete</button>
+        </div>
+    `;
 
     sheet.innerHTML = `
         <div class="marker-set-sheet-list">${rows}</div>
-        <div class="marker-set-sheet-divider"></div>
-        <div class="marker-set-sheet-footer">
-            <button type="button" class="speed-chip marker-set-chip" data-playset-action="rename"${disableRename}>Rename</button>
-            <button type="button" class="speed-chip marker-set-chip" data-playset-action="duplicate">Duplicate</button>
-            <button type="button" class="speed-chip marker-set-chip" data-playset-action="export">Export</button>
-            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
-            <button type="button" class="speed-chip marker-set-chip danger" data-playset-action="delete"${disableDelete}>Delete</button>
-        </div>
+        ${footerHtml}
     `;
 
     if (!sheet.dataset.bound) {
@@ -2698,6 +2709,10 @@ function renderPlaysetSheet() {
             if (row) {
                 currentPlaysetId = row.dataset.playsetId;
                 updatePlaysetLabel();
+                if (currentPlaysetId === 'all-songs') {
+                    closeAllSheets();
+                    return;
+                }
                 renderPlaysetSheet();
                 return;
             }
