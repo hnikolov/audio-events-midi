@@ -872,6 +872,10 @@
             color: var(--text-primary);
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
+        .card-events #current-title.selected-song {
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
 
         /* ===== TOUCH-FRIENDLY ===== */
         @media (pointer: coarse), (hover: none) {
@@ -1318,6 +1322,12 @@ function removeSongFromDB(name) {
         tx.onabort    = () => resolve(false);
     });
 }
+function setCurrentTitleState(title, hasSelectedSong) {
+    const titleEl = document.getElementById('current-title');
+    if (!titleEl) return;
+    titleEl.textContent = title;
+    titleEl.classList.toggle('selected-song', !!hasSelectedSong);
+}
 async function renameSongInDB(oldName) {
     const newName = prompt(`Rename "${oldName}" to:`, oldName);
     if (!newName || newName.trim() === '' || newName === oldName) return;
@@ -1334,7 +1344,7 @@ async function renameSongInDB(oldName) {
         tx.oncomplete = async () => {
             if (currentFileName === oldName) {
                 currentFileName = newName;
-                document.getElementById('current-title').textContent = newName;
+                setCurrentTitleState(newName, true);
             }
 
             const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
@@ -1389,6 +1399,7 @@ async function removeSongByName(songName) {
         if (currentFileName === songName) {
             audio.src = "";
             currentFileName = "";
+            setCurrentTitleState('Select a song', false);
             firedEvents.clear();
             lastTriggeredMarkerTime = null;
             lastTriggeredMarkerIndex = null;
@@ -2710,7 +2721,7 @@ async function playSong(name) {
     if (!song) return;
 
     currentFileName = name;
-    document.getElementById('current-title').textContent = name;
+    setCurrentTitleState(name, true);
     activeBlobUrl = safeRevoke(activeBlobUrl);
     activeBlobUrl = URL.createObjectURL(song.data);
     audio.src = activeBlobUrl;
