@@ -2815,15 +2815,21 @@ function onPointerUp(e) {
         abDrag.classList.remove('dragging');
     }
     dragMode = null;
+    wasPlaying = false;
 }
 function onPointerCancel(e) {
+    // Ignore unrelated pointer-cancel events that do not belong to an active progress interaction.
+    if (!dragMode && pointerId === null) return;
+
+    const resumeFromCanceledScrub = (dragMode === 'scrub') && wasPlaying && audio.paused;
     hideGhostPreview();
     updateProgressUI();
-    if (wasPlaying && audio.paused) {
+    if (resumeFromCanceledScrub) {
         audio.play().catch(() => { updatePlayPauseUI(); });
         updatePlayPauseUI();
     }
     dragMode = null; isScrubbing = false; scrubStartTime = null; scrubTargetTime = null; pointerId = null;
+    wasPlaying = false;
 }
 progressBar.addEventListener('pointerdown', onPointerDown);
 window.addEventListener('pointermove', onPointerMove);
