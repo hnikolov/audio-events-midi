@@ -525,6 +525,20 @@
             font-size: 0.86rem; color: var(--text-secondary);
             padding: 4px 0;
         }
+        .info-sheet-content .info-vendor {
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin: 10px 0 2px;
+        }
+        .info-sheet-content .info-model {
+            font-size: 0.86rem;
+            color: var(--text-secondary);
+            padding: 2px 0 2px 12px;
+        }
+        .info-sheet-content .info-vendor:first-of-type { margin-top: 4px; }
         .speed-btn-label {
             min-width: 52px; font-size: 0.83rem;
             color: var(--text-muted); font-weight: 600;
@@ -1240,12 +1254,18 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.2.11</p>
+            <p class="info-version" id="infoVersionLabel">v1.2.12</p>
             <p class="info-heading">Supported MIDI Devices</p>
-            <div class="info-device">NUX Mighty Plug Pro</div>
-            <div class="info-device">Sonicake Pocket Master</div>
-            <div class="info-device">Positive Grid Spark GO <span style="color: var(--text-muted);">(BLE only)</span></div>
-            <div class="info-device">Yamaha THR-II <span style="color: var(--text-muted);">(USB only)</span></div>
+            <div class="info-vendor">NUX</div>
+            <div class="info-model">Mighty Plug Pro</div>
+            <div class="info-model">Mighty Plug</div>
+            <div class="info-vendor">Sonicake</div>
+            <div class="info-model">Pocket Master</div>
+            <div class="info-model">Smart Box</div>
+            <div class="info-vendor">Positive Grid <span style="color: var(--text-muted);">(BLE only)</span></div>
+            <div class="info-model">Spark Go</div>
+            <div class="info-model">Spark 40 (gen 1)</div>
+            <div class="info-vendor">Yamaha THR-II <span style="color: var(--text-muted);">(USB only)</span></div>
         </div>
     `;
 }
@@ -2123,6 +2143,11 @@ function getConnectedDeviceName() {
     return '';
 }
 
+function shouldRoutePresetAsCc(deviceName) {
+    const name = (deviceName || '').toLowerCase();
+    return /pocket\s*master|smart\s*box/.test(name);
+}
+
 // Map preset (1..100) → PC program (0..127)
 function presetToProgram(preset) { let p = parseInt(preset,10); if (isNaN(p)) p=1; return Math.max(0, Math.min(127, p-1)); }
 
@@ -2719,7 +2744,7 @@ function fireMarkerByIndex(i, evt, opts) {
                 sendThriiPreset(evt.preset);
             } else {
                 const name = getConnectedDeviceName();
-                if ((name || '').toLowerCase().includes('pocket master')) window.sendCc(1, 1, evt.preset);
+                if (shouldRoutePresetAsCc(name)) window.sendCc(1, 1, evt.preset);
                 else window.sendPc(1, presetToProgram(evt.preset));
             }
         } catch {}
