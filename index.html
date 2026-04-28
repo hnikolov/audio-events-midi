@@ -339,51 +339,6 @@
             gap: 8px;
             user-select: none;
         }
-        #event-list .time-input, #event-list .preset-input, #event-list .note-input {
-            flex: 1 1 0; min-width: 0; width: 0;
-            border: 1px solid var(--border); border-radius: var(--radius-sm);
-            padding: 8px 10px; font-size: 1rem;
-            background: var(--bg-surface); color: var(--text-primary);
-            outline: none; transition: border-color 0.15s;
-        }
-        #event-list .time-input:focus, #event-list .preset-input:focus, #event-list .note-input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 2px rgba(29,185,84,0.15);
-        }
-        #event-list li button { flex: 0 0 auto; white-space: nowrap; }
-        #event-list li.editing {
-            grid-template-columns: 1fr 1fr 1fr auto;
-            row-gap: 6px;
-        }
-        #event-list li.editing .marker-left,
-        #event-list li.editing .marker-middle,
-        #event-list li.editing .marker-note { flex: 1 1 0; min-width: 0; }
-        #event-list li.editing .marker-right {
-            grid-column: 1 / -1;
-            justify-content: flex-end;
-            padding-top: 2px;
-        }
-        #event-list li.editing .time-input, #event-list li.editing .preset-input, #event-list li.editing .note-input {
-            width: 100%; font-size: 1rem; padding: 8px 10px; min-height: 44px;
-            border-radius: var(--radius-sm);
-        }
-        #event-list li.editing .marker-right button {
-            background: var(--bg-elevated);
-            color: var(--text-primary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-full);
-            padding: 7px 16px;
-            font-size: 0.88rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.12s;
-        }
-        #event-list li.editing .marker-right button:first-child {
-            background: var(--accent);
-            color: var(--accent-on-btn);
-            border-color: var(--accent);
-        }
-        #event-list li.editing .marker-right button:active { transform: scale(0.96); }
 
         /* ===== BOTTOM PLAYER BAR ===== */
         .mobile-player-bar {
@@ -472,6 +427,13 @@
         .ab-timestamp {
             min-width: 76px; text-align: center; white-space: nowrap;
         }
+        .ab-label-prefix,
+        .ab-label-value {
+            display: inline-block;
+        }
+        .ab-label-prefix {
+            margin-right: 2px;
+        }
         .ab-panel {
             max-height: 56px;
             overflow: hidden;
@@ -513,6 +475,23 @@
         .control-btn.loop-active {
             /* background: var(--amber-dim); */  color: var(--amber);
         }
+        .controls-container.five-slot-row {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 6px;
+            justify-items: center;
+            align-items: center;
+            padding: 2px 8px 4px;
+        }
+        .controls-container.five-slot-row > .speed-wrapper,
+        .controls-container.five-slot-row > .volume-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+        .controls-container.five-slot-row .control-btn {
+            margin: 0 auto;
+        }
 
         /* ===== SPEED MENU ===== */
         .speed-wrapper { position: relative; }
@@ -525,17 +504,24 @@
             padding: 12px 16px; display: none; z-index: 2000;
             min-width: 200px; white-space: nowrap;
         }
-        .info-popup .info-heading {
+        .info-sheet-content {
+            padding: 10px 12px 14px;
+        }
+        .info-popup .info-heading,
+        .info-sheet-content .info-heading {
             font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; color: var(--text-muted);
             margin: 0 0 6px;
         }
-        .info-popup .info-heading:not(:first-child) { margin-top: 12px; }
-        .info-popup .info-version {
+        .info-popup .info-heading:not(:first-child),
+        .info-sheet-content .info-heading:not(:first-child) { margin-top: 12px; }
+        .info-popup .info-version,
+        .info-sheet-content .info-version {
             /* font-size: 0.86rem; font-weight: 600; color: var(--text-primary); margin: 0 0 2px; */
             font-size: 0.86rem; color: var(--text-secondary); margin: 0 0 2px;
         }
-        .info-popup .info-device {
+        .info-popup .info-device,
+        .info-sheet-content .info-device {
             font-size: 0.86rem; color: var(--text-secondary);
             padding: 4px 0;
         }
@@ -632,6 +618,30 @@
         .song-menu-chip {
             font-size: 0.78rem;
             white-space: nowrap;
+        }
+        .marker-edit-sheet-fields {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            padding: 10px 12px 12px;
+        }
+        .marker-edit-sheet-input {
+            width: 100%;
+            min-width: 0;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 9px 10px;
+            font-size: 0.94rem;
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            outline: none;
+        }
+        .marker-edit-sheet-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(29,185,84,0.15);
+        }
+        .ab-label-prefix.loop-valid {
+            color: var(--amber);
         }
         .playset-modal-body {
             display: flex;
@@ -939,15 +949,6 @@
       <button id="infoBtn" class="menu-btn" onclick="toggleInfoPopup()" aria-label="App info" style="flex:0 0 auto;padding:8px 10px">
         <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       </button>
-      <div id="infoPopup" class="info-popup">
-        <p class="info-heading">Version</p>
-        <p class="info-version" id="infoVersionLabel">v1.2.11</p>
-        <p class="info-heading">Supported MIDI Devices</p>
-        <div class="info-device">NUX Mighty Plug Pro</div>
-        <div class="info-device">Sonicake Pocket Master</div>
-        <div class="info-device">Positive Grid Spark GO <span style="color: var(--text-muted);">(BLE only)</span></div>
-        <div class="info-device">Yamaha THR-II <span style="color: var(--text-muted);">(USB only)</span></div>
-      </div>
     </div>
     <button id="btnConnect" class="midi-status btn-connect" aria-label="Connect to MIDI device" style="flex:1">
             <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h6v3a3 3 0 0 1-6 0v-3z"/><line x1="10.5" y1="8" x2="10.5" y2="10"/><line x1="13.5" y1="8" x2="13.5" y2="10"/><line x1="12" y1="16" x2="12" y2="18"/></svg>
@@ -1049,7 +1050,7 @@
         </div>
 
         <!-- A/B loop panel (collapsible) -->
-        <div class="controls-container ab-panel collapsed" id="ab-panel" role="group" aria-label="A/B loop controls">
+        <div class="controls-container five-slot-row ab-panel collapsed" id="ab-panel" role="group" aria-label="A/B loop controls">
             <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show/hide loop overlay">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
@@ -1064,7 +1065,7 @@
         </div>
 
         <!-- Main controls: Prev, Seek-10, Play, Seek+10, Next -->
-        <div class="controls-container" role="group" aria-label="Playback controls">
+        <div class="controls-container five-slot-row" role="group" aria-label="Playback controls">
             <button class="control-btn" onclick="prevTrack()" aria-label="Previous track">
               <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
             </button>
@@ -1083,7 +1084,7 @@
         </div>
 
         <!-- Aux controls: Speed, Loop, AB, Volume, Stop -->
-        <div class="controls-container aux-controls" role="group" aria-label="Auxiliary controls">
+        <div class="controls-container five-slot-row aux-controls" role="group" aria-label="Auxiliary controls">
             <div class="speed-wrapper">
                 <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()" aria-label="Playback speed">
                     <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:1px"><path d="M12 14l3-3"></path><path d="M3.34 16a10 10 0 1 1 17.32 0"></path></svg>
@@ -1113,6 +1114,8 @@
 <div id="song-menu-sheet" class="marker-top-sheet" aria-label="Song menu"></div>
 <div id="playset-sheet" class="marker-top-sheet" aria-label="Playsets menu"></div>
 <div id="marker-set-sheet" class="marker-top-sheet" aria-label="Marker set menu"></div>
+<div id="marker-menu-sheet" class="marker-top-sheet" aria-label="Marker menu"></div>
+<div id="info-sheet" class="marker-top-sheet" aria-label="App info"></div>
 
 <!-- Speed Bottom Sheet -->
 <div id="speedPopup" class="action-sheet">
@@ -1231,16 +1234,64 @@ function toggleTheme() {
 applyTheme(localStorage.getItem('ui-theme') || 'dark');
 
 /* -------------------------------- INFO POPUP ----------------------------- */
-function toggleInfoPopup() {
-    const popup = document.getElementById('infoPopup');
-    popup.style.display = popup.style.display === 'block' ? 'none' : 'block';
+function renderInfoSheet() {
+    const sheet = document.getElementById('info-sheet');
+    if (!sheet) return;
+    sheet.innerHTML = `
+        <div class="marker-set-sheet-list info-sheet-content">
+            <p class="info-heading">Version</p>
+            <p class="info-version" id="infoVersionLabel">v1.2.11</p>
+            <p class="info-heading">Supported MIDI Devices</p>
+            <div class="info-device">NUX Mighty Plug Pro</div>
+            <div class="info-device">Sonicake Pocket Master</div>
+            <div class="info-device">Positive Grid Spark GO <span style="color: var(--text-muted);">(BLE only)</span></div>
+            <div class="info-device">Yamaha THR-II <span style="color: var(--text-muted);">(USB only)</span></div>
+        </div>
+    `;
 }
-document.addEventListener('pointerdown', (e) => {
-    if (!e.target.closest('.info-wrapper')) {
-        const popup = document.getElementById('infoPopup');
-        if (popup) popup.style.display = 'none';
+
+function positionInfoSheet() {
+    const sheet = document.getElementById('info-sheet');
+    const topBar = document.getElementById('mobileMidiBar');
+    if (!sheet || !topBar) return;
+
+    const barRect = topBar.getBoundingClientRect();
+    const top = Math.max(0, Math.round(barRect.bottom));
+    const rootStyles = getComputedStyle(document.documentElement);
+    const playerBarH = parseFloat(rootStyles.getPropertyValue('--mobile-playerbar-height')) || 160;
+    const tabBarH = parseFloat(rootStyles.getPropertyValue('--mobile-tab-height')) || 56;
+    const maxHeight = Math.max(180, Math.floor(window.innerHeight - top - playerBarH - tabBarH - 10));
+
+    sheet.style.top = `${top}px`;
+    sheet.style.maxHeight = `${maxHeight}px`;
+}
+
+function toggleInfoPopup() {
+    const sheet = document.getElementById('info-sheet');
+    const overlay = document.getElementById('sheetOverlay');
+    if (!sheet || !overlay) return;
+
+    const isOpen = sheet.classList.contains('open');
+    if (isOpen) {
+        closeAllSheets();
+        return;
     }
-});
+
+    renderInfoSheet();
+    positionInfoSheet();
+    document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet) songSheet.classList.remove('open');
+    const playsetSheet = document.getElementById('playset-sheet');
+    if (playsetSheet) playsetSheet.classList.remove('open');
+    const markerSetSheet = document.getElementById('marker-set-sheet');
+    if (markerSetSheet) markerSetSheet.classList.remove('open');
+    const markerMenuSheet = document.getElementById('marker-menu-sheet');
+    if (markerMenuSheet) markerMenuSheet.classList.remove('open');
+    sheet.classList.add('open');
+    overlay.classList.add('open');
+}
 
 /* ============================ Robust IndexedDB ============================ */
 const IDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
@@ -1389,6 +1440,7 @@ async function renameSongInDB(oldName) {
     }
 }
 let songMenuContext = { songName: null, rowEl: null };
+let markerMenuContext = { index: null, rowEl: null };
 
 async function removeSongByName(songName) {
     if (!songName) return;
@@ -1509,10 +1561,139 @@ function togglePlaylistMenu(e, songName, rowEl) {
     if (playsetSheet) playsetSheet.classList.remove('open');
     const markerSheet = document.getElementById('marker-set-sheet');
     if (markerSheet) markerSheet.classList.remove('open');
+    const markerMenuSheet = document.getElementById('marker-menu-sheet');
+    if (markerMenuSheet) markerMenuSheet.classList.remove('open');
+    const infoSheet = document.getElementById('info-sheet');
+    if (infoSheet) infoSheet.classList.remove('open');
     renderSongMenuSheet(songName);
     positionSongMenuSheet();
     sheet.classList.add('open');
     overlay.classList.add('open');
+}
+
+function renderMarkerMenuSheet(idx) {
+    const sheet = document.getElementById('marker-menu-sheet');
+    const events = getEvents();
+    const evt = events[idx];
+    if (!sheet || !evt) return;
+
+    sheet.innerHTML = `
+        <div class="marker-set-sheet-list" style="padding:10px 12px 8px;">
+            <div style="font-size:0.95rem;font-weight:600;color:var(--text-primary);">Edit marker</div>
+            <div class="marker-edit-sheet-fields">
+                <input type="number" step="0.1" class="marker-edit-sheet-input" id="marker-sheet-time" value="${escapeHtml(evt.time)}" aria-label="Marker time">
+                <input type="number" min="1" max="100" step="1" class="marker-edit-sheet-input" id="marker-sheet-preset" value="${escapeHtml(evt.preset)}" aria-label="Marker preset">
+                <input type="text" maxlength="24" class="marker-edit-sheet-input" id="marker-sheet-text" value="${escapeHtml(evt.text || '')}" placeholder="Description" aria-label="Marker description">
+            </div>
+        </div>
+        <div class="marker-set-sheet-divider"></div>
+        <div class="marker-set-sheet-footer">
+            <button type="button" class="speed-chip marker-set-chip" onclick="saveMarkerSheetEdit()">Save</button>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <button type="button" class="speed-chip marker-set-chip danger" onclick="deleteMarkerFromSheet()">Delete</button>
+        </div>
+    `;
+}
+
+function positionMarkerMenuSheet() {
+    const sheet = document.getElementById('marker-menu-sheet');
+    const row = markerMenuContext.rowEl;
+    if (!sheet || !row || !row.isConnected) return;
+
+    const rowRect = row.getBoundingClientRect();
+    const top = Math.max(0, Math.round(rowRect.bottom));
+    const rootStyles = getComputedStyle(document.documentElement);
+    const playerBarH = parseFloat(rootStyles.getPropertyValue('--mobile-playerbar-height')) || 160;
+    const tabBarH = parseFloat(rootStyles.getPropertyValue('--mobile-tab-height')) || 56;
+    const maxHeight = Math.max(180, Math.floor(window.innerHeight - top - playerBarH - tabBarH - 10));
+
+    sheet.style.top = `${top}px`;
+    sheet.style.maxHeight = `${maxHeight}px`;
+}
+
+function openMarkerEditorSheet(e, idx) {
+    if (e) e.stopPropagation();
+    if (!currentFileName) return;
+
+    const row = document.getElementById(`row-${idx}`);
+    const sheet = document.getElementById('marker-menu-sheet');
+    const overlay = document.getElementById('sheetOverlay');
+    if (!row || !sheet || !overlay) return;
+
+    const isSameOpen = sheet.classList.contains('open') && markerMenuContext.index === idx;
+    if (isSameOpen) {
+        closeAllSheets();
+        return;
+    }
+
+    markerMenuContext = { index: idx, rowEl: row };
+    renderMarkerMenuSheet(idx);
+    positionMarkerMenuSheet();
+
+    document.querySelectorAll('.action-sheet').forEach(panel => panel.classList.remove('open'));
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    const songSheet = document.getElementById('song-menu-sheet');
+    if (songSheet) songSheet.classList.remove('open');
+    const playsetSheet = document.getElementById('playset-sheet');
+    if (playsetSheet) playsetSheet.classList.remove('open');
+    const markerSetSheet = document.getElementById('marker-set-sheet');
+    if (markerSetSheet) markerSetSheet.classList.remove('open');
+    const infoSheet = document.getElementById('info-sheet');
+    if (infoSheet) infoSheet.classList.remove('open');
+
+    sheet.classList.add('open');
+    overlay.classList.add('open');
+
+    const firstInput = document.getElementById('marker-sheet-time');
+    if (firstInput) firstInput.focus({ preventScroll: true });
+}
+
+function saveMarkerSheetEdit() {
+    const idx = markerMenuContext.index;
+    const events = getEvents();
+    if (idx === null || idx < 0 || idx >= events.length) {
+        closeAllSheets();
+        return;
+    }
+
+    const old = events[idx];
+    const timeEl = document.getElementById('marker-sheet-time');
+    const presetEl = document.getElementById('marker-sheet-preset');
+    const textEl = document.getElementById('marker-sheet-text');
+
+    const newTime = parseFloat(timeEl?.value ?? '');
+    let newPreset = parseInt(presetEl?.value ?? '', 10);
+    const newText = sanitizeMarkerText(textEl?.value);
+
+    if (isNaN(newTime)) return;
+    if (isNaN(newPreset)) newPreset = 1;
+    newPreset = Math.min(100, Math.max(1, newPreset));
+
+    const updated = events.slice();
+    updated[idx] = { time: newTime, preset: newPreset, text: newText };
+    saveEvents(updated);
+
+    firedEvents.delete(old.time);
+    if (lastTriggeredMarkerIndex === idx || lastTriggeredMarkerTime === old.time) {
+        lastTriggeredMarkerIndex = null;
+        lastTriggeredMarkerTime = null;
+    }
+
+    closeAllSheets();
+    refreshEventUI();
+    updateMarkerTicks();
+}
+
+function deleteMarkerFromSheet() {
+    const idx = markerMenuContext.index;
+    if (idx === null) {
+        closeAllSheets();
+        return;
+    }
+    closeAllSheets();
+    deleteEvent(idx);
 }
 
 /* ---------- drag-to-reorder logic (drag handle approach) ---------- */
@@ -2145,13 +2326,23 @@ function closeAllSheets() {
     if (playsetSheet) playsetSheet.classList.remove('open');
     const markerSheet = document.getElementById('marker-set-sheet');
     if (markerSheet) markerSheet.classList.remove('open');
+    const markerMenuSheet = document.getElementById('marker-menu-sheet');
+    if (markerMenuSheet) markerMenuSheet.classList.remove('open');
+    const infoSheet = document.getElementById('info-sheet');
+    if (infoSheet) infoSheet.classList.remove('open');
     const overlay = document.getElementById('sheetOverlay');
     if (overlay) overlay.classList.remove('open');
     playsetModalState.mode = null;
     playsetModalState.sourceSongName = '';
     playsetModalState.anchorEl = null;
     playsetModalState.draft = null;
+    markerMenuContext.index = null;
+    markerMenuContext.rowEl = null;
 }
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllSheets();
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     const speedSlider = document.getElementById('speed-slider');
@@ -2360,10 +2551,13 @@ const MIN_GAP_SEC = 0.05;
 /* ============================ A/B Loop Controls ========================== */
 function isABValid() { return abLoop.a !== null && abLoop.b !== null && abLoop.b > abLoop.a; }
 function renderABButtons() {
-    const aStr = (abLoop.a === null) ? 'A: — —' : `A:${formatClock(abLoop.a)}`;
-    const bStr = (abLoop.b === null) ? 'B: — —' : `B:${formatClock(abLoop.b)}`;
-    btnSetA.textContent = aStr;
-    btnSetB.textContent = bStr;
+    const valid = isABValid();
+    const aValue = (abLoop.a === null) ? ' — —' : formatClock(abLoop.a);
+    const bValue = (abLoop.b === null) ? ' — —' : formatClock(abLoop.b);
+    const activeClass = valid ? ' loop-valid' : '';
+
+    btnSetA.innerHTML = `<span class="ab-label-prefix${activeClass}">A:</span><span class="ab-label-value">${aValue}</span>`;
+    btnSetB.innerHTML = `<span class="ab-label-prefix${activeClass}">B:</span><span class="ab-label-value">${bValue}</span>`;
     abVisibleBtn.classList.toggle('loop-active', !!abLoop.visible);
 }
 function updateABUI() {
@@ -3558,6 +3752,10 @@ function openPlaysetModal({ mode, playsetId = null, songName = '', anchorEl = nu
     if (songSheet) songSheet.classList.remove('open');
     const markerSheet = document.getElementById('marker-set-sheet');
     if (markerSheet) markerSheet.classList.remove('open');
+    const markerMenuSheet = document.getElementById('marker-menu-sheet');
+    if (markerMenuSheet) markerMenuSheet.classList.remove('open');
+    const infoSheet = document.getElementById('info-sheet');
+    if (infoSheet) infoSheet.classList.remove('open');
 
     renderPlaysetSheet();
     positionPlaysetSheet();
@@ -4011,6 +4209,10 @@ window.addEventListener('resize', () => {
     if (playsetSheet && playsetSheet.classList.contains('open')) positionPlaysetSheet();
     const songSheet = document.getElementById('song-menu-sheet');
     if (songSheet && songSheet.classList.contains('open')) positionSongMenuSheet();
+    const markerMenuSheet = document.getElementById('marker-menu-sheet');
+    if (markerMenuSheet && markerMenuSheet.classList.contains('open')) positionMarkerMenuSheet();
+    const infoSheet = document.getElementById('info-sheet');
+    if (infoSheet && infoSheet.classList.contains('open')) positionInfoSheet();
 }, { passive: true });
 
 const sheetScrollHost = document.querySelector('.grid');
@@ -4022,6 +4224,8 @@ if (sheetScrollHost) {
         if (playsetSheet && playsetSheet.classList.contains('open')) positionPlaysetSheet();
         const songSheet = document.getElementById('song-menu-sheet');
         if (songSheet && songSheet.classList.contains('open')) positionSongMenuSheet();
+        const markerMenuSheet = document.getElementById('marker-menu-sheet');
+        if (markerMenuSheet && markerMenuSheet.classList.contains('open')) positionMarkerMenuSheet();
     }, { passive: true });
 }
 
@@ -4044,6 +4248,10 @@ function toggleMarkerSetDropdown(e) {
     if (songSheet) songSheet.classList.remove('open');
     const playsetSheet = document.getElementById('playset-sheet');
     if (playsetSheet) playsetSheet.classList.remove('open');
+    const markerMenuSheet = document.getElementById('marker-menu-sheet');
+    if (markerMenuSheet) markerMenuSheet.classList.remove('open');
+    const infoSheet = document.getElementById('info-sheet');
+    if (infoSheet) infoSheet.classList.remove('open');
     positionMarkerSetSheet();
     sheet.classList.add('open');
     overlay.classList.add('open');
@@ -4158,13 +4366,9 @@ async function refreshEventUI() {
             <span class="marker-middle"><span class="preset-badge">${formatPreset(evt.preset)}</span></span>
                                                 <span class="marker-note">${markerText}</span>
             <span class="marker-right">
-                <button class="menu-btn" onclick="event.stopPropagation();toggleMarkerMenu(${i})" aria-label="Options">
+                <button class="menu-btn" onclick="openMarkerEditorSheet(event, ${i})" aria-label="Options">
                   <svg class="icon icon-sm" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
                 </button>
-                <div class="dropdown-menu" id="marker-menu-${i}">
-                    <button onclick="event.stopPropagation();toggleEdit(${i})">Edit</button>
-                    <button class="danger-item" onclick="event.stopPropagation();deleteEvent(${i})">Remove</button>
-                </div>
             </span>`;
         // Click handler to seek to marker time (skip clicks on buttons/menus)
         li.addEventListener('click', (e) => {
@@ -4182,70 +4386,6 @@ async function refreshEventUI() {
     });
     const focusIdx = getMarkerFocusIndex();
     if (focusIdx !== null) setActiveMarkerUIByIndex(focusIdx, false);
-    updateMarkerTicks();
-}
-function flipMenuIfOverflow(menu) {
-    menu.style.top = ''; menu.style.bottom = '';
-    const grid = document.querySelector('.grid');
-    if (grid) {
-        const menuRect = menu.getBoundingClientRect();
-        const gridRect = grid.getBoundingClientRect();
-        if (menuRect.bottom > gridRect.bottom) {
-            menu.style.top = 'auto';
-            menu.style.bottom = '100%';
-        }
-    }
-}
-function toggleMarkerMenu(idx) {
-    const menu = document.getElementById(`marker-menu-${idx}`);
-    const allMenus = document.querySelectorAll('#event-list .dropdown-menu');
-    allMenus.forEach(m => { if (m !== menu) m.classList.remove('open'); });
-    menu.classList.toggle('open');
-    if (menu.classList.contains('open')) flipMenuIfOverflow(menu);
-}
-function toggleEdit(idx) {
-  // Cancel any other marker currently being edited
-  const editingLi = document.querySelector('#event-list li.editing');
-  if (editingLi) { refreshEventUI(); }
-  const evt = getEvents()[idx];
-  const li = document.getElementById(`row-${idx}`);
-  li.classList.add('editing');
-  li.innerHTML = `
-    <span class="marker-left">
-      <input type="number" step="0.1" class="time-input" id="edit-time-${idx}" value="${evt.time}">
-    </span>
-    <span class="marker-middle" style="text-align:center">
-      <input type="number" min="1" max="100" step="1" class="preset-input" id="edit-preset-${idx}" value="${evt.preset}">
-    </span>
-        <span class="marker-note">
-            <input type="text" maxlength="24" class="note-input" id="edit-text-${idx}" value="${escapeHtml(evt.text || '')}" placeholder="Description">
-        </span>
-    <span class="marker-right">
-      <button onclick="saveEdit(${idx})">Save</button>
-      <button onclick="refreshEventUI()">Cancel</button>
-    </span>`;
-}
-
-function saveEdit(idx) {
-    const events = getEvents();
-    const old = events[idx];
-    const newTime = parseFloat(document.getElementById(`edit-time-${idx}`).value);
-    let newPreset = parseInt(document.getElementById(`edit-preset-${idx}`).value, 10);
-    const newText = sanitizeMarkerText(document.getElementById(`edit-text-${idx}`)?.value);
-    if (isNaN(newTime)) return;
-    if (isNaN(newPreset)) newPreset = 1;
-    newPreset = Math.min(100, Math.max(1, newPreset));
-
-    const updated = events.slice();
-    updated[idx] = { time: newTime, preset: newPreset, text: newText };
-    saveEvents(updated);
-
-    firedEvents.delete(old.time);
-    if (lastTriggeredMarkerIndex === idx || lastTriggeredMarkerTime === old.time) {
-        lastTriggeredMarkerIndex = null;
-        lastTriggeredMarkerTime = null;
-    }
-    refreshEventUI();
     updateMarkerTicks();
 }
 function setEvent() {
