@@ -1603,7 +1603,7 @@ function renderMarkerMenuSheet(idx) {
         <div class="marker-set-sheet-list" style="padding:10px 12px 8px;">
             <div style="font-size:0.95rem;font-weight:600;color:var(--text-primary);">Edit marker</div>
             <div class="marker-edit-sheet-fields">
-                <input type="number" step="0.1" class="marker-edit-sheet-input" id="marker-sheet-time" value="${escapeHtml(evt.time)}" aria-label="Marker time">
+                <input type="text" inputmode="decimal" class="marker-edit-sheet-input" id="marker-sheet-time" value="${escapeHtml(formatClock(evt.time))}" aria-label="Marker time (m:ss.s or seconds)">
                 <input type="number" min="1" max="100" step="1" class="marker-edit-sheet-input" id="marker-sheet-preset" value="${escapeHtml(evt.preset)}" aria-label="Marker preset">
                 <input type="text" maxlength="24" class="marker-edit-sheet-input" id="marker-sheet-text" value="${escapeHtml(evt.text || '')}" placeholder="Description" aria-label="Marker description">
             </div>
@@ -1685,7 +1685,7 @@ function saveMarkerSheetEdit() {
     const presetEl = document.getElementById('marker-sheet-preset');
     const textEl = document.getElementById('marker-sheet-text');
 
-    const newTime = parseFloat(timeEl?.value ?? '');
+    const newTime = parseMarkerTimeInput(timeEl?.value);
     let newPreset = parseInt(presetEl?.value ?? '', 10);
     const newText = sanitizeMarkerText(textEl?.value);
 
@@ -1706,6 +1706,42 @@ function saveMarkerSheetEdit() {
     closeAllSheets();
     refreshEventUI();
     updateMarkerTicks();
+}
+
+function parseMarkerTimeInput(raw) {
+    const v = String(raw ?? '').trim();
+    if (!v) return NaN;
+
+    // Accept "m:ss.s" (display format), "m.ss.s" (if ':' is replaced by '.')
+    // and "sss.s" (legacy seconds-only input).
+    if (v.includes(':')) {
+        const parts = v.split(':');
+        if (parts.length !== 2) return NaN;
+        const m = parseInt(parts[0], 10);
+        const s = parseFloat(parts[1]);
+        if (!isFinite(m) || !isFinite(s) || m < 0 || s < 0 || s >= 60) return NaN;
+        return m * 60 + s;
+    }
+
+    // Treat exactly two-dot form as m.ss.s (minutes + seconds.fraction),
+    // so inputs like "1.23.4" are parsed as 1:23.4 instead of 1.2 seconds.
+    const dotCount = (v.match(/\./g) || []).length;
+    if (dotCount === 2) {
+        const firstDot = v.indexOf('.');
+        if (firstDot > 0) {
+            const mPart = v.slice(0, firstDot);
+            const sPart = v.slice(firstDot + 1);
+            const m = parseInt(mPart, 10);
+            const s = parseFloat(sPart);
+            if (isFinite(m) && isFinite(s) && m >= 0 && s >= 0 && s < 60) {
+                return m * 60 + s;
+            }
+        }
+        return NaN;
+    }
+
+    const seconds = parseFloat(v);
+    return (isFinite(seconds) && seconds >= 0) ? seconds : NaN;
 }
 
 function deleteMarkerFromSheet() {
