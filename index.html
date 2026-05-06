@@ -33,6 +33,7 @@
             --radius-md: 10px;
             --radius-lg: 14px;
             --radius-full: 9999px;
+            --ab-loop-ts-radius: var(--radius-full);
             --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
             --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
             --glass-top: rgba(15,15,15,0.88);
@@ -426,6 +427,12 @@
         }
         .ab-timestamp {
             min-width: 76px; text-align: center; white-space: nowrap;
+        }
+        .ab-timestamp.loop-valid-visible {
+            max-height: 26px;
+            border: 1px solid var(--amber);
+            /* box-shadow: 0 0 0 2px rgba(245,158,11,0.15); */
+            border-radius: var(--ab-loop-ts-radius);
         }
         .ab-label-prefix,
         .ab-label-value {
@@ -2624,10 +2631,18 @@ function renderABButtons() {
     const valid = isABValid();
     const aValue = (abLoop.a === null) ? ' — —' : formatClock(abLoop.a);
     const bValue = (abLoop.b === null) ? ' — —' : formatClock(abLoop.b);
-    const activeClass = valid ? ' loop-valid' : '';
+    const showAccent = valid && !!abLoop.visible;
 
-    btnSetA.innerHTML = `<span class="ab-label-prefix${activeClass}">A:</span><span class="ab-label-value">${aValue}</span>`;
-    btnSetB.innerHTML = `<span class="ab-label-prefix${activeClass}">B:</span><span class="ab-label-value">${bValue}</span>`;
+    btnSetA.classList.toggle('loop-valid-visible', showAccent);
+    btnSetB.classList.toggle('loop-valid-visible', showAccent);
+
+    if (valid) {
+        btnSetA.innerHTML = `<span class="ab-label-value">${aValue}</span>`;
+        btnSetB.innerHTML = `<span class="ab-label-value">${bValue}</span>`;
+    } else {
+        btnSetA.innerHTML = `<span class="ab-label-prefix">A:</span><span class="ab-label-value">${aValue}</span>`;
+        btnSetB.innerHTML = `<span class="ab-label-prefix">B:</span><span class="ab-label-value">${bValue}</span>`;
+    }
     abVisibleBtn.classList.toggle('loop-active', !!abLoop.visible);
     if (abClearIcon) abClearIcon.style.color = valid ? 'var(--danger)' : '';
 }
