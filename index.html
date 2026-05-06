@@ -545,6 +545,24 @@
             color: var(--text-secondary);
             padding: 2px 0 2px 12px;
         }
+        .info-sheet-content .info-setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 4px 0;
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+        }
+        .info-sheet-content .info-setting-label {
+            line-height: 1.3;
+        }
+        .info-sheet-content .info-setting-row input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            accent-color: var(--accent);
+        }
         .info-sheet-content .info-vendor:first-of-type { margin-top: 4px; }
         .speed-btn-label {
             min-width: 52px; font-size: 0.83rem;
@@ -1266,10 +1284,20 @@ applyTheme(localStorage.getItem('ui-theme') || 'dark');
 function renderInfoSheet() {
     const sheet = document.getElementById('info-sheet');
     if (!sheet) return;
+    const settings = loadUiSettings();
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
             <p class="info-version" id="infoVersionLabel">v1.2.12</p>
+            <p class="info-heading">Settings</p>
+            <label class="info-setting-row" for="settingPlaysetOneClick">
+                <span class="info-setting-label">Playsets: one-click select</span>
+                <input type="checkbox" id="settingPlaysetOneClick" ${settings.playsetOneClickSelect ? 'checked' : ''}>
+            </label>
+            <label class="info-setting-row" for="settingMarkerSetOneClick">
+                <span class="info-setting-label">Marker sets: one-click select</span>
+                <input type="checkbox" id="settingMarkerSetOneClick" ${settings.markerSetOneClickSelect ? 'checked' : ''}>
+            </label>
             <p class="info-heading">Supported MIDI Devices</p>
             <div class="info-vendor">NUX</div>
             <div class="info-model">Mighty Plug Pro</div>
@@ -1283,6 +1311,20 @@ function renderInfoSheet() {
             <div class="info-vendor">Yamaha THR-II <span style="color: var(--text-muted);">(USB only)</span></div>
         </div>
     `;
+
+    const playsetToggle = sheet.querySelector('#settingPlaysetOneClick');
+    if (playsetToggle) {
+        playsetToggle.addEventListener('change', () => {
+            updateUiSetting('playsetOneClickSelect', playsetToggle.checked);
+        });
+    }
+
+    const markerToggle = sheet.querySelector('#settingMarkerSetOneClick');
+    if (markerToggle) {
+        markerToggle.addEventListener('change', () => {
+            updateUiSetting('markerSetOneClickSelect', markerToggle.checked);
+        });
+    }
 }
 
 function positionInfoSheet() {
@@ -1905,6 +1947,59 @@ const VOLUME_MAP_KEY = 'audio_volume_map_v1';
 const AB_LOOP_MAP_KEY = 'audio_ab_loop_map_v1';
 const SPEED_MAP_KEY = 'audio_speed_map_v1';
 const EQ_MAP_KEY = 'audio_eq_map_v1';
+const UI_SETTINGS_KEY = 'audio_ui_settings_v1';
+
+const DEFAULT_UI_SETTINGS = {
+    playsetOneClickSelect: false,
+    markerSetOneClickSelect: false
+};
+
+function normalizeUiSettings(raw) {
+    const next = {
+        playsetOneClickSelect: false,
+        markerSetOneClickSelect: false
+    };
+    if (raw && typeof raw === 'object') {
+        if (typeof raw.playsetOneClickSelect === 'boolean') {
+            next.playsetOneClickSelect = raw.playsetOneClickSelect;
+        }
+        if (typeof raw.markerSetOneClickSelect === 'boolean') {
+            next.markerSetOneClickSelect = raw.markerSetOneClickSelect;
+        }
+    }
+    return next;
+}
+
+function loadUiSettings() {
+    try {
+        return normalizeUiSettings(JSON.parse(localStorage.getItem(UI_SETTINGS_KEY) || '{}'));
+    } catch {
+        return { ...DEFAULT_UI_SETTINGS };
+    }
+}
+
+function saveUiSettings(settings) {
+    const normalized = normalizeUiSettings(settings);
+    localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(normalized));
+    return normalized;
+}
+
+function updateUiSetting(key, value) {
+    const settings = loadUiSettings();
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_UI_SETTINGS, key)) {
+        return settings;
+    }
+    settings[key] = !!value;
+    return saveUiSettings(settings);
+}
+
+function shouldAutoClosePlaysetSheetOnSelect() {
+    return loadUiSettings().playsetOneClickSelect;
+}
+
+function shouldAutoCloseMarkerSetSheetOnSelect() {
+    return loadUiSettings().markerSetOneClickSelect;
+}
 
 const volValueText = document.getElementById('volValueText');
 const volIcon = document.getElementById('volIcon');
@@ -3984,7 +4079,7 @@ function renderPlaysetSheet() {
             if (rowEl && (!playsetModalState.mode || playsetModalState.mode === 'selector')) {
                 setSelectedListId(rowEl.dataset.playsetId);
                 updatePlaysetLabel();
-                if (getSelectedListId() === ALL_SONGS_LIST_ID) {
+                if (shouldAutoClosePlaysetSheetOnSelect() || getSelectedListId() === ALL_SONGS_LIST_ID) {
                     closeAllSheets();
                     await renderPlaylist();
                     return;
@@ -4258,6 +4353,9 @@ function updateSetSelector(data) {
             const setRow = e.target.closest('[data-set-id]');
             if (setRow) {
                 changeMarkerSet(setRow.dataset.setId);
+                if (shouldAutoCloseMarkerSetSheetOnSelect()) {
+                    closeAllSheets();
+                }
                 return;
             }
 
