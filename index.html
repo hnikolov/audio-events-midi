@@ -1948,6 +1948,7 @@ const AB_LOOP_MAP_KEY = 'audio_ab_loop_map_v1';
 const SPEED_MAP_KEY = 'audio_speed_map_v1';
 const EQ_MAP_KEY = 'audio_eq_map_v1';
 const UI_SETTINGS_KEY = 'audio_ui_settings_v1';
+const PLAY_MODE_KEY = 'audio_play_mode_v1';
 
 const DEFAULT_UI_SETTINGS = {
     playsetOneClickSelect: false,
@@ -1999,6 +2000,20 @@ function shouldAutoClosePlaysetSheetOnSelect() {
 
 function shouldAutoCloseMarkerSetSheetOnSelect() {
     return loadUiSettings().markerSetOneClickSelect;
+}
+
+function normalizePlayMode(mode) {
+    return mode === 'loop' || mode === 'queue' ? mode : 'none';
+}
+
+function loadPlayMode() {
+    return normalizePlayMode(localStorage.getItem(PLAY_MODE_KEY));
+}
+
+function savePlayMode(mode) {
+    const normalized = normalizePlayMode(mode);
+    localStorage.setItem(PLAY_MODE_KEY, normalized);
+    return normalized;
 }
 
 const volValueText = document.getElementById('volValueText');
@@ -2065,7 +2080,7 @@ let activeBlobUrl = null;
 let firedEvents = new Set();
 
 // Play mode: 'none' | 'loop' | 'queue'
-let playMode = 'none';
+let playMode = loadPlayMode();
 
 // Extended A/B loop state with `visible`
 let abLoop = { enabled: false, visible: true, a: null, b: null };
@@ -2623,10 +2638,12 @@ function toggleLoop() {
         playMode = 'none';
         audio.loop = false;
     }
+    savePlayMode(playMode);
     updatePlayModeUI();
 }
 
 function updatePlayModeUI() {
+    audio.loop = playMode === 'loop';
     loopBtn.classList.remove('loop-mode', 'queue-mode');
     if (playMode === 'loop') {
         loopBtn.classList.add('loop-mode');
@@ -3655,6 +3672,38 @@ function makePlaysetNameUnique(desiredName, existingNames) {
     return candidate;
 }
 
+function splitPlaysetSongsByAvailability(songNames, availableSongsSet) {
+    const existingSet = availableSongsSet instanceof Set
+        ? availableSongsSet
+        : new Set(normalizeSongNameList(availableSongsSet));
+    const source = normalizeSongNameList(songNames);
+    const keptSongNames = [];
+    const skippedSongNames = [];
+
+    source.forEach(songName => {
+        if (existingSet.has(songName)) keptSongNames.push(songName);
+        else skippedSongNames.push(songName);
+    });
+
+    return { keptSongNames, skippedSongNames };
+}
+
+function buildSkippedSongsMessage(contextLabel, skippedSongNames) {
+    if (!Array.isArray(skippedSongNames) || skippedSongNames.length === 0) return '';
+    const maxInline = 10;
+    const shown = skippedSongNames.slice(0, maxInline);
+    const more = skippedSongNames.length - shown.length;
+    const list = shown.map(name => `- ${name}`).join('\n');
+    const heading = `${contextLabel}: ${skippedSongNames.length} missing song(s) skipped.`;
+    const tail = more > 0 ? `\n\n...and ${more} more.` : '';
+    return `${heading}\n\n${list}${tail}`;
+}
+
+function alertSkippedSongs(contextLabel, skippedSongNames) {
+    const message = buildSkippedSongsMessage(contextLabel, skippedSongNames);
+    if (message) alert(message);
+}
+
 function getCustomPlaysetById(playsetId) {
     return getCustomPlaysets().find(setDef => setDef.id === playsetId) || null;
 }
@@ -3723,9 +3772,10 @@ async function importPlaysetDefinitionFile(file) {
     }
 
     const allowedSongs = new Set(getAllSongsOrder());
-    const sourceSongs = normalizeSongNameList(payload?.songNames);
-    const filteredSongs = sourceSongs.filter(song => allowedSongs.has(song));
-    const skippedCount = sourceSongs.length - filteredSongs.length;
+    const { keptSongNames: filteredSongs, skippedSongNames } = splitPlaysetSongsByAvailability(
+        payload?.songNames,
+        allowedSongs
+    );
 
     const state = loadPlaysetState();
     const existingByName = state.customPlaysets.find(setDef => setDef.name.trim().toLowerCase() === importedName.toLowerCase());
@@ -3737,7 +3787,7 @@ async function importPlaysetDefinitionFile(file) {
             existingByName.songNames = filteredSongs;
             existingByName.updatedAt = Date.now();
             savePlaysetState(state);
-            if (skippedCount > 0) alert(`Imported with ${skippedCount} missing song(s) skipped.`);
+            alertSkippedSongs(`Playset \"${importedName}\" imported`, skippedSongNames);
             return true;
         }
 
@@ -3752,12 +3802,12 @@ async function importPlaysetDefinitionFile(file) {
         }
 
         createPlayset(finalName, filteredSongs);
-        if (skippedCount > 0) alert(`Imported with ${skippedCount} missing song(s) skipped.`);
+        alertSkippedSongs(`Playset \"${finalName}\" imported`, skippedSongNames);
         return true;
     }
 
     createPlayset(importedName, filteredSongs);
-    if (skippedCount > 0) alert(`Imported with ${skippedCount} missing song(s) skipped.`);
+    alertSkippedSongs(`Playset \"${importedName}\" imported`, skippedSongNames);
     return true;
 }
 
@@ -5132,6 +5182,8 @@ importInput.onchange = async () => {
 /* ============================== Initialize DB ============================= */
 (async function init() {
     db = await openDB();
+    playMode = loadPlayMode();
+    updatePlayModeUI();
     const songs = await getAllSongs();
     const order = reconcileOrderWithSongs(songs || []);
     migratePlaysetStateIfNeeded(order);
