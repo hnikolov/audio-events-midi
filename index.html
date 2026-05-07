@@ -563,6 +563,40 @@
             flex-shrink: 0;
             accent-color: var(--accent);
         }
+        .info-sheet-content .info-folder-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .info-sheet-content .info-export-actions {
+            margin-top: 6px;
+        }
+        .info-sheet-content .info-export-actions .speed-chip {
+            min-height: 34px;
+            padding: 8px 0;
+            font-size: 0.78rem;
+        }
+        .export-notice {
+            position: fixed;
+            left: 50%;
+            bottom: calc(var(--mobile-tab-height) + var(--mobile-playerbar-height) + env(safe-area-inset-bottom, 0px) + 10px);
+            transform: translateX(-50%);
+            max-width: min(92vw, 460px);
+            padding: 8px 12px;
+            border-radius: var(--radius-full);
+            border: 1px solid var(--border);
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            font-size: 0.8rem;
+            box-shadow: var(--shadow-lg);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+            z-index: 4200;
+            text-align: center;
+        }
+        .export-notice.show {
+            opacity: 1;
+        }
         .info-sheet-content .info-vendor:first-of-type { margin-top: 4px; }
         .speed-btn-label {
             min-width: 52px; font-size: 0.83rem;
@@ -1326,6 +1360,33 @@ function renderInfoSheet() {
                 <span class="info-setting-label">Marker sets: one-click select</span>
                 <input type="checkbox" id="settingMarkerSetOneClick" ${settings.markerSetOneClickSelect ? 'checked' : ''}>
             </label>
+            <p class="info-heading">Export/Import</p>
+            <label class="info-setting-row" for="settingOverwriteSongsOnExport">
+                <span class="info-setting-label">Overwrite songs on export</span>
+                <input type="checkbox" id="settingOverwriteSongsOnExport" ${settings.overwriteSongsOnExport ? 'checked' : ''}>
+            </label>
+            <label class="info-setting-row" for="settingOverwriteSongsOnImport">
+                <span class="info-setting-label">Overwrite songs on import</span>
+                <input type="checkbox" id="settingOverwriteSongsOnImport" ${settings.overwriteSongsOnImport ? 'checked' : ''}>
+            </label>
+            <label class="info-setting-row" for="settingOverwritePlaysetsOnExport">
+                <span class="info-setting-label">Overwrite playsets on export</span>
+                <input type="checkbox" id="settingOverwritePlaysetsOnExport" ${settings.overwritePlaysetsOnExport ? 'checked' : ''}>
+            </label>
+            <label class="info-setting-row" for="settingOverwritePlaysetsOnImport">
+                <span class="info-setting-label">Overwrite playsets on import</span>
+                <input type="checkbox" id="settingOverwritePlaysetsOnImport" ${settings.overwritePlaysetsOnImport ? 'checked' : ''}>
+            </label>
+            <div class="info-setting-row">
+                <span class="info-setting-label">Folder: <span id="exportFolderValue" class="info-folder-value"></span></span>
+            </div>
+            <div class="speed-chips-grid info-export-actions" aria-label="Export folder actions">
+                <button type="button" id="changeExportFolderBtn" class="speed-chip">Change</button>
+                <button type="button" id="clearExportFolderBtn" class="speed-chip">Clear</button>
+                <div class="speed-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            </div>
             <p class="info-heading">Supported MIDI Devices</p>
             <div class="info-vendor">NUX</div>
             <div class="info-model">Mighty Plug Pro</div>
@@ -1351,6 +1412,53 @@ function renderInfoSheet() {
     if (markerToggle) {
         markerToggle.addEventListener('change', () => {
             updateUiSetting('markerSetOneClickSelect', markerToggle.checked);
+        });
+    }
+
+    const overwriteSongsOnExportToggle = sheet.querySelector('#settingOverwriteSongsOnExport');
+    if (overwriteSongsOnExportToggle) {
+        overwriteSongsOnExportToggle.addEventListener('change', () => {
+            updateUiSetting('overwriteSongsOnExport', overwriteSongsOnExportToggle.checked);
+        });
+    }
+
+    const overwriteSongsOnImportToggle = sheet.querySelector('#settingOverwriteSongsOnImport');
+    if (overwriteSongsOnImportToggle) {
+        overwriteSongsOnImportToggle.addEventListener('change', () => {
+            updateUiSetting('overwriteSongsOnImport', overwriteSongsOnImportToggle.checked);
+        });
+    }
+
+    const overwritePlaysetsOnExportToggle = sheet.querySelector('#settingOverwritePlaysetsOnExport');
+    if (overwritePlaysetsOnExportToggle) {
+        overwritePlaysetsOnExportToggle.addEventListener('change', () => {
+            updateUiSetting('overwritePlaysetsOnExport', overwritePlaysetsOnExportToggle.checked);
+        });
+    }
+
+    const overwritePlaysetsOnImportToggle = sheet.querySelector('#settingOverwritePlaysetsOnImport');
+    if (overwritePlaysetsOnImportToggle) {
+        overwritePlaysetsOnImportToggle.addEventListener('change', () => {
+            updateUiSetting('overwritePlaysetsOnImport', overwritePlaysetsOnImportToggle.checked);
+        });
+    }
+
+    const exportFolderValueEl = sheet.querySelector('#exportFolderValue');
+    if (exportFolderValueEl) {
+        exportFolderValueEl.textContent = getExportFolderName();
+    }
+
+    const changeExportFolderBtn = sheet.querySelector('#changeExportFolderBtn');
+    if (changeExportFolderBtn) {
+        changeExportFolderBtn.addEventListener('click', async () => {
+            await promptChangeExportFolder();
+        });
+    }
+
+    const clearExportFolderBtn = sheet.querySelector('#clearExportFolderBtn');
+    if (clearExportFolderBtn) {
+        clearExportFolderBtn.addEventListener('click', () => {
+            clearExportFolderSelection();
         });
     }
 }
@@ -2083,13 +2191,21 @@ const PLAY_MODE_KEY = 'audio_play_mode_v1';
 
 const DEFAULT_UI_SETTINGS = {
     playsetOneClickSelect: false,
-    markerSetOneClickSelect: false
+    markerSetOneClickSelect: false,
+    overwriteSongsOnExport: false,
+    overwriteSongsOnImport: false,
+    overwritePlaysetsOnExport: false,
+    overwritePlaysetsOnImport: false
 };
 
 function normalizeUiSettings(raw) {
     const next = {
         playsetOneClickSelect: false,
-        markerSetOneClickSelect: false
+        markerSetOneClickSelect: false,
+        overwriteSongsOnExport: false,
+        overwriteSongsOnImport: false,
+        overwritePlaysetsOnExport: false,
+        overwritePlaysetsOnImport: false
     };
     if (raw && typeof raw === 'object') {
         if (typeof raw.playsetOneClickSelect === 'boolean') {
@@ -2097,6 +2213,18 @@ function normalizeUiSettings(raw) {
         }
         if (typeof raw.markerSetOneClickSelect === 'boolean') {
             next.markerSetOneClickSelect = raw.markerSetOneClickSelect;
+        }
+        if (typeof raw.overwriteSongsOnExport === 'boolean') {
+            next.overwriteSongsOnExport = raw.overwriteSongsOnExport;
+        }
+        if (typeof raw.overwriteSongsOnImport === 'boolean') {
+            next.overwriteSongsOnImport = raw.overwriteSongsOnImport;
+        }
+        if (typeof raw.overwritePlaysetsOnExport === 'boolean') {
+            next.overwritePlaysetsOnExport = raw.overwritePlaysetsOnExport;
+        }
+        if (typeof raw.overwritePlaysetsOnImport === 'boolean') {
+            next.overwritePlaysetsOnImport = raw.overwritePlaysetsOnImport;
         }
     }
     return next;
@@ -3899,13 +4027,35 @@ async function exportPlaysetById(playsetId) {
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const fileName = `${sanitizeFilename(setDef.name, 'playset')}.aeps`;
+    const settings = loadUiSettings();
+
+    if (settings.overwritePlaysetsOnExport && window.showDirectoryPicker) {
+        try {
+            if (!lastExportDirHandle) {
+                lastExportDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            }
+            if (lastExportDirHandle) {
+                const fileHandle = await lastExportDirHandle.getFileHandle(fileName, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                showExportNotice(`Exported to folder: ${getExportFolderName()}`);
+                return;
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            lastExportDirHandle = null;
+            updateExportFolderLabelInInfoSheet();
+        }
+    }
 
     if (window.showSaveFilePicker) {
         try {
-            const handle = await window.showSaveFilePicker({
+            const opts = {
                 suggestedName: fileName,
                 types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps'] } }]
-            });
+            };
+            const handle = await window.showSaveFilePicker(opts);
             const writable = await handle.createWritable();
             await writable.write(blob);
             await writable.close();
@@ -3952,8 +4102,10 @@ async function importPlaysetDefinitionFile(file) {
     const state = loadPlaysetState();
     const existingNames = state.customPlaysets.map(setDef => setDef.name);
 
+    const settings = loadUiSettings();
     let finalName = importedName;
-    if (existingNames.some(name => name.trim().toLowerCase() === importedName.toLowerCase())) {
+    const hasNameCollision = existingNames.some(name => name.trim().toLowerCase() === importedName.toLowerCase());
+    if (hasNameCollision && !settings.overwritePlaysetsOnImport) {
         const suggestedName = makePlaysetNameUnique(importedName, existingNames);
         const userInput = prompt(
             `"${importedName}" already exists.\n\nEnter a new name, or press OK to use the suggested alternative:`,
@@ -5140,6 +5292,58 @@ document.querySelectorAll('.tab-bar .tab').forEach((label, i) => {
 const AEM_MAGIC = new Uint8Array([0x41, 0x45, 0x4D, 0x49]); // "AEMI"
 const AEM_VERSION = 1;
 let lastExportDirHandle = null;
+let exportNoticeTimer = null;
+
+function getExportFolderName() {
+    return (lastExportDirHandle && typeof lastExportDirHandle.name === 'string')
+        ? lastExportDirHandle.name
+        : '';
+}
+
+function updateExportFolderLabelInInfoSheet() {
+    const label = document.getElementById('exportFolderValue');
+    if (label) label.textContent = getExportFolderName();
+}
+
+function clearExportFolderSelection() {
+    lastExportDirHandle = null;
+    updateExportFolderLabelInInfoSheet();
+}
+
+function showExportNotice(message) {
+    if (!message) return;
+    let notice = document.getElementById('exportNotice');
+    if (!notice) {
+        notice = document.createElement('div');
+        notice.id = 'exportNotice';
+        notice.className = 'export-notice';
+        document.body.appendChild(notice);
+    }
+    notice.textContent = message;
+    notice.classList.add('show');
+    if (exportNoticeTimer) clearTimeout(exportNoticeTimer);
+    exportNoticeTimer = setTimeout(() => {
+        notice.classList.remove('show');
+    }, 1500);
+}
+
+async function promptChangeExportFolder() {
+    if (!window.showDirectoryPicker) {
+        alert('Folder picker is not supported in this browser.');
+        return false;
+    }
+    try {
+        lastExportDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        updateExportFolderLabelInInfoSheet();
+        return !!lastExportDirHandle;
+    } catch (err) {
+        if (err.name === 'AbortError') return false;
+        lastExportDirHandle = null;
+        updateExportFolderLabelInInfoSheet();
+        alert('Could not set export folder: ' + (err.message || err.name || 'Unknown error'));
+        return false;
+    }
+}
 
 async function packAem(songName) {
     const song = await getSongByName(songName);
@@ -5224,6 +5428,27 @@ async function exportSong(songName) {
         const blob = await packAem(songName);
         const safeName = songName.replace(/[^a-zA-Z0-9._\-() ]/g, '_');
         const fileName = safeName.replace(/\.[^.]+$/, '') + '.aem';
+        const settings = loadUiSettings();
+
+        if (settings.overwriteSongsOnExport && window.showDirectoryPicker) {
+            try {
+                if (!lastExportDirHandle) {
+                    lastExportDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                }
+                if (lastExportDirHandle) {
+                    const fileHandle = await lastExportDirHandle.getFileHandle(fileName, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    showExportNotice(`Exported to folder: ${getExportFolderName()}`);
+                    return;
+                }
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                lastExportDirHandle = null;
+                updateExportFolderLabelInInfoSheet();
+            }
+        }
 
         if (window.showSaveFilePicker) {
             try {
@@ -5231,9 +5456,7 @@ async function exportSong(songName) {
                     suggestedName: fileName,
                     types: [{ description: 'Audio Events MIDI file', accept: { 'application/octet-stream': ['.aem'] } }]
                 };
-                if (lastExportDirHandle) opts.startIn = lastExportDirHandle;
                 const handle = await window.showSaveFilePicker(opts);
-                lastExportDirHandle = await handle.getParent?.() || null;
                 const writable = await handle.createWritable();
                 await writable.write(blob);
                 await writable.close();
@@ -5263,10 +5486,11 @@ async function importSong(file) {
 
         const allSongs = await getAllSongs();
         const existingNames = allSongs.map(s => s.name);
+        const settings = loadUiSettings();
 
         let finalName = metadata.name || file.name.replace(/\.aem$/i, '');
 
-        if (existingNames.includes(finalName)) {
+        if (existingNames.includes(finalName) && !settings.overwriteSongsOnImport) {
             const suggested = makeSongNameUnique(finalName, existingNames);
             const userInput = prompt(
                 `"${finalName}" already exists.\n\nEnter a new name, or press OK to use the suggested alternative:`,
