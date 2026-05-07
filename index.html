@@ -571,6 +571,44 @@
         .info-sheet-content .info-setting-label {
             line-height: 1.3;
         }
+        .info-sheet-content .info-setting-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .info-sheet-content .info-action-btn {
+            width: auto;
+            min-width: 82px;
+            padding: 6px 10px;
+            font-size: 0.74rem;
+            line-height: 1;
+        }
+        .info-sheet-content .info-action-btn:disabled {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+        .info-sheet-content .info-clear-btn {
+            width: 16px;
+            height: 16px;
+            min-width: 16px;
+            padding: 0;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .info-sheet-content .info-clear-btn.has-folder {
+            color: var(--danger);
+        }
+        .info-sheet-content .info-clear-btn svg {
+            width: 14px;
+            height: 14px;
+            display: block;
+        }
         .info-sheet-content .info-setting-row input[type="checkbox"] {
             width: 16px;
             height: 16px;
@@ -580,14 +618,6 @@
         .info-sheet-content .info-folder-value {
             color: var(--text-primary);
             font-weight: 500;
-        }
-        .info-sheet-content .info-export-actions {
-            margin-top: 6px;
-        }
-        .info-sheet-content .info-export-actions .speed-chip {
-            min-height: 34px;
-            padding: 8px 0;
-            font-size: 0.78rem;
         }
         .export-notice {
             position: fixed;
@@ -1368,6 +1398,7 @@ function renderInfoSheet() {
     const sheet = document.getElementById('info-sheet');
     if (!sheet) return;
     const settings = loadUiSettings();
+    const hasExportFolder = !!getExportFolderName();
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
@@ -1384,29 +1415,38 @@ function renderInfoSheet() {
             <p class="info-heading">Export/Import</p>
             <label class="info-setting-row" for="settingOverwriteSongsOnExport">
                 <span class="info-setting-label">Overwrite songs on export</span>
-                <input type="checkbox" id="settingOverwriteSongsOnExport" ${settings.overwriteSongsOnExport ? 'checked' : ''}>
+                <span class="info-setting-actions">
+                    <button type="button" id="bulkExportSongsBtn" class="speed-chip info-action-btn" ${settings.overwriteSongsOnExport ? '' : 'disabled'}>Export all</button>
+                    <input type="checkbox" id="settingOverwriteSongsOnExport" ${settings.overwriteSongsOnExport ? 'checked' : ''}>
+                </span>
             </label>
             <label class="info-setting-row" for="settingOverwriteSongsOnImport">
                 <span class="info-setting-label">Overwrite songs on import</span>
-                <input type="checkbox" id="settingOverwriteSongsOnImport" ${settings.overwriteSongsOnImport ? 'checked' : ''}>
+                <span class="info-setting-actions">
+                    <button type="button" id="bulkImportSongsBtn" class="speed-chip info-action-btn" ${settings.overwriteSongsOnImport ? '' : 'disabled'}>Import all</button>
+                    <input type="checkbox" id="settingOverwriteSongsOnImport" ${settings.overwriteSongsOnImport ? 'checked' : ''}>
+                </span>
             </label>
             <label class="info-setting-row" for="settingOverwritePlaysetsOnExport">
                 <span class="info-setting-label">Overwrite playsets on export</span>
-                <input type="checkbox" id="settingOverwritePlaysetsOnExport" ${settings.overwritePlaysetsOnExport ? 'checked' : ''}>
+                <span class="info-setting-actions">
+                    <button type="button" id="bulkExportPlaysetsBtn" class="speed-chip info-action-btn" ${settings.overwritePlaysetsOnExport ? '' : 'disabled'}>Export all</button>
+                    <input type="checkbox" id="settingOverwritePlaysetsOnExport" ${settings.overwritePlaysetsOnExport ? 'checked' : ''}>
+                </span>
             </label>
             <label class="info-setting-row" for="settingOverwritePlaysetsOnImport">
                 <span class="info-setting-label">Overwrite playsets on import</span>
-                <input type="checkbox" id="settingOverwritePlaysetsOnImport" ${settings.overwritePlaysetsOnImport ? 'checked' : ''}>
+                <span class="info-setting-actions">
+                    <button type="button" id="bulkImportPlaysetsBtn" class="speed-chip info-action-btn" ${settings.overwritePlaysetsOnImport ? '' : 'disabled'}>Import all</button>
+                    <input type="checkbox" id="settingOverwritePlaysetsOnImport" ${settings.overwritePlaysetsOnImport ? 'checked' : ''}>
+                </span>
             </label>
             <div class="info-setting-row">
                 <span class="info-setting-label">Folder: <span id="exportFolderValue" class="info-folder-value"></span></span>
-            </div>
-            <div class="speed-chips-grid info-export-actions" aria-label="Export folder actions">
-                <button type="button" id="changeExportFolderBtn" class="speed-chip">Change</button>
-                <button type="button" id="clearExportFolderBtn" class="speed-chip">Clear</button>
-                <div class="speed-chip marker-set-chip-spacer" aria-hidden="true"></div>
-                <div class="speed-chip marker-set-chip-spacer" aria-hidden="true"></div>
-                <div class="speed-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <span class="info-setting-actions">
+                    <button type="button" id="changeExportFolderBtn" class="speed-chip info-action-btn">Change</button>
+                    <button type="button" id="clearExportFolderBtn" class="info-clear-btn ${hasExportFolder ? 'has-folder' : ''}" aria-label="Clear folder" title="Clear folder"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                </span>
             </div>
             <p class="info-heading">Supported MIDI Devices</p>
             <div class="info-vendor">NUX</div>
@@ -1440,6 +1480,7 @@ function renderInfoSheet() {
     if (overwriteSongsOnExportToggle) {
         overwriteSongsOnExportToggle.addEventListener('change', () => {
             updateUiSetting('overwriteSongsOnExport', overwriteSongsOnExportToggle.checked);
+            renderInfoSheet();
         });
     }
 
@@ -1447,6 +1488,7 @@ function renderInfoSheet() {
     if (overwriteSongsOnImportToggle) {
         overwriteSongsOnImportToggle.addEventListener('change', () => {
             updateUiSetting('overwriteSongsOnImport', overwriteSongsOnImportToggle.checked);
+            renderInfoSheet();
         });
     }
 
@@ -1454,6 +1496,7 @@ function renderInfoSheet() {
     if (overwritePlaysetsOnExportToggle) {
         overwritePlaysetsOnExportToggle.addEventListener('change', () => {
             updateUiSetting('overwritePlaysetsOnExport', overwritePlaysetsOnExportToggle.checked);
+            renderInfoSheet();
         });
     }
 
@@ -1461,6 +1504,39 @@ function renderInfoSheet() {
     if (overwritePlaysetsOnImportToggle) {
         overwritePlaysetsOnImportToggle.addEventListener('change', () => {
             updateUiSetting('overwritePlaysetsOnImport', overwritePlaysetsOnImportToggle.checked);
+            renderInfoSheet();
+        });
+    }
+
+    const bulkExportSongsBtn = sheet.querySelector('#bulkExportSongsBtn');
+    if (bulkExportSongsBtn) {
+        bulkExportSongsBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await exportAllSongs();
+        });
+    }
+
+    const bulkImportSongsBtn = sheet.querySelector('#bulkImportSongsBtn');
+    if (bulkImportSongsBtn) {
+        bulkImportSongsBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await importAllSongs();
+        });
+    }
+
+    const bulkExportPlaysetsBtn = sheet.querySelector('#bulkExportPlaysetsBtn');
+    if (bulkExportPlaysetsBtn) {
+        bulkExportPlaysetsBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await exportAllPlaysets();
+        });
+    }
+
+    const bulkImportPlaysetsBtn = sheet.querySelector('#bulkImportPlaysetsBtn');
+    if (bulkImportPlaysetsBtn) {
+        bulkImportPlaysetsBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await importAllPlaysets();
         });
     }
 
@@ -4034,11 +4110,12 @@ function sanitizeFilename(name, fallback) {
     return cleaned || fallback || 'export';
 }
 
-async function exportPlaysetById(playsetId) {
+async function exportPlaysetById(playsetId, options = {}) {
     showIoBusy('Exporting playset...');
     try {
+    const showFolderNotice = options.showFolderNotice !== false;
     const setDef = getCustomPlaysetById(playsetId);
-    if (!setDef) return;
+    if (!setDef) return false;
 
     const payload = {
         version: 1,
@@ -4062,11 +4139,11 @@ async function exportPlaysetById(playsetId) {
                 const writable = await fileHandle.createWritable();
                 await writable.write(blob);
                 await writable.close();
-                showExportNotice(`Exported to folder: ${getExportFolderName()}`);
-                return;
+                if (showFolderNotice) showExportNotice(`Exported to folder: ${getExportFolderName()}`);
+                return true;
             }
         } catch (err) {
-            if (err.name === 'AbortError') return;
+            if (err.name === 'AbortError') return false;
             lastExportDirHandle = null;
             updateExportFolderLabelInInfoSheet();
         }
@@ -4085,9 +4162,9 @@ async function exportPlaysetById(playsetId) {
             const writable = await handle.createWritable();
             await writable.write(blob);
             await writable.close();
-            return;
+            return true;
         } catch (err) {
-            if (err.name === 'AbortError') return;
+            if (err.name === 'AbortError') return false;
         }
     }
 
@@ -4099,6 +4176,7 @@ async function exportPlaysetById(playsetId) {
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return true;
     } finally {
         hideIoBusy();
     }
@@ -5344,8 +5422,13 @@ function showIoBusy(message) {
     const label = document.getElementById('ioBusyLabel');
     if (!dialog) return;
     ioBusyDepth++;
-    if (label && message) label.textContent = message;
+    if (label && message && ioBusyDepth === 1) label.textContent = message;
     if (!dialog.open) dialog.showModal();
+}
+
+function setIoBusyLabel(message) {
+    const label = document.getElementById('ioBusyLabel');
+    if (label && message) label.textContent = message;
 }
 
 function hideIoBusy() {
@@ -5355,6 +5438,137 @@ function hideIoBusy() {
     if (ioBusyDepth === 0 && dialog.open) dialog.close();
 }
 
+async function resolveBatchFolderHandle() {
+    if (lastExportDirHandle) return lastExportDirHandle;
+    const ok = await promptChangeExportFolder();
+    return ok ? lastExportDirHandle : null;
+}
+
+async function listFolderFileHandlesByExtension(folderHandle, extension) {
+    if (!folderHandle) return [];
+    const ext = String(extension || '').toLowerCase();
+    const out = [];
+    for await (const entry of folderHandle.values()) {
+        if (entry.kind !== 'file') continue;
+        if (!entry.name.toLowerCase().endsWith(ext)) continue;
+        out.push(entry);
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name));
+    return out;
+}
+
+async function exportAllSongs() {
+    const settings = loadUiSettings();
+    if (!settings.overwriteSongsOnExport) return;
+
+    const songs = await getAllSongs();
+    if (!songs || songs.length === 0) {
+        alert('No songs found in database.');
+        return;
+    }
+
+    const folderHandle = await resolveBatchFolderHandle();
+    if (!folderHandle) return;
+
+    showIoBusy(`Exporting songs 0/${songs.length}...`);
+    let exported = 0;
+    try {
+        for (let i = 0; i < songs.length; i++) {
+            setIoBusyLabel(`Exporting songs ${i + 1}/${songs.length}...`);
+            const ok = await exportSong(songs[i].name, { showFolderNotice: false });
+            if (ok) exported++;
+        }
+    } finally {
+        hideIoBusy();
+    }
+
+    showExportNotice(`Exported ${exported}/${songs.length} songs to folder: ${getExportFolderName()}`);
+}
+
+async function importAllSongs() {
+    const settings = loadUiSettings();
+    if (!settings.overwriteSongsOnImport) return;
+
+    const folderHandle = await resolveBatchFolderHandle();
+    if (!folderHandle) return;
+    const fileHandles = await listFolderFileHandlesByExtension(folderHandle, '.aem');
+    if (fileHandles.length === 0) {
+        alert('No .aem files found in selected folder.');
+        return;
+    }
+
+    showIoBusy(`Importing songs 0/${fileHandles.length}...`);
+    let imported = 0;
+    try {
+        for (let i = 0; i < fileHandles.length; i++) {
+            setIoBusyLabel(`Importing songs ${i + 1}/${fileHandles.length}...`);
+            const file = await fileHandles[i].getFile();
+            const ok = await importSong(file);
+            if (ok) imported++;
+        }
+    } finally {
+        hideIoBusy();
+    }
+
+    showExportNotice(`Imported ${imported}/${fileHandles.length} songs from folder: ${getExportFolderName()}`);
+}
+
+async function exportAllPlaysets() {
+    const settings = loadUiSettings();
+    if (!settings.overwritePlaysetsOnExport) return;
+
+    const playsets = getCustomPlaysets();
+    if (!playsets || playsets.length === 0) {
+        alert('No custom playsets found.');
+        return;
+    }
+
+    const folderHandle = await resolveBatchFolderHandle();
+    if (!folderHandle) return;
+
+    showIoBusy(`Exporting playsets 0/${playsets.length}...`);
+    let exported = 0;
+    try {
+        for (let i = 0; i < playsets.length; i++) {
+            setIoBusyLabel(`Exporting playsets ${i + 1}/${playsets.length}...`);
+            const ok = await exportPlaysetById(playsets[i].id, { showFolderNotice: false });
+            if (ok) exported++;
+        }
+    } finally {
+        hideIoBusy();
+    }
+
+    showExportNotice(`Exported ${exported}/${playsets.length} playsets to folder: ${getExportFolderName()}`);
+}
+
+async function importAllPlaysets() {
+    const settings = loadUiSettings();
+    if (!settings.overwritePlaysetsOnImport) return;
+
+    const folderHandle = await resolveBatchFolderHandle();
+    if (!folderHandle) return;
+    const fileHandles = await listFolderFileHandlesByExtension(folderHandle, '.aeps');
+    if (fileHandles.length === 0) {
+        alert('No .aeps files found in selected folder.');
+        return;
+    }
+
+    showIoBusy(`Importing playsets 0/${fileHandles.length}...`);
+    let imported = 0;
+    try {
+        for (let i = 0; i < fileHandles.length; i++) {
+            setIoBusyLabel(`Importing playsets ${i + 1}/${fileHandles.length}...`);
+            const file = await fileHandles[i].getFile();
+            const ok = await importPlaysetDefinitionFile(file);
+            if (ok) imported++;
+        }
+    } finally {
+        hideIoBusy();
+    }
+
+    showExportNotice(`Imported ${imported}/${fileHandles.length} playsets from folder: ${getExportFolderName()}`);
+}
+
 function getExportFolderName() {
     return (lastExportDirHandle && typeof lastExportDirHandle.name === 'string')
         ? lastExportDirHandle.name
@@ -5362,8 +5576,14 @@ function getExportFolderName() {
 }
 
 function updateExportFolderLabelInInfoSheet() {
+    const folderName = getExportFolderName();
     const label = document.getElementById('exportFolderValue');
-    if (label) label.textContent = getExportFolderName();
+    if (label) label.textContent = folderName;
+
+    const clearBtn = document.getElementById('clearExportFolderBtn');
+    if (clearBtn) {
+        clearBtn.classList.toggle('has-folder', !!folderName);
+    }
 }
 
 function clearExportFolderSelection() {
@@ -5484,9 +5704,10 @@ function makeSongNameUnique(desiredName, existingNames) {
     return candidate;
 }
 
-async function exportSong(songName) {
+async function exportSong(songName, options = {}) {
     showIoBusy('Exporting song...');
     try {
+        const showFolderNotice = options.showFolderNotice !== false;
         const blob = await packAem(songName);
         const safeName = songName.replace(/[^a-zA-Z0-9._\-() ]/g, '_');
         const fileName = safeName.replace(/\.[^.]+$/, '') + '.aem';
@@ -5502,11 +5723,11 @@ async function exportSong(songName) {
                     const writable = await fileHandle.createWritable();
                     await writable.write(blob);
                     await writable.close();
-                    showExportNotice(`Exported to folder: ${getExportFolderName()}`);
-                    return;
+                    if (showFolderNotice) showExportNotice(`Exported to folder: ${getExportFolderName()}`);
+                    return true;
                 }
             } catch (err) {
-                if (err.name === 'AbortError') return;
+                if (err.name === 'AbortError') return false;
                 lastExportDirHandle = null;
                 updateExportFolderLabelInInfoSheet();
             }
@@ -5525,9 +5746,9 @@ async function exportSong(songName) {
                 const writable = await handle.createWritable();
                 await writable.write(blob);
                 await writable.close();
-                return;
+                return true;
             } catch (err) {
-                if (err.name === 'AbortError') return;
+                if (err.name === 'AbortError') return false;
             }
         }
 
@@ -5539,8 +5760,10 @@ async function exportSong(songName) {
         a.click();
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 5000);
+        return true;
     } catch (err) {
         alert('Export failed: ' + err.message);
+        return false;
     } finally {
         hideIoBusy();
     }
@@ -5626,8 +5849,10 @@ async function importSong(file) {
         }
 
         await renderPlaylist();
+        return true;
     } catch (err) {
         alert('Import failed: ' + err.message);
+        return false;
     } finally {
         hideIoBusy();
     }
