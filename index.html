@@ -1374,22 +1374,117 @@ function toggleInfoPopup() {
 const IDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
 let db = null;
 const DB_NAME = "AudioMasterDB_2026";
-const DB_VERSION = 1;
+const DB_PREFIX = "AudioMasterDB";
 const STORE_SONGS = "songs";
+let activeDBName = DB_NAME;
+let storageUnavailableReason = '';
 
-function openDB() {
+function normalizeStorageError(err, fallbackMessage) {
+    const name = err && err.name ? err.name : 'StorageError';
+    const message = err && err.message ? err.message : fallbackMessage;
+    return `${name}: ${message}`;
+}
+
+function openDBByName(name, allowCreateStore) {
     return new Promise((resolve) => {
-        if (!IDB) { console.warn("IndexedDB not available."); return resolve(null); }
-        const req = IDB.open(DB_NAME, DB_VERSION);
+        let req;
+        try {
+            req = IDB.open(name);
+        } catch (err) {
+            return resolve({ db: null, error: normalizeStorageError(err, 'Failed to open IndexedDB') });
+        }
+
         req.onupgradeneeded = (e) => {
+            if (!allowCreateStore) return;
             const _db = e.target.result;
             if (!_db.objectStoreNames.contains(STORE_SONGS)) {
                 _db.createObjectStore(STORE_SONGS, { keyPath: "name" });
             }
         };
-        req.onsuccess = (e) => resolve(e.target.result);
-        req.onerror  = () => resolve(null);
+        req.onsuccess = (e) => resolve({ db: e.target.result, error: '' });
+        req.onerror = () => {
+            const err = req.error || new Error('IndexedDB open failed');
+            resolve({ db: null, error: normalizeStorageError(err, 'IndexedDB open failed') });
+        };
+        req.onblocked = () => {
+            resolve({ db: null, error: 'BlockedError: IndexedDB is blocked by another tab/session' });
+        };
     });
+}
+
+function countSongsInDB(candidateDB) {
+    return new Promise((resolve) => {
+        if (!candidateDB || !candidateDB.objectStoreNames.contains(STORE_SONGS)) return resolve(0);
+        let tx;
+        try {
+            tx = candidateDB.transaction(STORE_SONGS, "readonly");
+        } catch (err) {
+            return resolve(0);
+        }
+        const store = tx.objectStore(STORE_SONGS);
+        const req = store.count();
+        req.onsuccess = () => resolve(Number(req.result) || 0);
+        req.onerror = () => resolve(0);
+    });
+}
+
+async function findLegacyDbNames() {
+    if (!IDB || typeof IDB.databases !== 'function') return [];
+    try {
+        const list = await IDB.databases();
+        return (list || [])
+            .map(entry => entry && entry.name)
+            .filter(name => typeof name === 'string' && name.startsWith(DB_PREFIX) && name !== DB_NAME);
+    } catch (err) {
+        return [];
+    }
+}
+
+async function openDB() {
+    if (!IDB) {
+        storageUnavailableReason = 'IndexedDB is not available in this browser context.';
+        console.warn(storageUnavailableReason);
+        return null;
+    }
+
+    const primary = await openDBByName(DB_NAME, true);
+    if (primary.db) {
+        activeDBName = DB_NAME;
+        storageUnavailableReason = '';
+
+        const primaryCount = await countSongsInDB(primary.db);
+        if (primaryCount > 0) return primary.db;
+
+        const legacyNames = await findLegacyDbNames();
+        for (const legacyName of legacyNames) {
+            const legacy = await openDBByName(legacyName, false);
+            if (!legacy.db) continue;
+            const legacyCount = await countSongsInDB(legacy.db);
+            if (legacyCount > 0) {
+                try { primary.db.close(); } catch (_) {}
+                activeDBName = legacyName;
+                console.info(`Using legacy library database: ${legacyName}`);
+                return legacy.db;
+            }
+            try { legacy.db.close(); } catch (_) {}
+        }
+
+        return primary.db;
+    }
+
+    const legacyNames = await findLegacyDbNames();
+    for (const legacyName of legacyNames) {
+        const legacy = await openDBByName(legacyName, false);
+        if (legacy.db) {
+            activeDBName = legacyName;
+            storageUnavailableReason = '';
+            return legacy.db;
+        }
+    }
+
+    storageUnavailableReason = primary.error || 'IndexedDB is unavailable for this origin.';
+    console.warn('openDB failed:', storageUnavailableReason);
+    return null;
 }
 function getAllSongs() {
     return new Promise((resolve) => {
@@ -3047,7 +3142,8 @@ fileInput.onchange = async () => {
 
 async function renderPlaylist() {
     if (!db) {
-        playlistUI.innerHTML = "<div style='padding:10px'>Storage unavailable</div>";
+        const reason = escapeHtml(storageUnavailableReason || 'IndexedDB could not be opened.');
+        playlistUI.innerHTML = `<div style='padding:10px'>Storage unavailable<br><small style='color:var(--text-secondary)'>${reason} Use the same origin as before (same protocol/host/port). If you opened this via file://, run it from http://localhost.</small></div>`;
         return;
     }
     try {
