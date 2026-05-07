@@ -3822,13 +3822,13 @@ async function exportPlaysetById(playsetId) {
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const fileName = `${sanitizeFilename(setDef.name, 'playset')}.aeps.json`;
+    const fileName = `${sanitizeFilename(setDef.name, 'playset')}.aeps`;
 
     if (window.showSaveFilePicker) {
         try {
             const handle = await window.showSaveFilePicker({
                 suggestedName: fileName,
-                types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps.json'] } }]
+                types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps'] } }]
             });
             const writable = await handle.createWritable();
             await writable.write(blob);
@@ -3874,36 +3874,33 @@ async function importPlaysetDefinitionFile(file) {
     );
 
     const state = loadPlaysetState();
-    const existingByName = state.customPlaysets.find(setDef => setDef.name.trim().toLowerCase() === importedName.toLowerCase());
+    const existingNames = state.customPlaysets.map(setDef => setDef.name);
 
-    if (existingByName) {
-        const overwrite = confirm(`Playset "${importedName}" already exists.\n\nPress OK to overwrite it, or Cancel to import as a copy.`);
-        if (overwrite) {
-            existingByName.name = importedName;
-            existingByName.songNames = filteredSongs;
-            existingByName.updatedAt = Date.now();
-            savePlaysetState(state);
-            alertSkippedSongs(`Playset \"${importedName}\" imported`, skippedSongNames);
-            return true;
-        }
-
-        const suggestedName = makePlaysetNameUnique(importedName, state.customPlaysets.map(setDef => setDef.name));
-        const userName = prompt('Enter a name for imported playset:', suggestedName);
-        if (userName === null) return false;
-        const finalName = String(userName || '').trim();
+    let finalName = importedName;
+    if (existingNames.some(name => name.trim().toLowerCase() === importedName.toLowerCase())) {
+        const suggestedName = makePlaysetNameUnique(importedName, existingNames);
+        const userInput = prompt(
+            `"${importedName}" already exists.\n\nEnter a new name, or press OK to use the suggested alternative:`,
+            suggestedName
+        );
+        if (userInput === null) return false;
+        finalName = String(userInput || '').trim();
         if (!finalName) return false;
-        if (isPlaysetNameTaken(finalName)) {
-            alert(`A playset named "${finalName}" already exists.`);
-            return false;
-        }
-
-        createPlayset(finalName, filteredSongs);
-        alertSkippedSongs(`Playset \"${finalName}\" imported`, skippedSongNames);
-        return true;
     }
 
-    createPlayset(importedName, filteredSongs);
-    alertSkippedSongs(`Playset \"${importedName}\" imported`, skippedSongNames);
+    const existingByFinalName = state.customPlaysets.find(
+        setDef => setDef.name.trim().toLowerCase() === finalName.toLowerCase()
+    );
+    if (existingByFinalName) {
+        existingByFinalName.name = finalName;
+        existingByFinalName.songNames = filteredSongs;
+        existingByFinalName.updatedAt = Date.now();
+        savePlaysetState(state);
+    } else {
+        createPlayset(finalName, filteredSongs);
+    }
+
+    alertSkippedSongs(`Playset \"${finalName}\" imported`, skippedSongNames);
     return true;
 }
 
@@ -3912,7 +3909,7 @@ function ensurePlaysetImportInput() {
     if (playsetImportInput) return playsetImportInput;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.aeps.json,application/json';
+    input.accept = '.aeps,application/json';
     input.style.display = 'none';
     input.addEventListener('click', () => { input.value = ''; });
     input.addEventListener('change', async () => {
@@ -3936,7 +3933,7 @@ async function promptImportPlaysetDefinition() {
         try {
             const [handle] = await window.showOpenFilePicker({
                 multiple: false,
-                types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps.json'] } }]
+                types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps'] } }]
             });
             if (!handle) return;
             const file = await handle.getFile();
