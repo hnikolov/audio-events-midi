@@ -55,9 +55,9 @@ The metadata block is a UTF-8 JSON object with the following fields:
       "default": {
         "name": "Default Set",
         "events": [
-          { "time": 12.5, "preset": 1 },
-          { "time": 24.3, "preset": 5 },
-          { "time": 45.1, "preset": 12 }
+          { "time": 12.5, "preset": 1, "text":"Intro" },
+          { "time": 24.3, "preset": 5, "text":"" },
+          { "time": 45.1, "preset": 12, "text":"Outro" }
         ]
       }
     }
@@ -89,6 +89,7 @@ The metadata block is a UTF-8 JSON object with the following fields:
 | `markers`        | array          | no       | `[]`    | Array of marker objects |
 | `markers[].time` | number         | yes      | —       | Marker position in seconds (e.g. `12.5`) |
 | `markers[].preset` | number       | yes      | —       | MIDI preset number (1–100). 1–50 = P01–P50, 51–100 = F01–F50 |
+| `markers[].text` | number         | yes      | —       | Optional description of the marker |
 | `volume`         | number         | no       | `1.0`   | Playback volume gain (0.0 to 2.0) |
 | `speed`          | number         | no       | `1.0`   | Playback speed (e.g. `0.8`, `1.0`, `1.5`) |
 | `eq`             | object         | no       | `0,0,0` | 3-band equalizer settings |
