@@ -563,6 +563,22 @@
             flex-shrink: 0;
             accent-color: var(--accent);
         }
+        .info-sheet-content .info-backup-actions {
+            margin-top: 6px;
+            margin-bottom: 8px;
+            padding: 8px 0 6px;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            background: transparent;
+        }
+        .info-sheet-content .info-backup-status {
+            font-size: 0.8rem;
+            line-height: 1.4;
+            color: var(--text-secondary);
+            display: grid;
+            gap: 2px;
+            margin-bottom: 10px;
+        }
         .info-sheet-content .info-vendor:first-of-type { margin-top: 4px; }
         .speed-btn-label {
             min-width: 52px; font-size: 0.83rem;
@@ -1277,6 +1293,7 @@ function toggleTheme() {
     const next = current === 'dark' ? 'light' : 'dark';
     localStorage.setItem('ui-theme', next);
     applyTheme(next);
+    scheduleMetadataBackup();
 }
 applyTheme(localStorage.getItem('ui-theme') || 'dark');
 
@@ -1285,6 +1302,11 @@ function renderInfoSheet() {
     const sheet = document.getElementById('info-sheet');
     if (!sheet) return;
     const settings = loadUiSettings();
+    const backupEnabled = !!backupRuntime.autoEnabled;
+    const backupBusy = !!backupRuntime.busy;
+    const folderLabel = backupRuntime.folderName || 'not selected';
+    const lastBackup = formatBackupTime(backupRuntime.lastSuccessAt);
+    const backupError = backupRuntime.lastError || 'none';
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
@@ -1298,6 +1320,30 @@ function renderInfoSheet() {
                 <span class="info-setting-label">Marker sets: one-click select</span>
                 <input type="checkbox" id="settingMarkerSetOneClick" ${settings.markerSetOneClickSelect ? 'checked' : ''}>
             </label>
+            <p class="info-heading">Backup</p>
+            <label class="info-setting-row" for="settingAutoBackupToggle">
+                <span class="info-setting-label">Auto-backup</span>
+                <input type="checkbox" id="settingAutoBackupToggle" ${backupEnabled ? 'checked' : ''} ${backupBusy ? 'disabled' : ''}>
+            </label>
+            <div class="marker-set-sheet-footer info-backup-actions">
+                <button type="button" class="speed-chip marker-set-chip" id="backupSelectFolderBtn" ${backupBusy ? 'disabled' : ''} title="Select folder">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                </button>
+                <button type="button" class="speed-chip marker-set-chip" id="backupNowBtn" ${backupBusy ? 'disabled' : ''} title="Backup all now">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </button>
+                <button type="button" class="speed-chip marker-set-chip" id="restoreBtn" ${backupBusy ? 'disabled' : ''} title="Restore">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 8 12 3 17 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </button>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            </div>
+            <div class="info-backup-status">
+                <div><b>Folder:</b> ${escapeHtml(folderLabel)}</div>
+                <div><b>Last backup:</b> ${escapeHtml(lastBackup)}</div>
+                <div><b>Last error:</b> ${escapeHtml(backupError)}</div>
+                ${backupBusy && backupRuntime.currentJob ? `<div><b>Running:</b> ${escapeHtml(backupRuntime.currentJob)}</div>` : ''}
+            </div>
             <p class="info-heading">Supported MIDI Devices</p>
             <div class="info-vendor">NUX</div>
             <div class="info-model">Mighty Plug Pro</div>
@@ -1323,6 +1369,54 @@ function renderInfoSheet() {
     if (markerToggle) {
         markerToggle.addEventListener('change', () => {
             updateUiSetting('markerSetOneClickSelect', markerToggle.checked);
+        });
+    }
+
+    const autoBackupToggle = sheet.querySelector('#settingAutoBackupToggle');
+    if (autoBackupToggle) {
+        autoBackupToggle.addEventListener('change', async () => {
+            const ok = await setAutoBackupEnabled(autoBackupToggle.checked);
+            if (!ok) autoBackupToggle.checked = false;
+            renderInfoSheet();
+        });
+    }
+
+    const selectFolderBtn = sheet.querySelector('#backupSelectFolderBtn');
+    if (selectFolderBtn) {
+        selectFolderBtn.addEventListener('click', async () => {
+            const handle = await pickBackupFolder();
+            if (handle) {
+                saveBackupSettings({ folderName: handle.name || '' });
+                renderInfoSheet();
+            }
+        });
+    }
+
+    const backupNowBtn = sheet.querySelector('#backupNowBtn');
+    if (backupNowBtn) {
+        backupNowBtn.addEventListener('click', async () => {
+            try {
+                await runBackupJob('Backup all', async () => {
+                    await backupAll();
+                });
+            } catch (err) {
+                alert(`Backup failed: ${err?.message || err}`);
+            }
+            renderInfoSheet();
+        });
+    }
+
+    const restoreBtn = sheet.querySelector('#restoreBtn');
+    if (restoreBtn) {
+        restoreBtn.addEventListener('click', async () => {
+            if (!confirm('Restore from the selected backup folder?')) return;
+            try {
+                const report = await runBackupJob('Restore', async () => restoreFromBackupFolder(), { markSuccessOnDone: false });
+                alert(formatRestoreSummary(report));
+            } catch (err) {
+                alert(`Restore failed: ${err?.message || err}`);
+            }
+            renderInfoSheet();
         });
     }
 }
@@ -1374,8 +1468,9 @@ function toggleInfoPopup() {
 const IDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
 let db = null;
 const DB_NAME = "AudioMasterDB_2026";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_SONGS = "songs";
+const STORE_APP = "app";
 
 function openDB() {
     return new Promise((resolve) => {
@@ -1385,6 +1480,9 @@ function openDB() {
             const _db = e.target.result;
             if (!_db.objectStoreNames.contains(STORE_SONGS)) {
                 _db.createObjectStore(STORE_SONGS, { keyPath: "name" });
+            }
+            if (!_db.objectStoreNames.contains(STORE_APP)) {
+                _db.createObjectStore(STORE_APP, { keyPath: 'key' });
             }
         };
         req.onsuccess = (e) => resolve(e.target.result);
@@ -1450,6 +1548,36 @@ function removeSongFromDB(name) {
         tx.onabort    = () => resolve(false);
     });
 }
+
+function getAppValue(key) {
+    return new Promise((resolve) => {
+        if (!db) return resolve(null);
+        try {
+            const tx = db.transaction(STORE_APP, 'readonly');
+            const store = tx.objectStore(STORE_APP);
+            const req = store.get(key);
+            req.onsuccess = () => resolve(req.result ? req.result.value : null);
+            req.onerror = () => resolve(null);
+        } catch {
+            resolve(null);
+        }
+    });
+}
+
+function setAppValue(key, value) {
+    return new Promise((resolve) => {
+        if (!db) return resolve(false);
+        try {
+            const tx = db.transaction(STORE_APP, 'readwrite');
+            tx.objectStore(STORE_APP).put({ key, value });
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+            tx.onabort = () => resolve(false);
+        } catch {
+            resolve(false);
+        }
+    });
+}
 function setCurrentTitleState(title, hasSelectedSong) {
     const titleEl = document.getElementById('current-title');
     if (!titleEl) return;
@@ -1511,7 +1639,11 @@ async function renameSongInDB(oldName) {
             }
 
             renameInOrder(oldName, newName);
-            renameSongReferencesInPlaysets(oldName, newName);
+            const changedPlaysetIds = renameSongReferencesInPlaysets(oldName, newName) || [];
+            scheduleSongBackupRemoval(oldName);
+            scheduleSongBackup(newName, { includeAudio: true });
+            scheduleAllSongsPlaysetBackup();
+            changedPlaysetIds.forEach(id => schedulePlaysetBackup(id));
             await renderPlaylist();
         };
     }
@@ -1524,7 +1656,10 @@ async function removeSongByName(songName) {
     if (!confirm(`Remove ${songName}?`)) return;
     const ok = await removeSongFromDB(songName);
     if (ok) {
-        removeSongReferencesFromPlaysets(songName);
+        const changedPlaysetIds = removeSongReferencesFromPlaysets(songName) || [];
+        scheduleSongBackupRemoval(songName);
+        scheduleAllSongsPlaysetBackup();
+        changedPlaysetIds.forEach(id => schedulePlaysetBackup(id));
         if (currentFileName === songName) {
             audio.src = "";
             currentFileName = "";
@@ -1949,6 +2084,24 @@ const SPEED_MAP_KEY = 'audio_speed_map_v1';
 const EQ_MAP_KEY = 'audio_eq_map_v1';
 const UI_SETTINGS_KEY = 'audio_ui_settings_v1';
 const PLAY_MODE_KEY = 'audio_play_mode_v1';
+const BACKUP_SETTINGS_KEY = 'audio_backup_settings_v1';
+const BACKUP_METADATA_VERSION = 1;
+const BACKUP_APP_VERSION = '1.2.12';
+const BACKUP_ALL_SONGS_PLAYSET_NAME = 'All songs';
+
+const backupRuntime = {
+    autoEnabled: false,
+    busy: false,
+    currentJob: '',
+    lastSuccessAt: null,
+    lastError: '',
+    folderName: '',
+    folderHandle: null,
+    suspendDepth: 0,
+    timers: new Map(),
+    opChain: Promise.resolve(),
+    playsetFileMap: {}
+};
 
 const DEFAULT_UI_SETTINGS = {
     playsetOneClickSelect: false,
@@ -1982,6 +2135,7 @@ function loadUiSettings() {
 function saveUiSettings(settings) {
     const normalized = normalizeUiSettings(settings);
     localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(normalized));
+    scheduleMetadataBackup();
     return normalized;
 }
 
@@ -2013,6 +2167,7 @@ function loadPlayMode() {
 function savePlayMode(mode) {
     const normalized = normalizePlayMode(mode);
     localStorage.setItem(PLAY_MODE_KEY, normalized);
+    scheduleMetadataBackup();
     return normalized;
 }
 
@@ -2032,6 +2187,7 @@ function getPlaylistOrder() {
 }
 function savePlaylistOrder(order) {
     localStorage.setItem(ORDER_KEY, JSON.stringify(order));
+    scheduleAllSongsPlaysetBackup();
 }
 function reconcileOrderWithSongs(songs) {
     try {
@@ -2589,6 +2745,7 @@ function setPlaybackRate(rate) {
         const map = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
         map[currentFileName] = rate;
         localStorage.setItem(SPEED_MAP_KEY, JSON.stringify(map));
+        scheduleSongBackup(currentFileName, { includeAudio: false });
     }
 }
 
@@ -2837,6 +2994,7 @@ function saveABLoop() {
     const map = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
     map[currentFileName] = abLoop;
     localStorage.setItem(AB_LOOP_MAP_KEY, JSON.stringify(map));
+    scheduleSongBackup(currentFileName, { includeAudio: false });
     updateABUI();
     updateABOverlay();
 }
@@ -3042,6 +3200,10 @@ fileInput.onchange = async () => {
     if (!files.length || !db) return;
 
     await putSongs(files);
+    files.forEach(file => {
+        scheduleSongBackup(file.name, { includeAudio: true });
+    });
+    scheduleAllSongsPlaysetBackup();
     await renderPlaylist();
 };
 
@@ -3211,6 +3373,7 @@ volSlider.oninput = (e) => {
         const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
         volMap[currentFileName] = val;
         localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap));
+        scheduleSongBackup(currentFileName, { includeAudio: false });
     }
 };
 
@@ -3244,6 +3407,7 @@ function applyEqToNodes(e) {
         const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
         eqMap[currentFileName] = { bass: b, mid: m, treble: t };
         localStorage.setItem(EQ_MAP_KEY, JSON.stringify(eqMap));
+        scheduleSongBackup(currentFileName, { includeAudio: false });
     }
 }
 
@@ -3463,6 +3627,7 @@ function setSelectedListId(id) {
         state.selectedListId = ALL_SONGS_LIST_ID;
     }
     savePlaysetState(state);
+    scheduleMetadataBackup();
 }
 
 function getCustomPlaysets() {
@@ -3530,6 +3695,7 @@ function createPlayset(name, initialSongNames = []) {
         updatedAt: now
     });
     savePlaysetState(state);
+    schedulePlaysetBackup(id);
     return id;
 }
 
@@ -3553,6 +3719,7 @@ function updatePlayset(playsetId, patch = {}) {
 
     setDef.updatedAt = Date.now();
     savePlaysetState(state);
+    schedulePlaysetBackup(playsetId);
     return true;
 }
 
@@ -3564,6 +3731,7 @@ function deletePlayset(playsetId) {
     state.customPlaysets = next;
     if (state.selectedListId === playsetId) state.selectedListId = ALL_SONGS_LIST_ID;
     savePlaysetState(state);
+    schedulePlaysetBackupRemoval(playsetId);
     return true;
 }
 
@@ -3579,6 +3747,7 @@ function addSongToPlayset(playsetId, songName) {
     if (!setDef.songNames.includes(songName)) setDef.songNames.push(songName);
     setDef.updatedAt = Date.now();
     savePlaysetState(state);
+    schedulePlaysetBackup(playsetId);
     return true;
 }
 
@@ -3592,6 +3761,7 @@ function removeSongFromPlayset(playsetId, songName) {
     if (before !== setDef.songNames.length) {
         setDef.updatedAt = Date.now();
         savePlaysetState(state);
+        schedulePlaysetBackup(playsetId);
         return true;
     }
     return false;
@@ -3601,35 +3771,47 @@ function renameSongReferencesInPlaysets(oldName, newName) {
     if (!oldName || !newName || oldName === newName) return;
     const state = loadPlaysetState();
     let changed = false;
+    const changedIds = [];
 
     state.customPlaysets = state.customPlaysets.map(setDef => {
         const mapped = setDef.songNames.map(song => (song === oldName ? newName : song));
         const deduped = normalizeSongNameList(mapped);
         if (deduped.length !== setDef.songNames.length || deduped.some((song, idx) => song !== setDef.songNames[idx])) {
             changed = true;
+            changedIds.push(setDef.id);
             return { ...setDef, songNames: deduped, updatedAt: Date.now() };
         }
         return setDef;
     });
 
-    if (changed) savePlaysetState(state);
+    if (changed) {
+        savePlaysetState(state);
+        changedIds.forEach(id => schedulePlaysetBackup(id));
+    }
+    return changedIds;
 }
 
 function removeSongReferencesFromPlaysets(songName) {
     if (!songName) return;
     const state = loadPlaysetState();
     let changed = false;
+    const changedIds = [];
 
     state.customPlaysets = state.customPlaysets.map(setDef => {
         const nextSongs = setDef.songNames.filter(song => song !== songName);
         if (nextSongs.length !== setDef.songNames.length) {
             changed = true;
+            changedIds.push(setDef.id);
             return { ...setDef, songNames: nextSongs, updatedAt: Date.now() };
         }
         return setDef;
     });
 
-    if (changed) savePlaysetState(state);
+    if (changed) {
+        savePlaysetState(state);
+        changedIds.forEach(id => schedulePlaysetBackup(id));
+    }
+    return changedIds;
 }
 
 function moveInCustomPlaysetOrder(playsetId, from, to) {
@@ -3647,6 +3829,7 @@ function moveInCustomPlaysetOrder(playsetId, from, to) {
     setDef.songNames = order;
     setDef.updatedAt = Date.now();
     savePlaysetState(state);
+    schedulePlaysetBackup(playsetId);
 }
 
 function moveInCurrentListOrder(from, to) {
@@ -3713,17 +3896,120 @@ function sanitizeFilename(name, fallback) {
     return cleaned || fallback || 'export';
 }
 
+function buildPlaysetPayload(setDef, { isAllSongs = false } = {}) {
+    return {
+        version: 1,
+        name: isAllSongs ? BACKUP_ALL_SONGS_PLAYSET_NAME : setDef.name,
+        isAllSongs: !!isAllSongs,
+        songNames: (isAllSongs ? getAllSongsOrder() : (setDef.songNames || [])).slice(),
+        createdAt: isAllSongs ? Date.now() : (setDef.createdAt || Date.now()),
+        updatedAt: isAllSongs ? Date.now() : (setDef.updatedAt || Date.now())
+    };
+}
+
+function applyPlaysetPayload(payload, options = {}) {
+    const opts = {
+        allowAllSongsSelection: false,
+        collisionMode: 'ask',
+        renameSuffixProvider: null,
+        ...options
+    };
+
+    const importedName = String(payload?.name || '').trim();
+    if (!importedName) {
+        return { ok: false, reason: 'missing-name' };
+    }
+
+    const isAllSongs = !!payload?.isAllSongs || importedName.toLowerCase() === BACKUP_ALL_SONGS_PLAYSET_NAME.toLowerCase();
+    const allowedSongs = new Set(getAllSongsOrder());
+    const { keptSongNames: filteredSongs, skippedSongNames } = splitPlaysetSongsByAvailability(
+        payload?.songNames,
+        allowedSongs
+    );
+
+    if (isAllSongs) {
+        saveAllSongsOrder(filteredSongs);
+        if (opts.allowAllSongsSelection) {
+            setSelectedListId(ALL_SONGS_LIST_ID);
+        }
+        return {
+            ok: true,
+            action: 'all-songs',
+            name: BACKUP_ALL_SONGS_PLAYSET_NAME,
+            skippedSongNames
+        };
+    }
+
+    const state = loadPlaysetState();
+    const existingByName = state.customPlaysets.find(setDef => setDef.name.trim().toLowerCase() === importedName.toLowerCase());
+
+    if (existingByName) {
+        let mode = opts.collisionMode;
+        if (mode === 'ask') {
+            mode = confirm(`Playset "${importedName}" already exists.\n\nPress OK to overwrite it, or Cancel to import as a copy.`)
+                ? 'overwrite'
+                : 'rename';
+        }
+
+        if (mode === 'overwrite') {
+            existingByName.name = importedName;
+            existingByName.songNames = filteredSongs;
+            existingByName.updatedAt = Date.now();
+            savePlaysetState(state);
+            schedulePlaysetBackup(existingByName.id);
+            return {
+                ok: true,
+                action: 'overwritten',
+                id: existingByName.id,
+                name: importedName,
+                skippedSongNames
+            };
+        }
+
+        const suggestedName = makePlaysetNameUnique(importedName, state.customPlaysets.map(setDef => setDef.name));
+        let finalName = suggestedName;
+
+        if (typeof opts.renameSuffixProvider === 'function') {
+            finalName = opts.renameSuffixProvider(suggestedName, importedName);
+        } else {
+            const userName = prompt('Enter a name for imported playset:', suggestedName);
+            if (userName === null) return { ok: false, reason: 'cancelled' };
+            finalName = String(userName || '').trim();
+        }
+
+        finalName = String(finalName || '').trim();
+        if (!finalName) return { ok: false, reason: 'empty-name' };
+        if (isPlaysetNameTaken(finalName)) {
+            return { ok: false, reason: 'name-taken', name: finalName };
+        }
+
+        const createdId = createPlayset(finalName, filteredSongs);
+        if (!createdId) return { ok: false, reason: 'create-failed' };
+        return {
+            ok: true,
+            action: 'renamed',
+            id: createdId,
+            name: finalName,
+            skippedSongNames
+        };
+    }
+
+    const createdId = createPlayset(importedName, filteredSongs);
+    if (!createdId) return { ok: false, reason: 'create-failed' };
+    return {
+        ok: true,
+        action: 'imported',
+        id: createdId,
+        name: importedName,
+        skippedSongNames
+    };
+}
+
 async function exportPlaysetById(playsetId) {
     const setDef = getCustomPlaysetById(playsetId);
     if (!setDef) return;
 
-    const payload = {
-        version: 1,
-        name: setDef.name,
-        songNames: setDef.songNames.slice(),
-        createdAt: setDef.createdAt || Date.now(),
-        updatedAt: setDef.updatedAt || Date.now()
-    };
+    const payload = buildPlaysetPayload(setDef);
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const fileName = `${sanitizeFilename(setDef.name, 'playset')}.aeps.json`;
@@ -3771,43 +4057,15 @@ async function importPlaysetDefinitionFile(file) {
         return false;
     }
 
-    const allowedSongs = new Set(getAllSongsOrder());
-    const { keptSongNames: filteredSongs, skippedSongNames } = splitPlaysetSongsByAvailability(
-        payload?.songNames,
-        allowedSongs
-    );
-
-    const state = loadPlaysetState();
-    const existingByName = state.customPlaysets.find(setDef => setDef.name.trim().toLowerCase() === importedName.toLowerCase());
-
-    if (existingByName) {
-        const overwrite = confirm(`Playset "${importedName}" already exists.\n\nPress OK to overwrite it, or Cancel to import as a copy.`);
-        if (overwrite) {
-            existingByName.name = importedName;
-            existingByName.songNames = filteredSongs;
-            existingByName.updatedAt = Date.now();
-            savePlaysetState(state);
-            alertSkippedSongs(`Playset \"${importedName}\" imported`, skippedSongNames);
-            return true;
+    const result = applyPlaysetPayload(payload, { collisionMode: 'ask' });
+    if (!result.ok) {
+        if (result.reason === 'name-taken') {
+            alert(`A playset named "${result.name}" already exists.`);
         }
-
-        const suggestedName = makePlaysetNameUnique(importedName, state.customPlaysets.map(setDef => setDef.name));
-        const userName = prompt('Enter a name for imported playset:', suggestedName);
-        if (userName === null) return false;
-        const finalName = String(userName || '').trim();
-        if (!finalName) return false;
-        if (isPlaysetNameTaken(finalName)) {
-            alert(`A playset named "${finalName}" already exists.`);
-            return false;
-        }
-
-        createPlayset(finalName, filteredSongs);
-        alertSkippedSongs(`Playset \"${finalName}\" imported`, skippedSongNames);
-        return true;
+        return false;
     }
 
-    createPlayset(importedName, filteredSongs);
-    alertSkippedSongs(`Playset \"${importedName}\" imported`, skippedSongNames);
+    alertSkippedSongs(`Playset \"${result.name || importedName}\" imported`, result.skippedSongNames || []);
     return true;
 }
 
@@ -4355,6 +4613,7 @@ function saveRawMarkerData(songName, data) {
     }
     map[songName] = data;
     localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
+    scheduleSongBackup(songName, { includeAudio: false });
 }
 
 function getEvents() {
@@ -4972,31 +5231,30 @@ const AEM_MAGIC = new Uint8Array([0x41, 0x45, 0x4D, 0x49]); // "AEMI"
 const AEM_VERSION = 1;
 let lastExportDirHandle = null;
 
-async function packAem(songName) {
-    const song = await getSongByName(songName);
-    if (!song) throw new Error('Song not found: ' + songName);
-
+function buildSongMetadata(songName, songRecord) {
     const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
     const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
     const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
     const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
     const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
 
-    const metadata = {
+    return {
         version: AEM_VERSION,
-        name: song.name,
-        type: song.type || '',
-        lastModified: song.lastModified || Date.now(),
+        name: songRecord.name,
+        type: songRecord.type || '',
+        lastModified: songRecord.lastModified || Date.now(),
         markerData: eventMap[songName] || null,
         volume: volMap[songName] !== undefined ? volMap[songName] : 1.0,
         speed: speedMap[songName] !== undefined ? speedMap[songName] : 1.0,
         abLoop: abMap[songName] || null,
         eq: eqMap[songName] || { bass: 0, mid: 0, treble: 0 }
     };
+}
 
+async function packAemFromParts(metadata, audioBlob) {
     const metaJson = new TextEncoder().encode(JSON.stringify(metadata));
-    const audioBlob = song.data instanceof Blob ? song.data : new Blob([song.data]);
-    const audioBuffer = await audioBlob.arrayBuffer();
+    const sourceBlob = audioBlob instanceof Blob ? audioBlob : new Blob([audioBlob]);
+    const audioBuffer = await sourceBlob.arrayBuffer();
 
     // Layout: [4 magic][1 version][4 meta-length][N meta][rest audio]
     const totalSize = 4 + 1 + 4 + metaJson.byteLength + audioBuffer.byteLength;
@@ -5011,6 +5269,15 @@ async function packAem(songName) {
     bytes.set(new Uint8Array(audioBuffer), 9 + metaJson.byteLength);
 
     return new Blob([output], { type: 'application/octet-stream' });
+}
+
+async function packAem(songName) {
+    const song = await getSongByName(songName);
+    if (!song) throw new Error('Song not found: ' + songName);
+
+    const metadata = buildSongMetadata(songName, song);
+    const audioBlob = song.data instanceof Blob ? song.data : new Blob([song.data]);
+    return packAemFromParts(metadata, audioBlob);
 }
 
 function unpackAem(arrayBuffer) {
@@ -5087,7 +5354,11 @@ async function exportSong(songName) {
     }
 }
 
-async function importSong(file) {
+async function importSong(file, options = {}) {
+    const opts = {
+        refreshUi: true,
+        ...options
+    };
     try {
         const arrayBuffer = await file.arrayBuffer();
         const { metadata, audioBlob } = unpackAem(arrayBuffer);
@@ -5103,9 +5374,9 @@ async function importSong(file) {
                 `"${finalName}" already exists.\n\nEnter a new name, or press OK to use the suggested alternative:`,
                 suggested
             );
-            if (userInput === null) return;
+            if (userInput === null) return { ok: false, reason: 'cancelled' };
             finalName = userInput.trim();
-            if (!finalName) return;
+            if (!finalName) return { ok: false, reason: 'cancelled' };
         }
 
         const audioFile = new File([audioBlob], finalName, {
@@ -5164,9 +5435,644 @@ async function importSong(file) {
             updateMuteUI();
         }
 
-        await renderPlaylist();
+        if (opts.refreshUi) {
+            await renderPlaylist();
+        }
+        scheduleSongBackup(finalName, { includeAudio: true });
+        scheduleAllSongsPlaysetBackup();
+        return { ok: true, reason: 'imported', name: finalName };
     } catch (err) {
         alert('Import failed: ' + err.message);
+        return { ok: false, reason: 'error', error: err };
+    }
+}
+
+function normalizeBackupSettings(raw) {
+    const next = {
+        autoEnabled: false,
+        lastSuccessAt: null,
+        lastError: '',
+        folderName: '',
+        playsetFileMap: {}
+    };
+    if (raw && typeof raw === 'object') {
+        if (typeof raw.autoEnabled === 'boolean') next.autoEnabled = raw.autoEnabled;
+        if (Number.isFinite(raw.lastSuccessAt)) next.lastSuccessAt = raw.lastSuccessAt;
+        if (typeof raw.lastError === 'string') next.lastError = raw.lastError.slice(0, 300);
+        if (typeof raw.folderName === 'string') next.folderName = raw.folderName;
+        if (raw.playsetFileMap && typeof raw.playsetFileMap === 'object') {
+            next.playsetFileMap = { ...raw.playsetFileMap };
+        }
+    }
+    return next;
+}
+
+function loadBackupSettings() {
+    try {
+        return normalizeBackupSettings(JSON.parse(localStorage.getItem(BACKUP_SETTINGS_KEY) || '{}'));
+    } catch {
+        return normalizeBackupSettings(null);
+    }
+}
+
+function saveBackupSettings(partial = {}) {
+    const current = loadBackupSettings();
+    const merged = normalizeBackupSettings({ ...current, ...partial });
+    localStorage.setItem(BACKUP_SETTINGS_KEY, JSON.stringify(merged));
+    backupRuntime.autoEnabled = merged.autoEnabled;
+    backupRuntime.lastSuccessAt = merged.lastSuccessAt;
+    backupRuntime.lastError = merged.lastError;
+    backupRuntime.folderName = merged.folderName;
+    backupRuntime.playsetFileMap = { ...merged.playsetFileMap };
+    return merged;
+}
+
+function formatBackupTime(ts) {
+    if (!Number.isFinite(ts)) return 'never';
+    try {
+        return new Date(ts).toLocaleString();
+    } catch {
+        return 'never';
+    }
+}
+
+function refreshInfoSheetIfOpen() {
+    const sheet = document.getElementById('info-sheet');
+    if (!sheet || !sheet.classList.contains('open')) return;
+    renderInfoSheet();
+    positionInfoSheet();
+}
+
+function setBackupError(message) {
+    backupRuntime.lastError = String(message || '').trim();
+    saveBackupSettings({ lastError: backupRuntime.lastError });
+    refreshInfoSheetIfOpen();
+}
+
+function markBackupSuccess() {
+    backupRuntime.lastSuccessAt = Date.now();
+    backupRuntime.lastError = '';
+    saveBackupSettings({ lastSuccessAt: backupRuntime.lastSuccessAt, lastError: '' });
+    refreshInfoSheetIfOpen();
+}
+
+function getSongBackupFileName(songName) {
+    const safeName = sanitizeFilename(songName, 'song').replace(/\.[^.]+$/, '');
+    return `${safeName}.aem`;
+}
+
+function getPlaysetBackupFileName(payloadName) {
+    const safeName = sanitizeFilename(payloadName, 'playset');
+    return `${safeName}.aeps`;
+}
+
+function getAllSongsPlaysetPayload() {
+    return buildPlaysetPayload({ name: BACKUP_ALL_SONGS_PLAYSET_NAME, songNames: getAllSongsOrder() }, { isAllSongs: true });
+}
+
+async function ensureDirectoryPermission(handle, { request = false } = {}) {
+    if (!handle) return false;
+    try {
+        const mode = { mode: 'readwrite' };
+        const current = await handle.queryPermission(mode);
+        if (current === 'granted') return true;
+        if (!request) return false;
+        return (await handle.requestPermission(mode)) === 'granted';
+    } catch {
+        return false;
+    }
+}
+
+async function persistBackupFolderHandle(handle) {
+    backupRuntime.folderHandle = handle || null;
+    if (handle) {
+        backupRuntime.folderName = handle.name || '';
+        saveBackupSettings({ folderName: backupRuntime.folderName });
+        await setAppValue('backupFolderHandle', handle);
+    } else {
+        backupRuntime.folderName = '';
+        saveBackupSettings({ folderName: '' });
+        await setAppValue('backupFolderHandle', null);
+    }
+    refreshInfoSheetIfOpen();
+}
+
+async function pickBackupFolder() {
+    if (!window.showDirectoryPicker) {
+        alert('This browser does not support folder access for backup.');
+        return null;
+    }
+    try {
+        const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        if (!handle) return null;
+        const granted = await ensureDirectoryPermission(handle, { request: true });
+        if (!granted) {
+            alert('Write permission was not granted.');
+            return null;
+        }
+        await persistBackupFolderHandle(handle);
+        return handle;
+    } catch (err) {
+        if (err && err.name === 'AbortError') return null;
+        setBackupError(err?.message || 'Folder selection failed.');
+        return null;
+    }
+}
+
+async function resolveBackupFolderForAutoEnable() {
+    if (backupRuntime.folderHandle) {
+        if (await ensureDirectoryPermission(backupRuntime.folderHandle, { request: false })) return backupRuntime.folderHandle;
+        if (await ensureDirectoryPermission(backupRuntime.folderHandle, { request: true })) return backupRuntime.folderHandle;
+    }
+
+    const stored = await getAppValue('backupFolderHandle');
+    if (stored) {
+        backupRuntime.folderHandle = stored;
+        if (await ensureDirectoryPermission(stored, { request: false })) {
+            await persistBackupFolderHandle(stored);
+            return stored;
+        }
+        if (await ensureDirectoryPermission(stored, { request: true })) {
+            await persistBackupFolderHandle(stored);
+            return stored;
+        }
+    }
+
+    return pickBackupFolder();
+}
+
+async function resolveBackupFolderForWrite() {
+    if (backupRuntime.folderHandle && await ensureDirectoryPermission(backupRuntime.folderHandle, { request: false })) {
+        return backupRuntime.folderHandle;
+    }
+    if (!backupRuntime.autoEnabled) return pickBackupFolder();
+    if (backupRuntime.folderHandle && await ensureDirectoryPermission(backupRuntime.folderHandle, { request: true })) {
+        return backupRuntime.folderHandle;
+    }
+    return null;
+}
+
+async function writeFileToFolder(folderHandle, fileName, content) {
+    const fileHandle = await folderHandle.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+}
+
+async function removeFileFromFolder(folderHandle, fileName) {
+    try {
+        await folderHandle.removeEntry(fileName);
+    } catch (err) {
+        if (err && err.name !== 'NotFoundError') throw err;
+    }
+}
+
+async function getOrCreateSubFolder(rootHandle, folderName) {
+    return rootHandle.getDirectoryHandle(folderName, { create: true });
+}
+
+async function readSongBackupAudioBlob(folderHandle, songName) {
+    const fileName = getSongBackupFileName(songName);
+    const handle = await folderHandle.getFileHandle(fileName, { create: false });
+    const file = await handle.getFile();
+    const { audioBlob } = unpackAem(await file.arrayBuffer());
+    return audioBlob;
+}
+
+async function writeSongBackup(songName, options = {}) {
+    const opts = { includeAudio: true, folderHandle: null, ...options };
+    const root = opts.folderHandle || await resolveBackupFolderForWrite();
+    if (!root) throw new Error('Backup folder is not set.');
+
+    const songsDir = await getOrCreateSubFolder(root, 'songs');
+    const song = await getSongByName(songName);
+    if (!song) throw new Error(`Song not found: ${songName}`);
+
+    const metadata = buildSongMetadata(songName, song);
+    let outputBlob;
+
+    if (opts.includeAudio) {
+        outputBlob = await packAem(songName);
+    } else {
+        try {
+            const existingAudio = await readSongBackupAudioBlob(songsDir, songName);
+            outputBlob = await packAemFromParts(metadata, existingAudio);
+        } catch {
+            // If no previous backup exists, do one full snapshot once.
+            outputBlob = await packAem(songName);
+        }
+    }
+
+    await writeFileToFolder(songsDir, getSongBackupFileName(songName), outputBlob);
+}
+
+async function removeSongBackup(songName, options = {}) {
+    const root = options.folderHandle || await resolveBackupFolderForWrite();
+    if (!root) return;
+    const songsDir = await getOrCreateSubFolder(root, 'songs');
+    await removeFileFromFolder(songsDir, getSongBackupFileName(songName));
+}
+
+async function writeAllSongsPlaysetBackup(options = {}) {
+    const root = options.folderHandle || await resolveBackupFolderForWrite();
+    if (!root) throw new Error('Backup folder is not set.');
+    const playsetsDir = await getOrCreateSubFolder(root, 'playsets');
+    const payload = getAllSongsPlaysetPayload();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    await writeFileToFolder(playsetsDir, getPlaysetBackupFileName(payload.name), blob);
+}
+
+async function writePlaysetBackup(playsetId, options = {}) {
+    const root = options.folderHandle || await resolveBackupFolderForWrite();
+    if (!root) throw new Error('Backup folder is not set.');
+    if (!playsetId || playsetId === ALL_SONGS_LIST_ID) return;
+
+    const playsetsDir = await getOrCreateSubFolder(root, 'playsets');
+    const setDef = getCustomPlaysetById(playsetId);
+    if (!setDef) return;
+
+    const payload = buildPlaysetPayload(setDef);
+    const newFileName = getPlaysetBackupFileName(payload.name);
+    const oldFileName = backupRuntime.playsetFileMap[playsetId];
+
+    if (oldFileName && oldFileName !== newFileName) {
+        await removeFileFromFolder(playsetsDir, oldFileName);
+    }
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    await writeFileToFolder(playsetsDir, newFileName, blob);
+    backupRuntime.playsetFileMap[playsetId] = newFileName;
+    saveBackupSettings({ playsetFileMap: backupRuntime.playsetFileMap });
+}
+
+async function removePlaysetBackup(playsetId, options = {}) {
+    const root = options.folderHandle || await resolveBackupFolderForWrite();
+    if (!root) return;
+    const playsetsDir = await getOrCreateSubFolder(root, 'playsets');
+    const known = backupRuntime.playsetFileMap[playsetId];
+    if (known) {
+        await removeFileFromFolder(playsetsDir, known);
+        delete backupRuntime.playsetFileMap[playsetId];
+        saveBackupSettings({ playsetFileMap: backupRuntime.playsetFileMap });
+    }
+}
+
+function buildMetadataBackupPayload() {
+    return {
+        version: BACKUP_METADATA_VERSION,
+        exportedAt: Date.now(),
+        appVersion: BACKUP_APP_VERSION,
+        selectedListId: getSelectedListId(),
+        uiTheme: localStorage.getItem('ui-theme') || 'dark',
+        uiSettings: loadUiSettings(),
+        playMode: loadPlayMode()
+    };
+}
+
+async function writeMetadataBackup(options = {}) {
+    const root = options.folderHandle || await resolveBackupFolderForWrite();
+    if (!root) throw new Error('Backup folder is not set.');
+    const payload = buildMetadataBackupPayload();
+    await writeFileToFolder(root, 'metadata-latest.json', new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+}
+
+function createRestoreReport() {
+    return {
+        songsImported: 0,
+        songsSkippedMissingFile: 0,
+        songsSkippedUserChoice: 0,
+        playsetsImported: 0,
+        playsetsOverwritten: 0,
+        playsetsRenamed: 0,
+        playsetsSkippedMissingSongs: [],
+        settingsAppliedKeys: [],
+        warnings: []
+    };
+}
+
+function formatRestoreSummary(report) {
+    const lines = [
+        `Songs imported: ${report.songsImported}`,
+        `Songs missing from backup order: ${report.songsSkippedMissingFile}`,
+        `Songs skipped by user: ${report.songsSkippedUserChoice}`,
+        `Playsets imported: ${report.playsetsImported}`,
+        `Playsets overwritten: ${report.playsetsOverwritten}`,
+        `Playsets imported as renamed: ${report.playsetsRenamed}`,
+        `Settings applied: ${report.settingsAppliedKeys.length ? report.settingsAppliedKeys.join(', ') : 'none'}`
+    ];
+
+    const missingMsgs = report.playsetsSkippedMissingSongs
+        .map(item => buildSkippedSongsMessage(`Playset \"${item.name}\"`, item.skippedSongNames))
+        .filter(Boolean);
+    if (missingMsgs.length) {
+        lines.push('');
+        lines.push(missingMsgs.join('\n\n'));
+    }
+    if (report.warnings.length) {
+        lines.push('');
+        lines.push('Warnings:');
+        report.warnings.slice(0, 10).forEach(w => lines.push(`- ${w}`));
+    }
+    return lines.join('\n');
+}
+
+async function importSongFromFile(file, options = {}) {
+    return importSong(file, options);
+}
+
+async function listDirectoryFiles(dirHandle, filterFn) {
+    const out = [];
+    if (!dirHandle) return out;
+    for await (const [name, handle] of dirHandle.entries()) {
+        if (handle.kind !== 'file') continue;
+        if (typeof filterFn === 'function' && !filterFn(name)) continue;
+        const file = await handle.getFile();
+        out.push({ name, handle, file });
+    }
+    return out;
+}
+
+async function readOptionalJsonFile(dirHandle, fileName) {
+    if (!dirHandle) return null;
+    try {
+        const handle = await dirHandle.getFileHandle(fileName, { create: false });
+        const file = await handle.getFile();
+        return JSON.parse(await file.text());
+    } catch {
+        return null;
+    }
+}
+
+function withAutoBackupSuspended(fn) {
+    backupRuntime.suspendDepth += 1;
+    return Promise.resolve()
+        .then(() => fn())
+        .finally(() => {
+            backupRuntime.suspendDepth = Math.max(0, backupRuntime.suspendDepth - 1);
+        });
+}
+
+async function runBackupJob(label, work, { markSuccessOnDone = true } = {}) {
+    backupRuntime.busy = true;
+    backupRuntime.currentJob = label;
+    refreshInfoSheetIfOpen();
+    try {
+        const result = await work();
+        if (markSuccessOnDone) markBackupSuccess();
+        return result;
+    } catch (err) {
+        setBackupError(err?.message || String(err || 'Backup operation failed.'));
+        throw err;
+    } finally {
+        backupRuntime.busy = false;
+        backupRuntime.currentJob = '';
+        refreshInfoSheetIfOpen();
+    }
+}
+
+function canAutoBackupRun() {
+    return backupRuntime.autoEnabled && !!backupRuntime.folderHandle && backupRuntime.suspendDepth === 0 && !backupRuntime.busy;
+}
+
+function enqueueBackupOperation(label, work) {
+    backupRuntime.opChain = backupRuntime.opChain
+        .then(async () => {
+            if (!canAutoBackupRun()) return;
+            await runBackupJob(label, work, { markSuccessOnDone: true });
+        })
+        .catch(() => {
+            // Errors are surfaced through status line; keep queue alive.
+        });
+    return backupRuntime.opChain;
+}
+
+function scheduleAutoBackup(key, label, work, delayMs = 350) {
+    if (backupRuntime.suspendDepth > 0) return;
+    const existing = backupRuntime.timers.get(key);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+        backupRuntime.timers.delete(key);
+        enqueueBackupOperation(label, work);
+    }, delayMs);
+    backupRuntime.timers.set(key, timer);
+}
+
+async function backupAll() {
+    const folder = await resolveBackupFolderForWrite();
+    if (!folder) throw new Error('Backup folder is not set.');
+
+    const songs = await getAllSongs();
+    const customPlaysets = getCustomPlaysets();
+
+    for (const song of songs) {
+        await writeSongBackup(song.name, { includeAudio: true, folderHandle: folder });
+    }
+    await writeAllSongsPlaysetBackup({ folderHandle: folder });
+    for (const setDef of customPlaysets) {
+        await writePlaysetBackup(setDef.id, { folderHandle: folder });
+    }
+    await writeMetadataBackup({ folderHandle: folder });
+}
+
+async function restoreFromBackupFolder() {
+    const root = await resolveBackupFolderForWrite();
+    if (!root) throw new Error('Backup folder is not set.');
+
+    const report = createRestoreReport();
+
+    const songsDir = await root.getDirectoryHandle('songs', { create: false }).catch(() => null);
+    const playsetsDir = await root.getDirectoryHandle('playsets', { create: false }).catch(() => null);
+    const metadata = await readOptionalJsonFile(root, 'metadata-latest.json');
+
+    const playsetFiles = await listDirectoryFiles(playsetsDir, (name) => /\.aeps(\.json)?$/i.test(name));
+    const parsedPlaysets = [];
+    for (const item of playsetFiles) {
+        try {
+            const payload = JSON.parse(await item.file.text());
+            parsedPlaysets.push({ fileName: item.name, payload });
+        } catch {
+            report.warnings.push(`Skipped invalid playset file: ${item.name}`);
+        }
+    }
+
+    const allSongsPlayset = parsedPlaysets.find(p => p.payload?.isAllSongs || String(p.payload?.name || '').trim().toLowerCase() === BACKUP_ALL_SONGS_PLAYSET_NAME.toLowerCase());
+    const customPlaysets = parsedPlaysets.filter(p => p !== allSongsPlayset);
+
+    const songFiles = await listDirectoryFiles(songsDir, (name) => /\.aem$/i.test(name));
+    const songByMetadataName = new Map();
+    for (const item of songFiles) {
+        try {
+            const { metadata: songMeta } = unpackAem(await item.file.arrayBuffer());
+            const key = String(songMeta?.name || '').trim();
+            if (key && !songByMetadataName.has(key)) {
+                songByMetadataName.set(key, item.file);
+            }
+        } catch {
+            report.warnings.push(`Skipped invalid song backup file: ${item.name}`);
+        }
+    }
+
+    const usedNames = new Set();
+    const orderedSongNames = normalizeSongNameList(allSongsPlayset?.payload?.songNames || []);
+
+    await withAutoBackupSuspended(async () => {
+        for (const name of orderedSongNames) {
+            const file = songByMetadataName.get(name);
+            if (!file) {
+                report.songsSkippedMissingFile += 1;
+                continue;
+            }
+            const imported = await importSongFromFile(file, { refreshUi: false });
+            if (imported?.ok) report.songsImported += 1;
+            else if (imported?.reason === 'cancelled') report.songsSkippedUserChoice += 1;
+            usedNames.add(name);
+        }
+
+        for (const [name, file] of songByMetadataName.entries()) {
+            if (usedNames.has(name)) continue;
+            const imported = await importSongFromFile(file, { refreshUi: false });
+            if (imported?.ok) report.songsImported += 1;
+            else if (imported?.reason === 'cancelled') report.songsSkippedUserChoice += 1;
+        }
+
+        if (allSongsPlayset) {
+            const r = applyPlaysetPayload(allSongsPlayset.payload, {
+                allowAllSongsSelection: true,
+                collisionMode: 'overwrite'
+            });
+            if (!r.ok) report.warnings.push('Failed to apply All songs order payload.');
+        }
+
+        for (const item of customPlaysets) {
+            const r = applyPlaysetPayload(item.payload, { collisionMode: 'ask' });
+            if (!r.ok) {
+                if (r.reason !== 'cancelled') report.warnings.push(`Failed to import playset from ${item.fileName}`);
+                continue;
+            }
+
+            if (r.action === 'imported') report.playsetsImported += 1;
+            else if (r.action === 'overwritten') report.playsetsOverwritten += 1;
+            else if (r.action === 'renamed') report.playsetsRenamed += 1;
+
+            if (Array.isArray(r.skippedSongNames) && r.skippedSongNames.length) {
+                report.playsetsSkippedMissingSongs.push({
+                    name: r.name || String(item.payload?.name || 'Imported playset'),
+                    skippedSongNames: r.skippedSongNames
+                });
+            }
+        }
+
+        if (metadata && typeof metadata === 'object') {
+            if (typeof metadata.uiTheme === 'string') {
+                localStorage.setItem('ui-theme', metadata.uiTheme);
+                applyTheme(metadata.uiTheme);
+                report.settingsAppliedKeys.push('uiTheme');
+            }
+            if (metadata.uiSettings && typeof metadata.uiSettings === 'object') {
+                saveUiSettings(metadata.uiSettings);
+                report.settingsAppliedKeys.push('uiSettings');
+            }
+            if (typeof metadata.playMode === 'string') {
+                playMode = savePlayMode(metadata.playMode);
+                updatePlayModeUI();
+                report.settingsAppliedKeys.push('playMode');
+            }
+            if (typeof metadata.selectedListId === 'string') {
+                setSelectedListId(metadata.selectedListId);
+                report.settingsAppliedKeys.push('selectedListId');
+            }
+        }
+    });
+
+    updatePlaysetLabel();
+    renderPlaysetSheet();
+    await renderPlaylist();
+    return report;
+}
+
+async function setAutoBackupEnabled(nextEnabled) {
+    if (!nextEnabled) {
+        saveBackupSettings({ autoEnabled: false });
+        refreshInfoSheetIfOpen();
+        return true;
+    }
+
+    const folder = await resolveBackupFolderForAutoEnable();
+    if (!folder) {
+        saveBackupSettings({ autoEnabled: false });
+        setBackupError('Auto-backup not enabled: no writable folder selected.');
+        return false;
+    }
+
+    saveBackupSettings({ autoEnabled: true, folderName: folder.name || backupRuntime.folderName });
+    refreshInfoSheetIfOpen();
+    return true;
+}
+
+function scheduleMetadataBackup() {
+    scheduleAutoBackup('meta', 'Auto backup: metadata', async () => {
+        await writeMetadataBackup();
+    });
+}
+
+function scheduleSongBackup(songName, options = {}) {
+    if (!songName) return;
+    const includeAudio = !!options.includeAudio;
+    const key = `song:${songName}`;
+    const label = includeAudio ? `Auto backup: song ${songName}` : `Auto backup: song metadata ${songName}`;
+    scheduleAutoBackup(key, label, async () => {
+        await writeSongBackup(songName, { includeAudio });
+    });
+}
+
+function scheduleSongBackupRemoval(songName) {
+    if (!songName) return;
+    scheduleAutoBackup(`song-del:${songName}`, `Auto backup: remove song ${songName}`, async () => {
+        await removeSongBackup(songName);
+    });
+}
+
+function scheduleAllSongsPlaysetBackup() {
+    scheduleAutoBackup('playset:all-songs', 'Auto backup: all songs order', async () => {
+        await writeAllSongsPlaysetBackup();
+    });
+}
+
+function schedulePlaysetBackup(playsetId) {
+    if (!playsetId || playsetId === ALL_SONGS_LIST_ID) return;
+    scheduleAutoBackup(`playset:${playsetId}`, `Auto backup: playset ${playsetId}`, async () => {
+        await writePlaysetBackup(playsetId);
+    });
+}
+
+function schedulePlaysetBackupRemoval(playsetId) {
+    if (!playsetId || playsetId === ALL_SONGS_LIST_ID) return;
+    scheduleAutoBackup(`playset-del:${playsetId}`, `Auto backup: remove playset ${playsetId}`, async () => {
+        await removePlaysetBackup(playsetId);
+    });
+}
+
+async function initBackupRuntime() {
+    const settings = loadBackupSettings();
+    backupRuntime.autoEnabled = settings.autoEnabled;
+    backupRuntime.lastSuccessAt = settings.lastSuccessAt;
+    backupRuntime.lastError = settings.lastError;
+    backupRuntime.folderName = settings.folderName;
+    backupRuntime.playsetFileMap = { ...settings.playsetFileMap };
+
+    const storedHandle = await getAppValue('backupFolderHandle');
+    if (storedHandle) {
+        backupRuntime.folderHandle = storedHandle;
+        if (!backupRuntime.folderName) {
+            backupRuntime.folderName = storedHandle.name || '';
+            saveBackupSettings({ folderName: backupRuntime.folderName });
+        }
+    }
+
+    // Keep auto-backup enabled only when a folder is still reachable.
+    if (backupRuntime.autoEnabled && !backupRuntime.folderHandle) {
+        backupRuntime.autoEnabled = false;
+        saveBackupSettings({ autoEnabled: false });
     }
 }
 
@@ -5182,6 +6088,7 @@ importInput.onchange = async () => {
 /* ============================== Initialize DB ============================= */
 (async function init() {
     db = await openDB();
+    await initBackupRuntime();
     playMode = loadPlayMode();
     updatePlayModeUI();
     const songs = await getAllSongs();
