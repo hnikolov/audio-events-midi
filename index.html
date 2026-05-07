@@ -838,6 +838,16 @@
             font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--text-muted); font-weight: 500;
         }
         .speed-slider-container input[type="range"] { flex: 1; margin: 0; padding: 0; accent-color: var(--accent); }
+
+        .pitch-chips-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 8px; margin-top: 14px;
+        }
+        .pitch-chip-icon {
+            width: 32px;
+            height: 28px;
+            display: block;
+        }
         
         .speed-chips-grid {
             display: grid; grid-template-columns: repeat(5, 1fr);
@@ -1167,9 +1177,27 @@
 <!-- Speed Bottom Sheet -->
 <div id="speedPopup" class="action-sheet">
     <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary)">Playback Speed</h3>
+        <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary)">Playback Speed and Pitch</h3>
         <button class="menu-btn" onclick="toggleSpeedMenu()" aria-label="Close" style="padding:6px">
             <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    </div>
+
+    <div class="pitch-chips-grid" aria-label="Pitch shift">
+        <button class="speed-chip pitch-chip" data-pitch-semitones="-2" onclick="setPitchShift(-2)" aria-label="Minus one tone">
+            <svg class="pitch-chip-icon" viewBox="0 0 24 16" aria-hidden="true"><text x="12" y="12" text-anchor="middle" font-size="15" font-weight="400" fill="currentColor">♭♭</text></svg>
+        </button>
+        <button class="speed-chip pitch-chip" data-pitch-semitones="-1" onclick="setPitchShift(-1)" aria-label="Minus one semitone">
+            <svg class="pitch-chip-icon" viewBox="0 0 24 16" aria-hidden="true"><text x="12" y="12" text-anchor="middle" font-size="15" font-weight="400" fill="currentColor">♭</text></svg>
+        </button>
+        <button class="speed-chip pitch-chip active" data-pitch-semitones="0" onclick="setPlaybackRate(1.00)" aria-label="Natural key">
+            <svg class="pitch-chip-icon" viewBox="0 0 24 16" aria-hidden="true"><text x="12" y="12" text-anchor="middle" font-size="16" font-weight="500" fill="currentColor">♮</text></svg>
+        </button>
+        <button class="speed-chip pitch-chip" data-pitch-semitones="1" onclick="setPitchShift(1)" aria-label="Plus one semitone">
+            <svg class="pitch-chip-icon" viewBox="0 0 24 16" aria-hidden="true"><text x="12" y="12" text-anchor="middle" font-size="15" font-weight="200" fill="currentColor">♯</text></svg>
+        </button>
+        <button class="speed-chip pitch-chip" data-pitch-semitones="2" onclick="setPitchShift(2)" aria-label="Plus one tone">
+            <svg class="pitch-chip-icon" viewBox="0 0 24 16" aria-hidden="true"><text x="12" y="12" text-anchor="middle" font-size="15" font-weight="200" fill="currentColor">♯♯</text></svg>
         </button>
     </div>
     
@@ -1180,17 +1208,17 @@
     
     <div class="speed-chips-grid">
         <!-- Row 1 & 2 -->
-        <button class="speed-chip" onclick="setPlaybackRate(0.60)">0.60</button>
-        <button class="speed-chip" onclick="setPlaybackRate(0.70)">0.70</button>
-        <button class="speed-chip center-hero" id="speed-chip-1" onclick="setPlaybackRate(1.00)">1.00</button>
-        <button class="speed-chip" onclick="setPlaybackRate(1.10)">1.10</button>
-        <button class="speed-chip" onclick="setPlaybackRate(1.25)">1.25</button>
+        <button class="speed-chip speed-rate-chip" data-speed-rate="0.60" onclick="setPlaybackRate(0.60)">0.60</button>
+        <button class="speed-chip speed-rate-chip" data-speed-rate="0.70" onclick="setPlaybackRate(0.70)">0.70</button>
+        <button class="speed-chip speed-rate-chip center-hero" id="speed-chip-1" data-speed-rate="1.00" onclick="setPlaybackRate(1.00)">1.00</button>
+        <button class="speed-chip speed-rate-chip" data-speed-rate="1.10" onclick="setPlaybackRate(1.10)">1.10</button>
+        <button class="speed-chip speed-rate-chip" data-speed-rate="1.25" onclick="setPlaybackRate(1.25)">1.25</button>
 
-        <button class="speed-chip" onclick="setPlaybackRate(0.80)">0.80</button>
-        <button class="speed-chip" onclick="setPlaybackRate(0.90)">0.90</button>
+        <button class="speed-chip speed-rate-chip" data-speed-rate="0.80" onclick="setPlaybackRate(0.80)">0.80</button>
+        <button class="speed-chip speed-rate-chip" data-speed-rate="0.90" onclick="setPlaybackRate(0.90)">0.90</button>
         <!-- Center hero spans here -->
-        <button class="speed-chip" onclick="setPlaybackRate(1.50)">1.50</button>
-        <button class="speed-chip" onclick="setPlaybackRate(1.75)">1.75</button>
+        <button class="speed-chip speed-rate-chip" data-speed-rate="1.50" onclick="setPlaybackRate(1.50)">1.50</button>
+        <button class="speed-chip speed-rate-chip" data-speed-rate="1.75" onclick="setPlaybackRate(1.75)">1.75</button>
     </div>
 </div>
 
@@ -2007,6 +2035,14 @@ const EPS_RECONCILE = 0.05;
 const EPS_LOOP_B    = 0.02;
 const CC_FLASH_MS   = 350;
 
+const PITCH_SHIFT_RATES = {
+    '-2': 0.891,
+    '-1': 0.944,
+    '0': 1.0,
+    '1': 1.059,
+    '2': 1.122
+};
+
 const DEFAULT_DECIMALS = 1; // 1 => m:ss.S
 
 /* =============================== DOM refs ================================ */
@@ -2196,6 +2232,28 @@ let scrubTargetTime = null;
 
 let audioCtx = null;
 let audioGraph = null;
+let isPitchShiftMode = false;
+let currentPitchSemitones = 0;
+
+function applyPreservesPitch(enabled) {
+    audio.preservesPitch = enabled;
+    audio.webkitPreservesPitch = enabled;
+    audio.mozPreservesPitch = enabled;
+}
+
+function updateSpeedPitchChipState(rate) {
+    document.querySelectorAll('.speed-rate-chip').forEach(chip => {
+        const chipRate = parseFloat(chip.dataset.speedRate || 'NaN');
+        chip.classList.toggle('active', !isPitchShiftMode && Math.abs(chipRate - rate) < 0.001);
+    });
+    document.querySelectorAll('.pitch-chip').forEach(chip => {
+        const semitones = parseInt(chip.dataset.pitchSemitones || '0', 10);
+        const shouldBeActive = isPitchShiftMode
+            ? semitones === currentPitchSemitones
+            : semitones === 0;
+        chip.classList.toggle('active', shouldBeActive);
+    });
+}
 
 function initWebAudio() {
     if (audioCtx) return;
@@ -2638,6 +2696,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setPlaybackRate(val);
         });
     }
+    updateSpeedPitchChipState(audio.playbackRate || 1.0);
     updatePlaysetLabel();
     renderPlaysetSheet();
 });
@@ -2655,7 +2714,18 @@ function toggleSpeedMenu() {
     }
 }
 
-function setPlaybackRate(rate) {
+function setPlaybackRate(rate, options = {}) {
+    const {
+        preservePitch = true,
+        isPitchShift = false,
+        pitchSemitones = 0,
+        persistRate = true
+    } = options;
+
+    applyPreservesPitch(!!preservePitch);
+    isPitchShiftMode = !!isPitchShift;
+    currentPitchSemitones = Number.isFinite(pitchSemitones) ? pitchSemitones : 0;
+
     audio.playbackRate = rate;
     const valText = document.getElementById('speedValueText');
     if (valText) {
@@ -2671,20 +2741,26 @@ function setPlaybackRate(rate) {
     if (sliderVal) sliderVal.textContent = rate.toFixed(2);
     
     document.getElementById('speed-slider').value = rate;
-    
-    document.querySelectorAll('.speed-chip').forEach(chip => {
-        if (parseFloat(chip.textContent) === rate) {
-            chip.classList.add('active');
-        } else {
-            chip.classList.remove('active');
-        }
-    });
 
-    if (currentFileName) {
+    updateSpeedPitchChipState(rate);
+
+    if (persistRate && currentFileName) {
         const map = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
         map[currentFileName] = rate;
         localStorage.setItem(SPEED_MAP_KEY, JSON.stringify(map));
     }
+}
+
+function setPitchShift(semitones) {
+    const key = String(semitones);
+    if (!Object.prototype.hasOwnProperty.call(PITCH_SHIFT_RATES, key)) return;
+    const rate = PITCH_SHIFT_RATES[key];
+    setPlaybackRate(rate, {
+        preservePitch: false,
+        isPitchShift: true,
+        pitchSemitones: semitones,
+        persistRate: false
+    });
 }
 
 document.addEventListener('pointerdown', (e) => {
