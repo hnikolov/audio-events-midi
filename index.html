@@ -1085,7 +1085,7 @@
                                 </div>
                                 <div id="playlist-header-actions" style="display:flex;gap:8px;align-items:center">
                   <input type="file" id="importInput" accept=".aem" style="display:none">
-                  <label for="importInput" class="btn-primary" style="cursor:pointer;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border)">
+                  <label id="importSongsBtn" for="importInput" class="btn-primary" style="cursor:pointer;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border)">
                     <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   </label>
                   <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
@@ -4055,7 +4055,10 @@ async function exportPlaysetById(playsetId) {
                 suggestedName: fileName,
                 types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps'] } }]
             };
+            const startIn = getPickerStartIn(lastExportPickerHandle);
+            if (startIn) opts.startIn = startIn;
             const handle = await window.showSaveFilePicker(opts);
+            lastExportPickerHandle = handle;
             const writable = await handle.createWritable();
             await writable.write(blob);
             await writable.close();
@@ -4159,11 +4162,15 @@ function ensurePlaysetImportInput() {
 async function promptImportPlaysetDefinition() {
     if (window.showOpenFilePicker) {
         try {
-            const [handle] = await window.showOpenFilePicker({
+            const opts = {
                 multiple: false,
                 types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps'] } }]
-            });
+            };
+            const startIn = getPickerStartIn(lastImportPickerHandle);
+            if (startIn) opts.startIn = startIn;
+            const [handle] = await window.showOpenFilePicker(opts);
             if (!handle) return;
+            lastImportPickerHandle = handle;
             const file = await handle.getFile();
             const imported = await importPlaysetDefinitionFile(file);
             if (imported) {
@@ -5292,7 +5299,13 @@ document.querySelectorAll('.tab-bar .tab').forEach((label, i) => {
 const AEM_MAGIC = new Uint8Array([0x41, 0x45, 0x4D, 0x49]); // "AEMI"
 const AEM_VERSION = 1;
 let lastExportDirHandle = null;
+let lastExportPickerHandle = null;
+let lastImportPickerHandle = null;
 let exportNoticeTimer = null;
+
+function getPickerStartIn(rememberedHandle) {
+    return rememberedHandle || lastExportDirHandle || undefined;
+}
 
 function getExportFolderName() {
     return (lastExportDirHandle && typeof lastExportDirHandle.name === 'string')
@@ -5456,7 +5469,10 @@ async function exportSong(songName) {
                     suggestedName: fileName,
                     types: [{ description: 'Audio Events MIDI file', accept: { 'application/octet-stream': ['.aem'] } }]
                 };
+                const startIn = getPickerStartIn(lastExportPickerHandle);
+                if (startIn) opts.startIn = startIn;
                 const handle = await window.showSaveFilePicker(opts);
+                lastExportPickerHandle = handle;
                 const writable = await handle.createWritable();
                 await writable.write(blob);
                 await writable.close();
@@ -5564,6 +5580,39 @@ async function importSong(file) {
 }
 
 const importInput = document.getElementById('importInput');
+const importSongsBtn = document.getElementById('importSongsBtn');
+
+async function promptImportSongFile() {
+    if (window.showOpenFilePicker) {
+        try {
+            const opts = {
+                multiple: false,
+                types: [{ description: 'Audio Events MIDI file', accept: { 'application/octet-stream': ['.aem'] } }]
+            };
+            const startIn = getPickerStartIn(lastImportPickerHandle);
+            if (startIn) opts.startIn = startIn;
+            const [handle] = await window.showOpenFilePicker(opts);
+            if (!handle) return;
+            lastImportPickerHandle = handle;
+            const file = await handle.getFile();
+            if (!file || !db) return;
+            await importSong(file);
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+        }
+    }
+    importInput.click();
+}
+
+if (importSongsBtn) {
+    importSongsBtn.addEventListener('click', (e) => {
+        if (!window.showOpenFilePicker) return;
+        e.preventDefault();
+        promptImportSongFile();
+    });
+}
+
 importInput.addEventListener('click', () => { importInput.value = ''; });
 importInput.onchange = async () => {
     const file = importInput.files?.[0];
