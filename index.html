@@ -50,6 +50,9 @@
             --mobile-topbar-height: 0px;
             --playlist-header-min-height: 58px;
             --markers-header-min-height: 50px;
+            --info-action-btn-width: 106px;
+            --info-action-icon-size: 16px;
+            --overlay-sheet-top-offset: calc(env(safe-area-inset-top, 0px) + 44px);
         }
 
         /* ===== LIGHT THEME ===== */
@@ -218,13 +221,30 @@
         }
         #ioBusyDialog {
             position: fixed;
-            top: calc(env(safe-area-inset-top, 0px) + 12px);
-            left: 50%;
-            transform: translateX(-50%);
+            top: var(--overlay-sheet-top-offset);
+            left: 0;
+            right: 0;
             margin: 0;
-            width: min(92vw, 300px);
-            padding: 10px 12px;
+            width: 100vw;
+            max-width: none;
+            padding: 10px 14px 12px;
+            border: none;
+            border-bottom: 1px solid var(--border);
+            border-radius: 0;
+            border-top-left-radius: 0;
+            border-top-right-radius: 0;
+            border-bottom-left-radius: var(--radius-lg);
+            border-bottom-right-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            box-shadow: var(--shadow-lg);
             z-index: 5000;
+            transform: translateY(calc(-100% - 10px));
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
+        }
+        #ioBusyDialog[open].show {
+            transform: translateY(0);
+            opacity: 1;
         }
         #ioBusyDialog::backdrop {
             background: rgba(0, 0, 0, 0.25);
@@ -233,6 +253,8 @@
         #ioBusyProgress {
             accent-color: var(--accent);
             color: var(--accent);
+            display: block;
+            width: 100%;
         }
 
         /* ===== PLAYLIST CARD ===== */
@@ -582,11 +604,28 @@
             flex-shrink: 0;
         }
         .info-sheet-content .info-action-btn {
-            width: auto;
-            min-width: 82px;
+            width: var(--info-action-btn-width);
+            min-width: var(--info-action-btn-width);
             padding: 6px 10px;
             font-size: 0.74rem;
             line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 6px;
+        }
+        .info-sheet-content .info-action-icon {
+            width: var(--info-action-icon-size);
+            height: var(--info-action-icon-size);
+            color: var(--text-muted);
+            flex: 0 0 auto;
+            display: inline-block;
+        }
+        .info-sheet-content .info-action-btn.is-active .info-action-icon {
+            color: var(--accent);
+        }
+        .info-sheet-content .info-action-btn.has-folder .info-action-icon {
+            color: var(--amber);
         }
         .info-sheet-content .info-action-btn:disabled {
             opacity: 0.45;
@@ -609,8 +648,8 @@
             color: var(--danger);
         }
         .info-sheet-content .info-clear-btn svg {
-            width: 14px;
-            height: 14px;
+            width: 18px;
+            height: 18px;
             display: block;
         }
         .info-sheet-content .info-setting-row input[type="checkbox"] {
@@ -625,24 +664,31 @@
         }
         .export-notice {
             position: fixed;
-            left: 50%;
-            bottom: calc(var(--mobile-tab-height) + var(--mobile-playerbar-height) + env(safe-area-inset-bottom, 0px) + 10px);
-            transform: translateX(-50%);
-            max-width: min(92vw, 460px);
-            padding: 8px 12px;
-            border-radius: var(--radius-full);
+            top: var(--overlay-sheet-top-offset);
+            left: 0;
+            right: 0;
+            width: 100vw;
+            max-width: none;
+            min-height: 44px;
+            padding: 10px 14px 12px;
             border: 1px solid var(--border);
+            border-bottom-left-radius: var(--radius-lg);
+            border-bottom-right-radius: var(--radius-lg);
             background: var(--bg-elevated);
             color: var(--text-primary);
-            font-size: 0.8rem;
             box-shadow: var(--shadow-lg);
+            font-size: 0.86rem;
+            font-weight: 600;
+            line-height: 1.3;
+            text-align: center;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.15s ease;
             z-index: 4200;
-            text-align: center;
+            transform: translateY(calc(-100% - 10px));
+            transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.22s ease;
         }
         .export-notice.show {
+            transform: translateY(0);
             opacity: 1;
         }
         .info-sheet-content .info-vendor:first-of-type { margin-top: 4px; }
@@ -1118,9 +1164,9 @@
 </dialog>
 
 <dialog id="ioBusyDialog" aria-live="polite" aria-label="Operation in progress">
-    <div style="display:flex;flex-direction:column;gap:10px;align-items:center;min-width:220px;">
-        <progress id="ioBusyProgress" style="width:100%;height:12px;"></progress>
-        <p id="ioBusyLabel" style="font-size:0.9rem;color:var(--text-secondary);margin:0;">Working...</p>
+    <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;width:100%;">
+        <progress id="ioBusyProgress" style="height:12px;"></progress>
+        <p id="ioBusyLabel" style="font-size:0.86rem;color:var(--text-secondary);margin:0;text-align:center;">Working...</p>
     </div>
 </dialog>
 
@@ -1398,6 +1444,48 @@ function toggleTheme() {
 applyTheme(localStorage.getItem('ui-theme') || 'dark');
 
 /* -------------------------------- INFO POPUP ----------------------------- */
+function updateInfoActionButtonStates(sheet = document.getElementById('info-sheet')) {
+    if (!sheet) return;
+
+    const overwriteSongsOnExportToggle = sheet.querySelector('#settingOverwriteSongsOnExport');
+    const overwriteSongsOnImportToggle = sheet.querySelector('#settingOverwriteSongsOnImport');
+    const overwritePlaysetsOnExportToggle = sheet.querySelector('#settingOverwritePlaysetsOnExport');
+    const overwritePlaysetsOnImportToggle = sheet.querySelector('#settingOverwritePlaysetsOnImport');
+
+    const bulkExportSongsBtn = sheet.querySelector('#bulkExportSongsBtn');
+    if (bulkExportSongsBtn && overwriteSongsOnExportToggle) {
+        const isEnabled = !!overwriteSongsOnExportToggle.checked;
+        bulkExportSongsBtn.disabled = !isEnabled;
+        bulkExportSongsBtn.classList.toggle('is-active', isEnabled);
+    }
+
+    const bulkImportSongsBtn = sheet.querySelector('#bulkImportSongsBtn');
+    if (bulkImportSongsBtn && overwriteSongsOnImportToggle) {
+        const isEnabled = !!overwriteSongsOnImportToggle.checked;
+        bulkImportSongsBtn.disabled = !isEnabled;
+        bulkImportSongsBtn.classList.toggle('is-active', isEnabled);
+    }
+
+    const bulkExportPlaysetsBtn = sheet.querySelector('#bulkExportPlaysetsBtn');
+    if (bulkExportPlaysetsBtn && overwritePlaysetsOnExportToggle) {
+        const isEnabled = !!overwritePlaysetsOnExportToggle.checked;
+        bulkExportPlaysetsBtn.disabled = !isEnabled;
+        bulkExportPlaysetsBtn.classList.toggle('is-active', isEnabled);
+    }
+
+    const bulkImportPlaysetsBtn = sheet.querySelector('#bulkImportPlaysetsBtn');
+    if (bulkImportPlaysetsBtn && overwritePlaysetsOnImportToggle) {
+        const isEnabled = !!overwritePlaysetsOnImportToggle.checked;
+        bulkImportPlaysetsBtn.disabled = !isEnabled;
+        bulkImportPlaysetsBtn.classList.toggle('is-active', isEnabled);
+    }
+
+    const changeExportFolderBtn = sheet.querySelector('#changeExportFolderBtn');
+    if (changeExportFolderBtn) {
+        changeExportFolderBtn.classList.toggle('has-folder', !!getExportFolderName());
+    }
+}
+
 function renderInfoSheet() {
     const sheet = document.getElementById('info-sheet');
     if (!sheet) return;
@@ -1406,7 +1494,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.2.14</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.1</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -1420,35 +1508,35 @@ function renderInfoSheet() {
             <label class="info-setting-row" for="settingOverwriteSongsOnExport">
                 <span class="info-setting-label">Overwrite songs on export</span>
                 <span class="info-setting-actions">
-                    <button type="button" id="bulkExportSongsBtn" class="speed-chip info-action-btn" ${settings.overwriteSongsOnExport ? '' : 'disabled'}>Export all</button>
+                    <button type="button" id="bulkExportSongsBtn" class="speed-chip info-action-btn ${settings.overwriteSongsOnExport ? 'is-active' : ''}" ${settings.overwriteSongsOnExport ? '' : 'disabled'}><svg class="info-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 8 12 3 17 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>Export all</button>
                     <input type="checkbox" id="settingOverwriteSongsOnExport" ${settings.overwriteSongsOnExport ? 'checked' : ''}>
                 </span>
             </label>
             <label class="info-setting-row" for="settingOverwriteSongsOnImport">
                 <span class="info-setting-label">Overwrite songs on import</span>
                 <span class="info-setting-actions">
-                    <button type="button" id="bulkImportSongsBtn" class="speed-chip info-action-btn" ${settings.overwriteSongsOnImport ? '' : 'disabled'}>Import all</button>
+                    <button type="button" id="bulkImportSongsBtn" class="speed-chip info-action-btn ${settings.overwriteSongsOnImport ? 'is-active' : ''}" ${settings.overwriteSongsOnImport ? '' : 'disabled'}><svg class="info-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 8 12 13 17 8" /><line x1="12" y1="13" x2="12" y2="3" /></svg>Import all</button>
                     <input type="checkbox" id="settingOverwriteSongsOnImport" ${settings.overwriteSongsOnImport ? 'checked' : ''}>
                 </span>
             </label>
             <label class="info-setting-row" for="settingOverwritePlaysetsOnExport">
                 <span class="info-setting-label">Overwrite playsets on export</span>
                 <span class="info-setting-actions">
-                    <button type="button" id="bulkExportPlaysetsBtn" class="speed-chip info-action-btn" ${settings.overwritePlaysetsOnExport ? '' : 'disabled'}>Export all</button>
+                    <button type="button" id="bulkExportPlaysetsBtn" class="speed-chip info-action-btn ${settings.overwritePlaysetsOnExport ? 'is-active' : ''}" ${settings.overwritePlaysetsOnExport ? '' : 'disabled'}><svg class="info-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 8 12 3 17 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>Export all</button>
                     <input type="checkbox" id="settingOverwritePlaysetsOnExport" ${settings.overwritePlaysetsOnExport ? 'checked' : ''}>
                 </span>
             </label>
             <label class="info-setting-row" for="settingOverwritePlaysetsOnImport">
                 <span class="info-setting-label">Overwrite playsets on import</span>
                 <span class="info-setting-actions">
-                    <button type="button" id="bulkImportPlaysetsBtn" class="speed-chip info-action-btn" ${settings.overwritePlaysetsOnImport ? '' : 'disabled'}>Import all</button>
+                    <button type="button" id="bulkImportPlaysetsBtn" class="speed-chip info-action-btn ${settings.overwritePlaysetsOnImport ? 'is-active' : ''}" ${settings.overwritePlaysetsOnImport ? '' : 'disabled'}><svg class="info-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 8 12 13 17 8" /><line x1="12" y1="13" x2="12" y2="3" /></svg>Import all</button>
                     <input type="checkbox" id="settingOverwritePlaysetsOnImport" ${settings.overwritePlaysetsOnImport ? 'checked' : ''}>
                 </span>
             </label>
             <div class="info-setting-row">
                 <span class="info-setting-label">Folder: <span id="exportFolderValue" class="info-folder-value"></span></span>
                 <span class="info-setting-actions">
-                    <button type="button" id="changeExportFolderBtn" class="speed-chip info-action-btn">Change</button>
+                    <button type="button" id="changeExportFolderBtn" class="speed-chip info-action-btn ${hasExportFolder ? 'has-folder' : ''}"><svg class="info-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Change</button>
                     <button type="button" id="clearExportFolderBtn" class="info-clear-btn ${hasExportFolder ? 'has-folder' : ''}" aria-label="Clear folder" title="Clear folder"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </span>
             </div>
@@ -1484,7 +1572,7 @@ function renderInfoSheet() {
     if (overwriteSongsOnExportToggle) {
         overwriteSongsOnExportToggle.addEventListener('change', () => {
             updateUiSetting('overwriteSongsOnExport', overwriteSongsOnExportToggle.checked);
-            renderInfoSheet();
+            updateInfoActionButtonStates(sheet);
         });
     }
 
@@ -1492,7 +1580,7 @@ function renderInfoSheet() {
     if (overwriteSongsOnImportToggle) {
         overwriteSongsOnImportToggle.addEventListener('change', () => {
             updateUiSetting('overwriteSongsOnImport', overwriteSongsOnImportToggle.checked);
-            renderInfoSheet();
+            updateInfoActionButtonStates(sheet);
         });
     }
 
@@ -1500,7 +1588,7 @@ function renderInfoSheet() {
     if (overwritePlaysetsOnExportToggle) {
         overwritePlaysetsOnExportToggle.addEventListener('change', () => {
             updateUiSetting('overwritePlaysetsOnExport', overwritePlaysetsOnExportToggle.checked);
-            renderInfoSheet();
+            updateInfoActionButtonStates(sheet);
         });
     }
 
@@ -1508,7 +1596,7 @@ function renderInfoSheet() {
     if (overwritePlaysetsOnImportToggle) {
         overwritePlaysetsOnImportToggle.addEventListener('change', () => {
             updateUiSetting('overwritePlaysetsOnImport', overwritePlaysetsOnImportToggle.checked);
-            renderInfoSheet();
+            updateInfoActionButtonStates(sheet);
         });
     }
 
@@ -1562,6 +1650,8 @@ function renderInfoSheet() {
             clearExportFolderSelection();
         });
     }
+
+    updateInfoActionButtonStates(sheet);
 }
 
 function positionInfoSheet() {
@@ -5416,6 +5506,7 @@ let lastExportPickerHandle = null;
 let lastImportPickerHandle = null;
 let exportNoticeTimer = null;
 let ioBusyDepth = 0;
+let ioBusyCloseTimer = null;
 
 function getPickerStartIn(rememberedHandle) {
     return rememberedHandle || lastExportDirHandle || undefined;
@@ -5427,7 +5518,12 @@ function showIoBusy(message) {
     if (!dialog) return;
     ioBusyDepth++;
     if (label && message && ioBusyDepth === 1) label.textContent = message;
+    if (ioBusyCloseTimer) {
+        clearTimeout(ioBusyCloseTimer);
+        ioBusyCloseTimer = null;
+    }
     if (!dialog.open) dialog.showModal();
+    requestAnimationFrame(() => dialog.classList.add('show'));
 }
 
 function setIoBusyLabel(message) {
@@ -5439,7 +5535,24 @@ function hideIoBusy() {
     const dialog = document.getElementById('ioBusyDialog');
     if (ioBusyDepth > 0) ioBusyDepth--;
     if (!dialog) return;
-    if (ioBusyDepth === 0 && dialog.open) dialog.close();
+    if (ioBusyDepth > 0) return;
+    dialog.classList.remove('show');
+    if (ioBusyCloseTimer) clearTimeout(ioBusyCloseTimer);
+    ioBusyCloseTimer = setTimeout(() => {
+        if (ioBusyDepth === 0 && dialog.open) dialog.close();
+        ioBusyCloseTimer = null;
+    }, 220);
+}
+
+function hideIoBusyImmediately() {
+    const dialog = document.getElementById('ioBusyDialog');
+    if (ioBusyCloseTimer) {
+        clearTimeout(ioBusyCloseTimer);
+        ioBusyCloseTimer = null;
+    }
+    ioBusyDepth = 0;
+    if (dialog) dialog.classList.remove('show');
+    if (dialog && dialog.open) dialog.close();
 }
 
 async function resolveBatchFolderHandle() {
@@ -5581,6 +5694,7 @@ function getExportFolderName() {
 
 function updateExportFolderLabelInInfoSheet() {
     const folderName = getExportFolderName();
+    const sheet = document.getElementById('info-sheet');
     const label = document.getElementById('exportFolderValue');
     if (label) label.textContent = folderName;
 
@@ -5588,6 +5702,8 @@ function updateExportFolderLabelInInfoSheet() {
     if (clearBtn) {
         clearBtn.classList.toggle('has-folder', !!folderName);
     }
+
+    updateInfoActionButtonStates(sheet);
 }
 
 function clearExportFolderSelection() {
@@ -5597,6 +5713,7 @@ function clearExportFolderSelection() {
 
 function showExportNotice(message) {
     if (!message) return;
+    hideIoBusyImmediately();
     let notice = document.getElementById('exportNotice');
     if (!notice) {
         notice = document.createElement('div');
@@ -5605,6 +5722,9 @@ function showExportNotice(message) {
         document.body.appendChild(notice);
     }
     notice.textContent = message;
+    notice.classList.remove('show');
+    // Force reflow so repeated notices restart the slide animation.
+    void notice.offsetWidth;
     notice.classList.add('show');
     if (exportNoticeTimer) clearTimeout(exportNoticeTimer);
     exportNoticeTimer = setTimeout(() => {
