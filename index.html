@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0f0f0f" />
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
@@ -12,6 +13,7 @@
     <style>
         /* ===== ROOT DESIGN TOKENS ===== */
         :root {
+            color-scheme: dark;
             --bg-base: #0f0f0f;
             --bg-surface: #1a1a1a;
             --bg-elevated: #242424;
@@ -57,6 +59,7 @@
 
         /* ===== LIGHT THEME ===== */
         [data-theme="light"] {
+            color-scheme: light;
             --bg-base: #f5f5f5;
             --bg-surface: #ffffff;
             --bg-elevated: #ffffff;
@@ -1424,7 +1427,11 @@
 /* ============================ Theme toggle ================================ */
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#f5f5f5' : '#0f0f0f';
+    document.documentElement.style.colorScheme = theme;
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+        themeMeta.content = theme === 'light' ? '#f5f5f5' : '#0f0f0f';
+    }
     const icon = document.getElementById('themeIcon');
     if (icon) {
         icon.innerHTML = theme === 'light'
@@ -1441,7 +1448,16 @@ function toggleTheme() {
     localStorage.setItem('ui-theme', next);
     applyTheme(next);
 }
-applyTheme(localStorage.getItem('ui-theme') || 'dark');
+(function initTheme() {
+    const savedTheme = localStorage.getItem('ui-theme');
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+        applyTheme(savedTheme);
+        return;
+    }
+
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    applyTheme(systemTheme);
+})();
 
 /* -------------------------------- INFO POPUP ----------------------------- */
 function updateInfoActionButtonStates(sheet = document.getElementById('info-sheet')) {
@@ -1494,7 +1510,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.1</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.2</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -2642,8 +2658,17 @@ let device = null, server = null, service = null, midiChar = null; // BLE
 let sparkWriteChar = null; // Spark BLE
 let midiAccess = null, usbOutput = null; // USB Web MIDI
 
-/* Single status setter: set the label's text (no connected background class) */
-function setStatusText(text) { statusEl.textContent = text || ''; }
+const CONNECT_LABEL_HTML = '<svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h6v3a3 3 0 0 1-6 0v-3z"/><line x1="10.5" y1="8" x2="10.5" y2="10"/><line x1="13.5" y1="8" x2="13.5" y2="10"/><line x1="12" y1="16" x2="12" y2="18"/></svg>\n      Connect';
+
+/* Single status setter: keep the Connect icon when resetting to idle */
+function setStatusText(text) {
+    const value = text || '';
+    if (value === 'Connect') {
+        statusEl.innerHTML = CONNECT_LABEL_HTML;
+        return;
+    }
+    statusEl.textContent = value;
+}
 
 /* Flash visual (activity indicator on CC/PC sends) */
 let ccFlashTimer = null;
@@ -2953,7 +2978,13 @@ async function connectBleFlow() {
         currentTransport = 'ble';
         connectionStatus = toDisconnect;
         setStatusText(device.name || 'BLE Device');
-    } catch {
+    } catch (err) {
+        const isUserCancel = err && (err.name === 'NotFoundError' || err.name === 'AbortError');
+        if (isUserCancel) {
+            connectionStatus = toConnect;
+            setStatusText('Connect');
+            return;
+        }
         setStatusText('Error');
     }
 }
