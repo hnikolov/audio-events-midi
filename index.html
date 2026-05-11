@@ -1228,7 +1228,7 @@
                                     </div>
                                 </div>
                                 <div id="playlist-header-actions" style="display:flex;gap:8px;align-items:center">
-                  <input type="file" id="importInput" accept=".aem" style="display:none">
+                  <input type="file" id="importInput" style="display:none">
                   <label id="importSongsBtn" for="importInput" class="btn-primary" style="cursor:pointer;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border)">
                     <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   </label>
@@ -1550,7 +1550,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.6</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.7</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -4479,8 +4479,7 @@ async function exportPlaysetById(playsetId, options = {}) {
     if (window.showSaveFilePicker) {
         try {
             const opts = {
-                suggestedName: fileName,
-                types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps'] } }]
+                suggestedName: fileName
             };
             const startIn = getPickerStartIn(lastExportPickerHandle);
             if (startIn) opts.startIn = startIn;
@@ -4576,7 +4575,7 @@ function ensurePlaysetImportInput() {
     if (playsetImportInput) return playsetImportInput;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.aeps,application/json';
+    input.accept = '';
     input.style.display = 'none';
     input.addEventListener('click', () => { input.value = ''; });
     input.addEventListener('change', async () => {
@@ -4599,8 +4598,7 @@ async function promptImportPlaysetDefinition() {
     if (window.showOpenFilePicker) {
         try {
             const opts = {
-                multiple: false,
-                types: [{ description: 'Audio Events Playset', accept: { 'application/json': ['.aeps'] } }]
+                multiple: false
             };
             const startIn = getPickerStartIn(lastImportPickerHandle);
             if (startIn) opts.startIn = startIn;
@@ -6271,8 +6269,7 @@ async function exportSong(songName, options = {}) {
         if (window.showSaveFilePicker) {
             try {
                 const opts = {
-                    suggestedName: fileName,
-                    types: [{ description: 'Audio Events MIDI file', accept: { 'application/octet-stream': ['.aem'] } }]
+                    suggestedName: fileName
                 };
                 const startIn = getPickerStartIn(lastExportPickerHandle);
                 if (startIn) opts.startIn = startIn;
@@ -6400,8 +6397,7 @@ async function promptImportSongFile() {
     if (window.showOpenFilePicker) {
         try {
             const opts = {
-                multiple: false,
-                types: [{ description: 'Audio Events MIDI file', accept: { 'application/octet-stream': ['.aem'] } }]
+                multiple: false
             };
             const startIn = getPickerStartIn(lastImportPickerHandle);
             if (startIn) opts.startIn = startIn;
