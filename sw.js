@@ -1,4 +1,4 @@
-const CACHE_NAME = 'audio-midi-v1.3.4';
+const CACHE_NAME = 'audio-midi-v1.3.5';
 const ASSETS = [
   './',
   './index.html',
@@ -50,9 +50,12 @@ function isShareTargetRequest(request) {
 async function handleShareTarget(request) {
   try {
     const formData = await request.formData();
-    const files = formData
-      .getAll('sharedFiles')
-      .filter((entry) => entry instanceof File && entry.size > 0);
+    const files = [];
+    for (const entry of formData.values()) {
+      if (entry instanceof File && entry.size > 0) {
+        files.push(entry);
+      }
+    }
     if (files.length > 0) {
       await saveSharedFiles(files);
     }
