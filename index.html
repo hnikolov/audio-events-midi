@@ -1550,7 +1550,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.8</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.9</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -2003,9 +2003,9 @@ let songMenuContext = {
 };
 let markerMenuContext = { index: null, rowEl: null };
 
-function buildSongExportFileName(songName) {
+function buildSongShareFileName(songName) {
     const safeName = String(songName || '').replace(/[^a-zA-Z0-9._\-() ]/g, '_');
-    return safeName.replace(/\.[^.]+$/, '') + '.aem';
+    return safeName.replace(/\.[^.]+$/, '') + '.mp3';
 }
 
 function isSongShareReady(songName) {
@@ -2022,9 +2022,9 @@ function prepareSongShareForMenu(songName) {
     packAem(songName)
         .then((blob) => {
             if (songMenuContext.songName !== songName || songMenuContext.shareToken !== token) return;
-            const fileName = buildSongExportFileName(songName);
+            const fileName = buildSongShareFileName(songName);
             songMenuContext.shareFile = new File([blob], fileName, {
-                type: 'application/octet-stream',
+                type: 'audio/mpeg',
                 lastModified: Date.now()
             });
             songMenuContext.shareError = null;
@@ -4490,7 +4490,7 @@ async function tryNativeShareFile(file, options = {}) {
     };
 
     try {
-        if (typeof navigator.canShare === 'function' && !navigator.canShare({ files: [file] })) {
+        if (typeof navigator.canShare === 'function' && !navigator.canShare(shareData)) {
             return { status: 'unsupported' };
         }
         await navigator.share(shareData);
@@ -4513,9 +4513,9 @@ async function sharePlaysetById(playsetId) {
         updatedAt: setDef.updatedAt || Date.now()
     };
 
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const fileName = `${sanitizeFilename(setDef.name, 'playset')}.aeps`;
-    const file = new File([blob], fileName, { type: 'application/json', lastModified: Date.now() });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'text/plain' });
+    const fileName = `${sanitizeFilename(setDef.name, 'playset')}.txt`;
+    const file = new File([blob], fileName, { type: 'text/plain', lastModified: Date.now() });
     const shareResult = await tryNativeShareFile(file, {
         title: `Share playset: ${setDef.name}`,
         text: fileName
