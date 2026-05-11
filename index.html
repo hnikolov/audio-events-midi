@@ -923,6 +923,48 @@
             font-size: 0.88rem;
             color: var(--text-secondary);
         }
+        .playset-selector-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .playset-row-label {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: left;
+        }
+        .playset-drag-handle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            min-width: 30px;
+            height: 30px;
+            color: var(--text-muted);
+            cursor: grab;
+            touch-action: none;
+            flex-shrink: 0;
+            border-radius: var(--radius-sm);
+        }
+        .playset-drag-handle:active {
+            color: var(--text-secondary);
+            background: var(--bg-hover);
+        }
+        .playset-drag-handle svg {
+            width: 16px;
+            height: 16px;
+            pointer-events: none;
+        }
+        .playset-drag-spacer {
+            width: 30px;
+            min-width: 30px;
+            height: 30px;
+            flex-shrink: 0;
+            pointer-events: none;
+        }
         .playset-add-picker {
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
@@ -1508,7 +1550,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.2</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.3</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -2254,6 +2296,11 @@ let dragSrcIdx = null;
 let dropIndicator = null;
 let isDraggingItem = false;
 let recentlyDragged = false;
+let playsetDragSrcEl = null;
+let playsetDragSrcIdx = null;
+let playsetDropIndicator = null;
+let isDraggingPlayset = false;
+let playsetRecentlyDragged = false;
 const DRAG_ACTIVATE_PX = 6;  // min movement before drag "activates" visually
 
 function onPlaylistPointerDown(e) {
@@ -2344,6 +2391,104 @@ function finishDrag() {
     dragSrcIdx = null;
     dropIndicator = null;
     isDraggingItem = false;
+}
+
+function onPlaysetSheetPointerDown(e) {
+    if (playsetModalState.mode !== 'selector') return;
+    const handle = e.target.closest('.playset-drag-handle');
+    if (!handle) return;
+
+    const row = handle.closest('[data-playset-row-idx]');
+    if (!row) return;
+    const idx = parseInt(row.dataset.playsetRowIdx, 10);
+    if (isNaN(idx)) return;
+
+    const sheet = document.getElementById('playset-sheet');
+    const listEl = sheet ? sheet.querySelector('.marker-set-sheet-list') : null;
+    if (!listEl) return;
+
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+
+    playsetDragSrcEl = row;
+    playsetDragSrcIdx = idx;
+    isDraggingPlayset = false;
+    const startY = e.clientY;
+
+    playsetDropIndicator = document.createElement('div');
+    playsetDropIndicator.className = 'drop-indicator';
+    playsetDropIndicator.dataset.targetIdx = idx;
+
+    function updatePlaysetDragPosition(clientY) {
+        if (!playsetDragSrcEl || !isDraggingPlayset) return;
+        const allRows = Array.from(listEl.querySelectorAll('[data-playset-row-idx]'));
+        const items = allRows.filter(r => !r.classList.contains('dragging'));
+        let targetIdx = allRows.length;
+
+        for (let i = 0; i < items.length; i++) {
+            const rect = items[i].getBoundingClientRect();
+            if (clientY < rect.top + rect.height / 2) {
+                targetIdx = parseInt(items[i].dataset.playsetRowIdx, 10);
+                break;
+            }
+        }
+
+        if (playsetDropIndicator.parentNode) playsetDropIndicator.parentNode.removeChild(playsetDropIndicator);
+        if (targetIdx < allRows.length) {
+            const refEl = allRows.find(it => parseInt(it.dataset.playsetRowIdx, 10) === targetIdx && !it.classList.contains('dragging'));
+            if (refEl) listEl.insertBefore(playsetDropIndicator, refEl);
+            else listEl.appendChild(playsetDropIndicator);
+        } else {
+            listEl.appendChild(playsetDropIndicator);
+        }
+        playsetDropIndicator.dataset.targetIdx = targetIdx;
+    }
+
+    function finishPlaysetDrag() {
+        if (playsetDragSrcEl) playsetDragSrcEl.classList.remove('dragging');
+        if (playsetDropIndicator) {
+            const targetIdx = parseInt(playsetDropIndicator.dataset.targetIdx, 10);
+            playsetDropIndicator.remove();
+            if (isDraggingPlayset && typeof playsetDragSrcIdx === 'number') {
+                let finalIdx = targetIdx;
+                if (targetIdx > playsetDragSrcIdx) finalIdx = targetIdx - 1;
+                if (finalIdx !== playsetDragSrcIdx) {
+                    moveInPlaysetOrder(playsetDragSrcIdx, finalIdx);
+                    renderPlaysetSheet();
+                    playsetRecentlyDragged = true;
+                    setTimeout(() => { playsetRecentlyDragged = false; }, 150);
+                }
+            }
+        }
+
+        playsetDragSrcEl = null;
+        playsetDragSrcIdx = null;
+        playsetDropIndicator = null;
+        isDraggingPlayset = false;
+    }
+
+    function onMove(ev) {
+        const dy = Math.abs(ev.clientY - startY);
+        if (!isDraggingPlayset) {
+            if (dy < DRAG_ACTIVATE_PX) return;
+            isDraggingPlayset = true;
+            playsetDragSrcEl.classList.add('dragging');
+            if (navigator.vibrate) navigator.vibrate(30);
+        }
+        updatePlaysetDragPosition(ev.clientY);
+    }
+
+    function onUp(ev) {
+        handle.releasePointerCapture(ev.pointerId);
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+        finishPlaysetDrag();
+    }
+
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
 }
 
 /* ============================== App Constants ============================= */
@@ -4184,6 +4329,18 @@ function moveInCurrentListOrder(from, to) {
     moveInCustomPlaysetOrder(selected, from, to);
 }
 
+function moveInPlaysetOrder(from, to) {
+    const state = loadPlaysetState();
+    const order = state.customPlaysets.slice();
+    if (!Array.isArray(order) || from < 0 || to < 0 || from >= order.length || from === to) return;
+    const boundedTo = Math.min(to, order.length - 1);
+    const item = order.splice(from, 1)[0];
+    if (!item) return;
+    order.splice(boundedTo, 0, item);
+    state.customPlaysets = order;
+    savePlaysetState(state);
+}
+
 function makePlaysetNameUnique(desiredName, existingNames) {
     const existingLower = new Set(existingNames.map(name => String(name || '').trim().toLowerCase()));
     let base = String(desiredName || '').trim();
@@ -4629,10 +4786,15 @@ function renderPlaysetSheet() {
 
     if (!mode || mode === 'selector') {
         const current = getCurrentPlayset();
-        const rows = getAllPlaysetsForUi().map(setDef => {
-            const activeClass = setDef.id === getSelectedListId() ? ' active' : '';
-            return `<button type="button" class="speed-option marker-set-row${activeClass}" data-playset-id="${escapeHtml(setDef.id)}">${escapeHtml(setDef.name)}</button>`;
-        }).join('');
+        const selectedListId = getSelectedListId();
+        const customPlaysets = getCustomPlaysets();
+        const rows = [
+            `<button type="button" class="speed-option marker-set-row playset-selector-row${selectedListId === ALL_SONGS_LIST_ID ? ' active' : ''}" data-playset-id="${escapeHtml(ALL_SONGS_LIST_ID)}"><span class="playset-drag-spacer" aria-hidden="true"></span><span class="playset-row-label">All songs</span></button>`,
+            ...customPlaysets.map((setDef, idx) => {
+                const activeClass = setDef.id === selectedListId ? ' active' : '';
+                return `<button type="button" class="speed-option marker-set-row playset-selector-row${activeClass}" data-playset-id="${escapeHtml(setDef.id)}" data-playset-row-idx="${idx}"><span class="playset-drag-handle" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></span><span class="playset-row-label">${escapeHtml(setDef.name)}</span></button>`;
+            })
+        ].join('');
 
         const actionDisabled = current?.permanent ? ' disabled' : '';
         const fourthButtonHtml = current?.permanent
@@ -4737,6 +4899,8 @@ function renderPlaysetSheet() {
             const targetEl = e.target.closest('[data-playset-target]');
 
             if (rowEl && (!playsetModalState.mode || playsetModalState.mode === 'selector')) {
+                if (playsetRecentlyDragged) return;
+                if (e.target.closest('.playset-drag-handle')) return;
                 setSelectedListId(rowEl.dataset.playsetId);
                 updatePlaysetLabel();
                 if (shouldAutoClosePlaysetSheetOnSelect() || getSelectedListId() === ALL_SONGS_LIST_ID) {
@@ -4892,6 +5056,8 @@ function renderPlaysetSheet() {
                 }
             }
         });
+
+        sheet.addEventListener('pointerdown', onPlaysetSheetPointerDown);
 
         sheet.dataset.bound = '1';
     }
