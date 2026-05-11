@@ -1550,7 +1550,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.3</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.4</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -5753,12 +5753,117 @@ document.querySelectorAll('.tab-bar .tab').forEach((label, i) => {
 /* ========================== .aem Export / Import ========================== */
 const AEM_MAGIC = new Uint8Array([0x41, 0x45, 0x4D, 0x49]); // "AEMI"
 const AEM_VERSION = 1;
+const SHARE_TARGET_DB_NAME = 'audio-share-target-db';
+const SHARE_TARGET_DB_STORE = 'inbox';
+const SHARE_TARGET_DB_KEY = 'pending-share-files';
 let lastExportDirHandle = null;
 let lastExportPickerHandle = null;
 let lastImportPickerHandle = null;
 let exportNoticeTimer = null;
 let ioBusyDepth = 0;
 let ioBusyCloseTimer = null;
+
+function openShareTargetDb() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(SHARE_TARGET_DB_NAME, 1);
+        req.onupgradeneeded = () => {
+            const dbInstance = req.result;
+            if (!dbInstance.objectStoreNames.contains(SHARE_TARGET_DB_STORE)) {
+                dbInstance.createObjectStore(SHARE_TARGET_DB_STORE, { keyPath: 'key' });
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('Failed to open share target database'));
+    });
+}
+
+async function takeSharedFilesFromInbox() {
+    const dbInstance = await openShareTargetDb();
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = dbInstance.transaction(SHARE_TARGET_DB_STORE, 'readwrite');
+            const store = tx.objectStore(SHARE_TARGET_DB_STORE);
+            const getReq = store.get(SHARE_TARGET_DB_KEY);
+
+            getReq.onsuccess = () => {
+                const record = getReq.result;
+                if (!record || !Array.isArray(record.files) || record.files.length === 0) {
+                    resolve([]);
+                    return;
+                }
+
+                const files = record.files;
+                const deleteReq = store.delete(SHARE_TARGET_DB_KEY);
+                deleteReq.onsuccess = () => resolve(files);
+                deleteReq.onerror = () => reject(deleteReq.error || new Error('Failed to clear share target inbox'));
+            };
+
+            getReq.onerror = () => reject(getReq.error || new Error('Failed to read shared files from inbox'));
+            tx.onabort = () => reject(tx.error || new Error('Share inbox transaction aborted'));
+        });
+    } finally {
+        dbInstance.close();
+    }
+}
+
+function clearShareTargetQueryParam() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('share-target')) return;
+    url.searchParams.delete('share-target');
+    history.replaceState({}, '', url.pathname + url.search + url.hash);
+}
+
+async function importSharedFilesFromShareTarget() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('share-target')) return;
+
+    try {
+        if (!db) {
+            clearShareTargetQueryParam();
+            return;
+        }
+
+        const files = await takeSharedFilesFromInbox();
+        if (!files.length) {
+            clearShareTargetQueryParam();
+            return;
+        }
+
+        let songsImported = 0;
+        let playsetsImported = 0;
+        let failed = 0;
+        let unsupported = 0;
+
+        for (const file of files) {
+            const fileName = String(file?.name || '').toLowerCase();
+            if (fileName.endsWith('.aem') || fileName.endsWith('.aep')) {
+                const ok = await importSong(file);
+                if (ok) songsImported++; else failed++;
+            } else if (fileName.endsWith('.aeps')) {
+                const ok = await importPlaysetDefinitionFile(file);
+                if (ok) playsetsImported++; else failed++;
+            } else {
+                unsupported++;
+            }
+        }
+
+        updatePlaysetLabel();
+        renderPlaysetSheet();
+        await renderPlaylist();
+
+        const parts = [];
+        if (songsImported) parts.push(`${songsImported} song(s)`);
+        if (playsetsImported) parts.push(`${playsetsImported} playset(s)`);
+        if (unsupported) parts.push(`${unsupported} unsupported file(s)`);
+        if (failed) parts.push(`${failed} failed`);
+        const summary = parts.length ? parts.join(', ') : 'No supported shared files found';
+        showExportNotice(`Shared import: ${summary}`);
+    } catch (err) {
+        alert(`Shared import failed: ${err.message || err}`);
+    } finally {
+        clearShareTargetQueryParam();
+    }
+}
 
 function getPickerStartIn(rememberedHandle) {
     return rememberedHandle || lastExportDirHandle || undefined;
@@ -6305,6 +6410,7 @@ importInput.onchange = async () => {
     updatePlaysetLabel();
     renderPlaysetSheet();
     await renderPlaylist();
+    await importSharedFilesFromShareTarget();
 })();
 
 /* ===================== Fixed bars: measure heights (no re-parenting) ===================== */

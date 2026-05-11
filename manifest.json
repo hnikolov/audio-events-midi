@@ -13,6 +13,25 @@
   "lang": "en",
   "dir": "ltr",
   "prefer_related_applications": false,
+  "share_target": {
+    "action": "./share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "sharedFiles",
+          "accept": [
+            ".aem",
+            ".aep",
+            ".aeps",
+            "application/octet-stream",
+            "application/json"
+          ]
+        }
+      ]
+    }
+  },
   "background_color": "#0f0f0f",
   "theme_color": "#0f0f0f",
   "icons": [
