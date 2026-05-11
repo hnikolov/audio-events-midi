@@ -1550,7 +1550,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.5</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.6</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -5813,6 +5813,42 @@ function clearShareTargetQueryParam() {
     history.replaceState({}, '', url.pathname + url.search + url.hash);
 }
 
+async function detectSharedImportKind(file) {
+    const fileName = String(file?.name || '').toLowerCase();
+    const mime = String(file?.type || '').toLowerCase();
+
+    if (fileName.endsWith('.aem') || fileName.endsWith('.aep')) return 'song';
+    if (fileName.endsWith('.aeps')) return 'playset';
+
+    try {
+        const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+        if (
+            header.length === 4 &&
+            header[0] === AEM_MAGIC[0] &&
+            header[1] === AEM_MAGIC[1] &&
+            header[2] === AEM_MAGIC[2] &&
+            header[3] === AEM_MAGIC[3]
+        ) {
+            return 'song';
+        }
+    } catch {}
+
+    const looksJson = mime.includes('json') || mime.includes('text') || mime === '';
+    if (looksJson) {
+        try {
+            const text = await file.text();
+            const payload = JSON.parse(text);
+            if (payload && typeof payload === 'object') {
+                const hasPlaysetName = typeof payload.name === 'string' && payload.name.trim().length > 0;
+                const hasSongsArray = Array.isArray(payload.songNames);
+                if (hasPlaysetName && hasSongsArray) return 'playset';
+            }
+        } catch {}
+    }
+
+    return 'unknown';
+}
+
 async function importSharedFilesFromShareTarget() {
     const params = new URLSearchParams(window.location.search);
     if (!params.has('share-target')) return;
@@ -5835,11 +5871,11 @@ async function importSharedFilesFromShareTarget() {
         let unsupported = 0;
 
         for (const file of files) {
-            const fileName = String(file?.name || '').toLowerCase();
-            if (fileName.endsWith('.aem') || fileName.endsWith('.aep')) {
+            const kind = await detectSharedImportKind(file);
+            if (kind === 'song') {
                 const ok = await importSong(file);
                 if (ok) songsImported++; else failed++;
-            } else if (fileName.endsWith('.aeps')) {
+            } else if (kind === 'playset') {
                 const ok = await importPlaysetDefinitionFile(file);
                 if (ok) playsetsImported++; else failed++;
             } else {
