@@ -294,7 +294,12 @@
         .playlist-item.dragging { opacity: 0.4; cursor: grabbing; }
         .drag-handle {
             display: flex; align-items: center; justify-content: center;
-            padding: 4px 6px; margin-right: 4px; cursor: grab;
+            width: 42px;
+            min-width: 42px;
+            margin-left: -12px;
+            padding: 4px 0 4px 12px;
+            margin-right: 4px;
+            cursor: grab;
             color: var(--text-muted);
             touch-action: none;
             flex-shrink: 0;
@@ -917,13 +922,6 @@
             padding: 12px;
             font-size: 0.88rem;
             color: var(--text-secondary);
-        }
-        .playset-target-row {
-            justify-content: space-between;
-        }
-        .playset-target-row .arrow {
-            color: var(--text-muted);
-            margin-left: 8px;
         }
         .playset-add-picker {
             border: 1px solid var(--border);
@@ -1987,7 +1985,7 @@ function renderSongMenuSheet(songName) {
             <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="rename" aria-label="Rename" title="Rename"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg></button>
             <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="export" aria-label="Export" title="Export"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 8 12 3 17 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg></button>
             <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="add-to-playset" aria-label="Add to playset" title="Add to playset"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(90 12 12)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 8 12 3 17 8" /><line x1="12" y1="3" x2="12" y2="15" /></g></svg></button>
-            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <button type="button" class="speed-chip marker-set-chip song-menu-chip" data-song-action="share" aria-label="Share" title="Share"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.7" y1="10.7" x2="15.3" y2="6.3"/><line x1="8.7" y1="13.3" x2="15.3" y2="17.7"/></svg></button>
             <button type="button" class="speed-chip marker-set-chip song-menu-chip danger" data-song-action="delete" aria-label="Delete" title="Delete"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg></button>
         `
         : `
@@ -2024,6 +2022,9 @@ function renderSongMenuSheet(songName) {
             } else if (action === 'export') {
                 closeAllSheets();
                 await exportSong(song);
+            } else if (action === 'share') {
+                closeAllSheets();
+                await exportSong(song, { share: true });
             } else if (action === 'add-to-playset') {
                 openPlaysetModal({
                     mode: 'add-to',
@@ -3619,7 +3620,10 @@ async function renderPlaylist() {
                 togglePlaylistMenu(e, song.name, row);
             };
 
-            row.onclick = (e) => { if (!isDraggingItem && !recentlyDragged) playSong(song.name); };
+            row.onclick = (e) => {
+                if (e.target.closest('.drag-handle')) return;
+                if (!isDraggingItem && !recentlyDragged) playSong(song.name);
+            };
 
             const dragHandle = document.createElement('div');
             dragHandle.className = 'drag-handle';
@@ -4235,6 +4239,29 @@ function sanitizeFilename(name, fallback) {
     return cleaned || fallback || 'export';
 }
 
+async function tryNativeShareFile(file, options = {}) {
+    if (!navigator.share || typeof File === 'undefined') {
+        return { status: 'unsupported' };
+    }
+
+    const shareData = {
+        files: [file],
+        title: options.title || file.name,
+        text: options.text || ''
+    };
+
+    try {
+        if (typeof navigator.canShare === 'function' && !navigator.canShare({ files: [file] })) {
+            return { status: 'unsupported' };
+        }
+        await navigator.share(shareData);
+        return { status: 'shared' };
+    } catch (err) {
+        if (err && err.name === 'AbortError') return { status: 'cancelled' };
+        return { status: 'error', error: err };
+    }
+}
+
 async function exportPlaysetById(playsetId, options = {}) {
     showIoBusy('Exporting playset...');
     try {
@@ -4252,6 +4279,24 @@ async function exportPlaysetById(playsetId, options = {}) {
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const fileName = `${sanitizeFilename(setDef.name, 'playset')}.aeps`;
+    const shareRequested = options.share === true;
+
+    if (shareRequested) {
+        const file = new File([blob], fileName, { type: 'application/json', lastModified: Date.now() });
+        const shareResult = await tryNativeShareFile(file, {
+            title: `Share playset: ${setDef.name}`,
+            text: fileName
+        });
+        if (shareResult.status === 'shared') return true;
+        if (shareResult.status === 'cancelled') return false;
+        if (shareResult.status === 'unsupported') {
+            alert('Sharing files is not supported in this browser.');
+            return false;
+        }
+        alert(`Share failed: ${shareResult.error?.message || 'Unknown error'}`);
+        return false;
+    }
+
     const settings = loadUiSettings();
 
     if (settings.overwritePlaysetsOnExport && window.showDirectoryPicker) {
@@ -4590,6 +4635,9 @@ function renderPlaysetSheet() {
         }).join('');
 
         const actionDisabled = current?.permanent ? ' disabled' : '';
+        const fourthButtonHtml = current?.permanent
+            ? '<button type="button" class="speed-chip marker-set-chip" data-playset-action="new" aria-label="New playset" title="New playset"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3" ry="3" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg></button>'
+            : '<button type="button" class="speed-chip marker-set-chip" data-playset-action="share" aria-label="Share playset" title="Share playset"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.7" y1="10.7" x2="15.3" y2="6.3"/><line x1="8.7" y1="13.3" x2="15.3" y2="17.7"/></svg></button>';
 
         bodyHtml = `<div class="marker-set-sheet-list">${rows}</div>`;
         footerHtml = `
@@ -4598,13 +4646,13 @@ function renderPlaysetSheet() {
                 <button type="button" class="speed-chip marker-set-chip" data-playset-action="edit"${actionDisabled} aria-label="Edit playset" title="Edit playset"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg></button>
                 <button type="button" class="speed-chip marker-set-chip" data-playset-action="export"${actionDisabled} aria-label="Export playset" title="Export playset"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 8 12 3 17 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg></button>
                 <button type="button" class="speed-chip marker-set-chip" data-playset-action="import" aria-label="Import playset" title="Import playset"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg></button>
-                <button type="button" class="speed-chip marker-set-chip" data-playset-action="new" aria-label="New playset" title="New playset"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3" ry="3" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg></button>
+                ${fourthButtonHtml}
                 <button type="button" class="speed-chip marker-set-chip danger" data-playset-action="delete"${actionDisabled} aria-label="Delete playset" title="Delete playset"><svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg></button>
             </div>
         `;
     } else if (mode === 'add-to') {
         const rows = getCustomPlaysets()
-            .map(setDef => `<button type="button" class="speed-option marker-set-row playset-target-row" data-playset-target="${escapeHtml(setDef.id)}"><span>${escapeHtml(setDef.name)}</span><span class="arrow">></span></button>`)
+            .map(setDef => `<button type="button" class="speed-option marker-set-row playset-target-row" data-playset-target="${escapeHtml(setDef.id)}"><span>${escapeHtml(setDef.name)}</span></button>`)
             .join('');
 
         bodyHtml = `
@@ -4744,6 +4792,13 @@ function renderPlaysetSheet() {
                     const current = getCurrentPlayset();
                     if (current && !current.permanent) {
                         await exportPlaysetById(current.id);
+                    }
+                    return;
+                }
+                if (action === 'share') {
+                    const current = getCurrentPlayset();
+                    if (current && !current.permanent) {
+                        await exportPlaysetById(current.id, { share: true });
                     }
                     return;
                 }
@@ -5866,6 +5921,24 @@ async function exportSong(songName, options = {}) {
         const blob = await packAem(songName);
         const safeName = songName.replace(/[^a-zA-Z0-9._\-() ]/g, '_');
         const fileName = safeName.replace(/\.[^.]+$/, '') + '.aem';
+        const shareRequested = options.share === true;
+
+        if (shareRequested) {
+            const file = new File([blob], fileName, { type: 'application/octet-stream', lastModified: Date.now() });
+            const shareResult = await tryNativeShareFile(file, {
+                title: `Share song: ${songName}`,
+                text: fileName
+            });
+            if (shareResult.status === 'shared') return true;
+            if (shareResult.status === 'cancelled') return false;
+            if (shareResult.status === 'unsupported') {
+                alert('Sharing files is not supported in this browser.');
+                return false;
+            }
+            alert(`Share failed: ${shareResult.error?.message || 'Unknown error'}`);
+            return false;
+        }
+
         const settings = loadUiSettings();
 
         if (settings.overwriteSongsOnExport && window.showDirectoryPicker) {
