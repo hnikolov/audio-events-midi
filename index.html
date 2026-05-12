@@ -4636,7 +4636,7 @@ function ensurePlaysetImportInput() {
 }
 
 async function promptImportPlaysetDefinition() {
-    if (window.showOpenFilePicker) {
+    if (window.showOpenFilePicker && !shouldUseInputImportPicker()) {
         try {
             const opts = {
                 multiple: false,
@@ -5941,6 +5941,12 @@ function getPickerStartIn(rememberedHandle) {
     return rememberedHandle || lastExportDirHandle || undefined;
 }
 
+function shouldUseInputImportPicker() {
+    const ua = String(navigator.userAgent || '').toLowerCase();
+    const platform = String(navigator.userAgentData?.platform || '').toLowerCase();
+    return ua.includes('android') || platform.includes('android');
+}
+
 function showIoBusy(message) {
     const dialog = document.getElementById('ioBusyDialog');
     const label = document.getElementById('ioBusyLabel');
@@ -6415,7 +6421,7 @@ const importInput = document.getElementById('importInput');
 const importSongsBtn = document.getElementById('importSongsBtn');
 
 async function promptImportSongFile() {
-    if (window.showOpenFilePicker) {
+    if (window.showOpenFilePicker && !shouldUseInputImportPicker()) {
         try {
             const opts = {
                 multiple: false,
