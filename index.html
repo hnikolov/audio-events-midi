@@ -4392,7 +4392,13 @@ function getCustomPlaysetById(playsetId) {
 }
 
 function sanitizeFilename(name, fallback) {
-    const cleaned = String(name || fallback || 'export').replace(/[^a-zA-Z0-9._\-() ]/g, '_').trim();
+    const raw = String(name || fallback || 'export')
+        .normalize('NFC')
+        .replace(/[\u0000-\u001F\u007F]/g, '_')
+        .replace(/[<>:"/\\|?*]/g, '_')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const cleaned = raw.replace(/[. ]+$/g, '');
     return cleaned || fallback || 'export';
 }
 
@@ -6267,7 +6273,7 @@ async function exportSong(songName, options = {}) {
     try {
         const showFolderNotice = options.showFolderNotice !== false;
         const blob = await packAem(songName);
-        const safeName = songName.replace(/[^a-zA-Z0-9._\-() ]/g, '_');
+        const safeName = sanitizeFilename(songName, 'song');
         const fileName = safeName.replace(/\.[^.]+$/, '') + '.aem';
 
         const settings = loadUiSettings();
