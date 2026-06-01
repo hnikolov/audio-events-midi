@@ -1566,7 +1566,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.12</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.13</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -4464,15 +4464,109 @@ function buildPlaysetPayload(setDef) {
     };
 }
 
+function hasNonDefaultEq(eq) {
+    if (!eq || typeof eq !== 'object') return false;
+    const bass = Number(eq.bass);
+    const mid = Number(eq.mid);
+    const treble = Number(eq.treble);
+    return (Number.isFinite(bass) && Math.abs(bass) > 0.0001)
+        || (Number.isFinite(mid) && Math.abs(mid) > 0.0001)
+        || (Number.isFinite(treble) && Math.abs(treble) > 0.0001);
+}
+
+function hasMeaningfulAbLoop(ab) {
+    if (!ab || typeof ab !== 'object') return false;
+    if (ab.enabled === true) return true;
+    if (Number.isFinite(ab.a) || Number.isFinite(ab.b)) return true;
+    return false;
+}
+
+function hasMeaningfulMarkerData(markerData) {
+    if (!markerData || typeof markerData !== 'object' || !markerData.sets || typeof markerData.sets !== 'object') {
+        return false;
+    }
+    return Object.values(markerData.sets).some((setDef) => {
+        const events = normalizeMarkerList(setDef?.events || []);
+        return events.length > 0;
+    });
+}
+
+function songHasSavedAemMetadata(songName) {
+    const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
+    const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
+    const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
+    const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
+    const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
+
+    const hasMarkers = hasMeaningfulMarkerData(eventMap[songName]);
+    const volume = volMap[songName];
+    const speed = speedMap[songName];
+    const hasVolume = Number.isFinite(volume) && Math.abs(volume - 1.0) > 0.0001;
+    const hasSpeed = Number.isFinite(speed) && Math.abs(speed - 1.0) > 0.0001;
+    const hasAbLoop = hasMeaningfulAbLoop(abMap[songName]);
+    const hasEq = hasNonDefaultEq(eqMap[songName]);
+
+    return hasMarkers || hasVolume || hasSpeed || hasAbLoop || hasEq;
+}
+
+function isLikelyAudioFile(file) {
+    if (!file) return false;
+    const fileType = String(file.type || '').toLowerCase();
+    if (fileType.startsWith('audio/')) return true;
+
+    const fileName = String(file.name || '').toLowerCase();
+    return /\.(mp3|m4a|aac|wav|ogg|oga|flac|opus|webm)$/i.test(fileName);
+}
+
+async function importAudioFileToLibrary(file) {
+    if (!file || !isLikelyAudioFile(file)) return false;
+
+    const allSongs = await getAllSongs();
+    const existingNames = allSongs.map(s => s.name);
+    const settings = loadUiSettings();
+
+    let finalName = String(file.name || '').trim() || 'Shared audio';
+    if (existingNames.includes(finalName) && !settings.overwriteSongsOnImport) {
+        finalName = makeSongNameUnique(finalName, existingNames);
+    }
+
+    const audioFile = new File([file], finalName, {
+        type: file.type || 'audio/mpeg',
+        lastModified: file.lastModified || Date.now()
+    });
+
+    await putSongs([audioFile]);
+    return true;
+}
+
 async function shareSongByName(songName) {
     try {
-        const blob = await packAem(songName);
-        const baseName = sanitizeFilename(songName, 'song').replace(/\.[^.]+$/, '');
-        const fileName = `${baseName}.aem.txt`;
-        const file = new File([blob], fileName, { type: 'text/plain', lastModified: Date.now() });
+        const song = await getSongByName(songName);
+        if (!song) {
+            alert('Share failed: song not found.');
+            return false;
+        }
+
+        let file;
+        let shareText;
+
+        if (!songHasSavedAemMetadata(songName)) {
+            file = new File([song.data], song.name, {
+                type: song.type || 'audio/mpeg',
+                lastModified: song.lastModified || Date.now()
+            });
+            shareText = song.name;
+        } else {
+            const blob = await packAem(songName);
+            const baseName = sanitizeFilename(songName, 'song').replace(/\.[^.]+$/, '');
+            const fileName = `${baseName}.aem.txt`;
+            file = new File([blob], fileName, { type: 'text/plain', lastModified: Date.now() });
+            shareText = fileName;
+        }
+
         const shareResult = await tryNativeShareFile(file, {
             title: `Share song: ${songName}`,
-            text: fileName
+            text: shareText
         });
         return handleShareResult(shareResult);
     } catch (err) {
@@ -5875,6 +5969,7 @@ async function detectSharedImportKind(file) {
 
     if (fileName.endsWith('.aem') || fileName.endsWith('.aep')) return 'song';
     if (fileName.endsWith('.aeps')) return 'playset';
+    if (isLikelyAudioFile(file)) return 'audio';
 
     try {
         const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
@@ -5927,6 +6022,9 @@ async function importSharedFilesFromShareTarget() {
             const kind = await detectSharedImportKind(file);
             if (kind === 'song') {
                 const ok = await importSong(file);
+                if (ok) songsImported++; else failed++;
+            } else if (kind === 'audio') {
+                const ok = await importAudioFileToLibrary(file);
                 if (ok) songsImported++; else failed++;
             } else if (kind === 'playset') {
                 const ok = await importPlaysetDefinitionFile(file);
