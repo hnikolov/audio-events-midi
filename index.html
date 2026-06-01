@@ -1566,7 +1566,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.13</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.14</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -4414,6 +4414,25 @@ function sanitizeFilename(name, fallback) {
     return cleaned || fallback || 'export';
 }
 
+function isAndroidPlatform() {
+    const ua = String(navigator.userAgent || '').toLowerCase();
+    const platform = String(navigator.userAgentData?.platform || '').toLowerCase();
+    return ua.includes('android') || platform.includes('android');
+}
+
+function isFlacFilename(name) {
+    return /\.flac$/i.test(String(name || '').trim());
+}
+
+function isSharePermissionDeniedError(error) {
+    const name = String(error?.name || '').toLowerCase();
+    const message = String(error?.message || '').toLowerCase();
+    return name === 'notallowederror'
+        || name === 'securityerror'
+        || message.includes('permission denied')
+        || message.includes('not allowed');
+}
+
 async function tryNativeShareFile(file, options = {}) {
     if (!navigator.share || typeof File === 'undefined') {
         return { status: 'unsupported' };
@@ -4549,8 +4568,9 @@ async function shareSongByName(songName) {
 
         let file;
         let shareText;
+        const useRawAudioShare = !songHasSavedAemMetadata(songName);
 
-        if (!songHasSavedAemMetadata(songName)) {
+        if (useRawAudioShare) {
             file = new File([song.data], song.name, {
                 type: song.type || 'audio/mpeg',
                 lastModified: song.lastModified || Date.now()
@@ -4564,10 +4584,30 @@ async function shareSongByName(songName) {
             shareText = fileName;
         }
 
-        const shareResult = await tryNativeShareFile(file, {
+        let shareResult = await tryNativeShareFile(file, {
             title: `Share song: ${songName}`,
             text: shareText
         });
+
+        // Android can reject direct FLAC shares with a permission error.
+        // Retry with a neutral MIME while preserving filename and bytes.
+        if (
+            useRawAudioShare
+            && isAndroidPlatform()
+            && isFlacFilename(song.name)
+            && shareResult.status === 'error'
+            && isSharePermissionDeniedError(shareResult.error)
+        ) {
+            const fallbackFile = new File([song.data], song.name, {
+                type: 'application/octet-stream',
+                lastModified: song.lastModified || Date.now()
+            });
+            shareResult = await tryNativeShareFile(fallbackFile, {
+                title: `Share song: ${songName}`,
+                text: shareText
+            });
+        }
+
         return handleShareResult(shareResult);
     } catch (err) {
         alert(`Share failed: ${err?.message || err || 'Unknown error'}`);
