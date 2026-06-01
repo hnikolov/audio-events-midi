@@ -1226,6 +1226,10 @@
     <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;width:100%;">
         <progress id="ioBusyProgress" style="height:12px;"></progress>
         <p id="ioBusyLabel" style="font-size:0.86rem;color:var(--text-secondary);margin:0;text-align:center;">Working...</p>
+        <div id="ioBusyActionRow" style="display:none;gap:8px;justify-content:center;">
+            <button id="ioBusyActionBtn" type="button" class="btn-primary">Open Share Menu</button>
+            <button id="ioBusyCancelBtn" type="button" style="background:var(--bg-hover);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-full);padding:8px 14px;font-size:0.85rem;">Cancel</button>
+        </div>
     </div>
 </dialog>
 
@@ -1566,7 +1570,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.14</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.15</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -4433,6 +4437,73 @@ function isSharePermissionDeniedError(error) {
         || message.includes('not allowed');
 }
 
+function resetIoBusyDialogMode() {
+    const progress = document.getElementById('ioBusyProgress');
+    const actionRow = document.getElementById('ioBusyActionRow');
+    const actionBtn = document.getElementById('ioBusyActionBtn');
+    const cancelBtn = document.getElementById('ioBusyCancelBtn');
+    if (progress) progress.style.display = '';
+    if (actionRow) actionRow.style.display = 'none';
+    if (actionBtn) actionBtn.onclick = null;
+    if (cancelBtn) cancelBtn.onclick = null;
+}
+
+function promptIoBusyAction(message, actionLabel = 'Open Share Menu') {
+    const dialog = document.getElementById('ioBusyDialog');
+    const label = document.getElementById('ioBusyLabel');
+    const progress = document.getElementById('ioBusyProgress');
+    const actionRow = document.getElementById('ioBusyActionRow');
+    const actionBtn = document.getElementById('ioBusyActionBtn');
+    const cancelBtn = document.getElementById('ioBusyCancelBtn');
+
+    if (!dialog || !label || !progress || !actionRow || !actionBtn || !cancelBtn) {
+        return Promise.resolve(false);
+    }
+
+    if (ioBusyCloseTimer) {
+        clearTimeout(ioBusyCloseTimer);
+        ioBusyCloseTimer = null;
+    }
+
+    ioBusyDepth = 0;
+    label.textContent = message || 'Ready';
+    progress.style.display = 'none';
+    actionRow.style.display = 'flex';
+    actionBtn.textContent = actionLabel;
+
+    if (!dialog.open) dialog.showModal();
+    requestAnimationFrame(() => dialog.classList.add('show'));
+
+    return new Promise((resolve) => {
+        let settled = false;
+
+        const cleanup = () => {
+            actionBtn.onclick = null;
+            cancelBtn.onclick = null;
+            dialog.removeEventListener('cancel', onCancel);
+            dialog.removeEventListener('close', onClose);
+            resetIoBusyDialogMode();
+        };
+
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            dialog.classList.remove('show');
+            if (dialog.open) dialog.close();
+            cleanup();
+            resolve(value);
+        };
+
+        const onCancel = () => finish(false);
+        const onClose = () => finish(false);
+
+        actionBtn.onclick = () => finish(true);
+        cancelBtn.onclick = () => finish(false);
+        dialog.addEventListener('cancel', onCancel);
+        dialog.addEventListener('close', onClose);
+    });
+}
+
 async function tryNativeShareFile(file, options = {}) {
     if (!navigator.share || typeof File === 'undefined') {
         return { status: 'unsupported' };
@@ -4569,6 +4640,11 @@ async function shareSongByName(songName) {
         let file;
         let shareText;
         const useRawAudioShare = !songHasSavedAemMetadata(songName);
+        const isAndroidFlacRawShare = useRawAudioShare && isAndroidPlatform() && isFlacFilename(song.name);
+
+        if (isAndroidFlacRawShare) {
+            showIoBusy('Preparing track for share...');
+        }
 
         if (useRawAudioShare) {
             file = new File([song.data], song.name, {
@@ -4582,6 +4658,12 @@ async function shareSongByName(songName) {
             const fileName = `${baseName}.aem.txt`;
             file = new File([blob], fileName, { type: 'text/plain', lastModified: Date.now() });
             shareText = fileName;
+        }
+
+        if (isAndroidFlacRawShare) {
+            hideIoBusyImmediately();
+            const shouldOpenShare = await promptIoBusyAction('Track ready to share', 'Open Share Menu');
+            if (!shouldOpenShare) return false;
         }
 
         let shareResult = await tryNativeShareFile(file, {
@@ -4602,6 +4684,12 @@ async function shareSongByName(songName) {
                 type: 'application/octet-stream',
                 lastModified: song.lastModified || Date.now()
             });
+
+            if (isAndroidFlacRawShare) {
+                const shouldRetryShare = await promptIoBusyAction('Retry share in compatibility mode', 'Open Share Menu');
+                if (!shouldRetryShare) return false;
+            }
+
             shareResult = await tryNativeShareFile(fallbackFile, {
                 title: `Share song: ${songName}`,
                 text: shareText
@@ -6106,6 +6194,7 @@ function showIoBusy(message) {
     const dialog = document.getElementById('ioBusyDialog');
     const label = document.getElementById('ioBusyLabel');
     if (!dialog) return;
+    resetIoBusyDialogMode();
     ioBusyDepth++;
     if (label && message && ioBusyDepth === 1) label.textContent = message;
     if (ioBusyCloseTimer) {
@@ -6141,6 +6230,7 @@ function hideIoBusyImmediately() {
         ioBusyCloseTimer = null;
     }
     ioBusyDepth = 0;
+    resetIoBusyDialogMode();
     if (dialog) dialog.classList.remove('show');
     if (dialog && dialog.open) dialog.close();
 }
