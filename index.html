@@ -1566,7 +1566,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.16</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.17</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -3087,7 +3087,8 @@ async function connectBleFlow() {
         device = await navigator.bluetooth.requestDevice({
             filters: [
                 { services: [MIDI_SERVICE_UUID] },
-                { namePrefix: 'Spark' }
+                { services: [SPARK_SERVICE_UUID] },
+//                { namePrefix: 'Spark' }
             ],
             optionalServices: [MIDI_SERVICE_UUID, SPARK_SERVICE_UUID]
         });
