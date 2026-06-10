@@ -1366,6 +1366,7 @@
 <div id="playset-sheet" class="marker-top-sheet" aria-label="Playsets menu"></div>
 <div id="marker-set-sheet" class="marker-top-sheet" aria-label="Marker set menu"></div>
 <div id="marker-menu-sheet" class="marker-top-sheet" aria-label="Marker menu"></div>
+<div id="midi-devices-sheet" class="marker-top-sheet" aria-label="Connected MIDI devices"></div>
 <div id="info-sheet" class="marker-top-sheet" aria-label="App info"></div>
 
 <!-- Speed Bottom Sheet -->
@@ -1566,7 +1567,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.17</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.18</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -2810,11 +2811,13 @@ const SPARK_NOTIFY_UUID  = '0000ffc2-0000-1000-8000-00805f9b34fb';
 
 // NOTE: Spark Go is supported only via BLE (preset selection via USB does not work)
 
-let currentTransport = null; // 'usb' | 'ble' | null
-let deviceType = null; // 'midi' | 'spark' | 'thrii'
-let device = null, server = null, service = null, midiChar = null; // BLE
-let sparkWriteChar = null; // Spark BLE
-let midiAccess = null, usbOutput = null; // USB Web MIDI
+let midiAccess = null; // USB Web MIDI access handle
+
+// Single source of truth for active output connections.
+const midiConnections = new Map();
+let midiPrimaryConnectionId = null;
+let connectInFlight = false;
+let connectStatusTimer = null;
 
 const CONNECT_LABEL_HTML = '<svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h6v3a3 3 0 0 1-6 0v-3z"/><line x1="10.5" y1="8" x2="10.5" y2="10"/><line x1="13.5" y1="8" x2="13.5" y2="10"/><line x1="12" y1="16" x2="12" y2="18"/></svg>\n      Connect';
 
@@ -2822,10 +2825,15 @@ const CONNECT_LABEL_HTML = '<svg class="icon icon-sm" viewBox="0 0 24 24" fill="
 function setStatusText(text) {
     const value = text || '';
     if (value === 'Connect') {
-        statusEl.innerHTML = CONNECT_LABEL_HTML;
+        updateConnectButtonLabel();
         return;
     }
     statusEl.textContent = value;
+    if (connectStatusTimer) clearTimeout(connectStatusTimer);
+    connectStatusTimer = setTimeout(() => {
+        connectStatusTimer = null;
+        updateConnectButtonLabel();
+    }, 1400);
 }
 
 /* Flash visual (activity indicator on CC/PC sends) */
@@ -2855,19 +2863,22 @@ function buildBleMidiPacket(midiBytes, useZeroTimestamp = false) {
     packet.set(midiBytes, 2);
     return packet;
 }
-async function writeBle(bytes, { forceResponse = false, useZeroTimestamp = false } = {}) {
-    if (!midiChar) throw new Error('Not connected');
+async function writeBleTo(conn, bytes, { forceResponse = false, useZeroTimestamp = false } = {}) {
+    if (!conn || !conn.midiChar) throw new Error('Not connected');
     const packet = buildBleMidiPacket(bytes, useZeroTimestamp);
-    if (!forceResponse && typeof midiChar.writeValueWithoutResponse === 'function') {
-        await midiChar.writeValueWithoutResponse(packet);
+    if (!forceResponse && typeof conn.midiChar.writeValueWithoutResponse === 'function') {
+        await conn.midiChar.writeValueWithoutResponse(packet);
     } else {
-        await midiChar.writeValue(packet);
+        await conn.midiChar.writeValue(packet);
     }
 }
-let bleQueue = Promise.resolve();
-function enqueueBle(bytes, opts = {}) {
-    bleQueue = bleQueue.then(() => writeBle(bytes, opts)).catch(() => { /* swallow transient errors */ });
-    return bleQueue;
+function enqueueBleTo(conn, bytes, opts = {}) {
+    if (!conn) return Promise.resolve(false);
+    if (!conn.bleQueue) conn.bleQueue = Promise.resolve();
+    conn.bleQueue = conn.bleQueue
+        .then(() => writeBleTo(conn, bytes, opts).then(() => true))
+        .catch(() => false);
+    return conn.bleQueue;
 }
 
 // --- Spark BLE Helpers ---
@@ -2877,12 +2888,15 @@ function buildSparkPresetCmd(index) {
     for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
     return bytes;
 }
-let sparkQueue = Promise.resolve();
-function sendSparkPreset(presetNumber) {
-    if (!sparkWriteChar) return;
+async function sendSparkPresetTo(conn, presetNumber) {
+    if (!conn || !conn.sparkWriteChar) return false;
     const index = Math.max(0, Math.min(3, presetNumber - 1));
     const cmd = buildSparkPresetCmd(index);
-    sparkQueue = sparkQueue.then(() => sparkWriteChar.writeValue(cmd)).then(() => flashCcStatus()).catch(() => {});
+    if (!conn.sparkQueue) conn.sparkQueue = Promise.resolve();
+    conn.sparkQueue = conn.sparkQueue
+        .then(() => conn.sparkWriteChar.writeValue(cmd).then(() => true))
+        .catch(() => false);
+    return conn.sparkQueue;
 }
 
 // --- THRII USB Helpers ---
@@ -2902,11 +2916,17 @@ function parseSysExHex(hexStr) {
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-async function activateThr10ii() {
+function writeUsbTo(conn, bytes) {
+    if (!conn || !conn.usbOutput) throw new Error('Not connected');
+    conn.usbOutput.send(bytes);
+}
+
+async function activateThr10iiFor(conn) {
+    if (!conn || conn.profile !== 'thrii') return;
     try {
         for (let i = 0; i < THR10II_ACTIVATION_SEQUENCE.length; i++) {
             const syx = parseSysExHex(THR10II_ACTIVATION_SEQUENCE[i]);
-            writeUsb(syx);
+            writeUsbTo(conn, syx);
             await sleep(500);
         }
     } catch (err) {
@@ -2914,20 +2934,473 @@ async function activateThr10ii() {
     }
 }
 
-function sendThriiPreset(presetNumber) {
-    if (!usbOutput) return;
+function sendThriiPresetTo(conn, presetNumber) {
+    if (!conn || conn.profile !== 'thrii') return false;
     const index = Math.max(0, Math.min(4, presetNumber - 1));
     const hex = `f000010c24014d0108000e0b000e0000000400000000${index.toString(16).padStart(2, '0')}0000000000f7`;
     const cmd = parseSysExHex(hex);
-    try { writeUsb(cmd); flashCcStatus(); } catch {}
+    try {
+        writeUsbTo(conn, cmd);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
-function finishUsbConnect() {
-    const name = getConnectedDeviceName().toLowerCase();
-    if (name.includes('thr')) {
-        deviceType = 'thrii';
-        activateThr10ii();
+function isUsbOutputConnected(output) {
+    for (const conn of midiConnections.values()) {
+        if (conn.transport === 'usb' && conn.usbOutput && conn.usbOutput.id === output.id) return true;
     }
+    return false;
+}
+
+function buildConnectionId({ transport, usbOutput = null, bleDevice = null }) {
+    if (transport === 'usb' && usbOutput) {
+        return `usb:${usbOutput.id || usbOutput.name || Date.now().toString(36)}`;
+    }
+    if (transport === 'ble' && bleDevice) {
+        const rawId = bleDevice.id || bleDevice.name || Date.now().toString(36);
+        return `ble:${rawId}`;
+    }
+    return `${transport || 'unknown'}:${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function hasAnyConnection() {
+    return midiConnections.size > 0;
+}
+
+function getConnectedDevices() {
+    return Array.from(midiConnections.values()).sort((a, b) => a.connectedAt - b.connectedAt);
+}
+
+function getPrimaryConnection() {
+    if (midiPrimaryConnectionId && midiConnections.has(midiPrimaryConnectionId)) {
+        return midiConnections.get(midiPrimaryConnectionId);
+    }
+    const first = getConnectedDevices()[0] || null;
+    midiPrimaryConnectionId = first ? first.id : null;
+    return first;
+}
+
+function updateConnectButtonLabel() {
+    if (connectStatusTimer) {
+        clearTimeout(connectStatusTimer);
+        connectStatusTimer = null;
+    }
+
+    const devices = getConnectedDevices();
+    if (!devices.length) {
+        statusEl.innerHTML = CONNECT_LABEL_HTML;
+        statusEl.setAttribute('aria-label', 'Connect to MIDI device');
+        return;
+    }
+
+    const primary = getPrimaryConnection();
+    const primaryName = (primary && primary.name ? primary.name : 'MIDI Device').trim();
+    let label = primaryName;
+    if (devices.length > 1) {
+        label = `${primaryName} +${devices.length - 1}`;
+        if (label.length > 22) label = `${devices.length} devices`;
+    }
+    statusEl.textContent = label;
+    statusEl.setAttribute('aria-label', 'Connected MIDI devices');
+}
+
+function getConnectionTypeLabel(conn) {
+    if (!conn) return '';
+    if (conn.profile === 'spark') return 'BLE Spark';
+    if (conn.profile === 'thrii') return 'USB THRII';
+    return conn.transport === 'usb' ? 'USB MIDI' : 'BLE MIDI';
+}
+
+function renderMidiDevicesSheet() {
+    const sheet = document.getElementById('midi-devices-sheet');
+    if (!sheet) return;
+
+    const devices = getConnectedDevices();
+    const rowsHtml = devices.length
+        ? devices.map(conn => `
+            <button type="button" class="speed-option marker-set-row" data-midi-connection-id="${escapeHtml(conn.id)}" aria-label="Disconnect ${escapeHtml(conn.name)}">
+                <span style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;min-width:0;">
+                    <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(conn.name)}</span>
+                    <span style="font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">${escapeHtml(getConnectionTypeLabel(conn))}</span>
+                </span>
+            </button>
+        `).join('')
+        : '<div class="speed-option marker-set-row" style="pointer-events:none;color:var(--text-muted);">No connected devices</div>';
+
+    sheet.innerHTML = `
+        <div class="marker-set-sheet-list">${rowsHtml}</div>
+        <div class="marker-set-sheet-divider"></div>
+        <div class="marker-set-sheet-footer">
+            <button type="button" class="speed-chip marker-set-chip" data-midi-action="connect" aria-label="Connect another MIDI device" title="Connect">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+            <button type="button" class="speed-chip marker-set-chip danger" data-midi-action="disconnect-all" aria-label="Disconnect all devices" title="Disconnect all"${devices.length ? '' : ' disabled'}>
+                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
+            </button>
+        </div>
+    `;
+
+    if (!sheet.dataset.bound) {
+        sheet.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const rowEl = e.target.closest('[data-midi-connection-id]');
+            const actionEl = e.target.closest('[data-midi-action]');
+
+            if (rowEl) {
+                disconnectConnectionById(rowEl.dataset.midiConnectionId, { notify: false });
+                return;
+            }
+            if (!actionEl) return;
+
+            const action = actionEl.dataset.midiAction;
+            if (action === 'connect') {
+                closeAllSheets();
+                await beginAddConnectionFlow();
+                return;
+            }
+            if (action === 'disconnect-all') {
+                disconnectAllConnections();
+            }
+        });
+        sheet.dataset.bound = '1';
+    }
+
+    if (sheet.classList.contains('open')) positionMidiDevicesSheet();
+}
+
+function positionMidiDevicesSheet() {
+    const sheet = document.getElementById('midi-devices-sheet');
+    const anchor = document.getElementById('mobileMidiBar');
+    if (!sheet || !anchor) return;
+
+    const rect = anchor.getBoundingClientRect();
+    const top = Math.max(0, Math.round(rect.bottom));
+    const rootStyles = getComputedStyle(document.documentElement);
+    const playerBarH = parseFloat(rootStyles.getPropertyValue('--mobile-playerbar-height')) || 160;
+    const tabBarH = parseFloat(rootStyles.getPropertyValue('--mobile-tab-height')) || 56;
+    const maxHeight = Math.max(180, Math.floor(window.innerHeight - top - playerBarH - tabBarH - 10));
+
+    sheet.style.top = `${top}px`;
+    sheet.style.maxHeight = `${maxHeight}px`;
+}
+
+function openMidiDevicesSheet() {
+    const sheet = document.getElementById('midi-devices-sheet');
+    const overlay = document.getElementById('sheetOverlay');
+    if (!sheet || !overlay) return;
+
+    closeAllSheets();
+    renderMidiDevicesSheet();
+    positionMidiDevicesSheet();
+    sheet.classList.add('open');
+    overlay.classList.add('open');
+}
+
+function toggleMidiDevicesSheet(e) {
+    if (e) e.stopPropagation();
+    const sheet = document.getElementById('midi-devices-sheet');
+    if (!sheet) return;
+    if (sheet.classList.contains('open')) {
+        closeAllSheets();
+        return;
+    }
+    openMidiDevicesSheet();
+}
+
+function registerConnection(conn) {
+    if (!conn || !conn.id) return false;
+    if (midiConnections.has(conn.id)) return false;
+    midiConnections.set(conn.id, conn);
+    if (!midiPrimaryConnectionId) midiPrimaryConnectionId = conn.id;
+    updateConnectButtonLabel();
+    renderMidiDevicesSheet();
+    return true;
+}
+
+function unregisterConnection(connectionId) {
+    if (!connectionId || !midiConnections.has(connectionId)) return null;
+    const removed = midiConnections.get(connectionId);
+    midiConnections.delete(connectionId);
+    if (midiPrimaryConnectionId === connectionId) {
+        const nextPrimary = getConnectedDevices()[0] || null;
+        midiPrimaryConnectionId = nextPrimary ? nextPrimary.id : null;
+    }
+    updateConnectButtonLabel();
+    renderMidiDevicesSheet();
+    return removed;
+}
+
+function disconnectConnectionById(connectionId, { notify = false } = {}) {
+    const conn = unregisterConnection(connectionId);
+    if (!conn) return;
+    if (conn.transport === 'ble') {
+        try {
+            if (conn.bleDevice && conn.bleDevice.gatt && conn.bleDevice.gatt.connected) {
+                conn.bleDevice.gatt.disconnect();
+            }
+        } catch {}
+    }
+    if (notify) showToast(`Disconnected: ${conn.name || 'MIDI device'}`);
+}
+
+function disconnectAllConnections() {
+    const ids = Array.from(midiConnections.keys());
+    ids.forEach(id => disconnectConnectionById(id));
+    closeAllSheets();
+}
+
+function getConnectedDeviceName() {
+    const primary = getPrimaryConnection();
+    return primary && primary.name ? primary.name : '';
+}
+
+let toastTimer = null;
+let toastQueue = [];
+function flushToastQueue() {
+    if (!toastQueue.length) {
+        toastTimer = null;
+        return;
+    }
+    const next = toastQueue.shift();
+    showExportNotice(next);
+    toastTimer = setTimeout(() => {
+        toastTimer = null;
+        flushToastQueue();
+    }, 3000);
+}
+
+function showToast(message) {
+    if (!message) return;
+    if (toastQueue.length > 5) {
+        toastQueue = [`${toastQueue.length + 1} device disconnect events`];
+    }
+    toastQueue.push(message);
+    if (!toastTimer) flushToastQueue();
+}
+
+async function connectUsbOutput(output) {
+    if (!output) return false;
+    if (isUsbOutputConnected(output)) {
+        setStatusText('Already connected');
+        return false;
+    }
+
+    const name = output.name || 'USB Output';
+    const profile = String(name).toLowerCase().includes('thr') ? 'thrii' : 'midi';
+    const connection = {
+        id: buildConnectionId({ transport: 'usb', usbOutput: output }),
+        name,
+        transport: 'usb',
+        profile,
+        usbOutput: output,
+        connectedAt: Date.now()
+    };
+
+    if (!registerConnection(connection)) {
+        setStatusText('Already connected');
+        return false;
+    }
+
+    if (profile === 'thrii') activateThr10iiFor(connection);
+    setStatusText(`Connected: ${name}`);
+    return true;
+}
+
+async function connectBleFlow() {
+    if (!navigator.bluetooth) {
+        setStatusText('Web Bluetooth unavailable');
+        return false;
+    }
+
+    try {
+        setStatusText('Requesting BLE device...');
+        const bleDevice = await navigator.bluetooth.requestDevice({
+            filters: [
+                { services: [MIDI_SERVICE_UUID] },
+                { services: [SPARK_SERVICE_UUID] }
+            ],
+            optionalServices: [MIDI_SERVICE_UUID, SPARK_SERVICE_UUID]
+        });
+
+        const connectionId = buildConnectionId({ transport: 'ble', bleDevice });
+        if (midiConnections.has(connectionId)) {
+            setStatusText('Already connected');
+            return false;
+        }
+
+        setStatusText('Connecting...');
+        const gattServer = await bleDevice.gatt.connect();
+
+        const devName = (bleDevice.name || '').toLowerCase();
+        if (devName.includes('thr')) {
+            bleDevice.gatt.disconnect();
+            setStatusText('Connect');
+            alert('THRII connected via Bluetooth is not supported.\nPlease connect via USB.');
+            return false;
+        }
+
+        const isSpark = devName.startsWith('spark');
+        let midiCharacteristic = null;
+        let sparkWriteCharacteristic = null;
+
+        if (isSpark) {
+            const sparkService = await gattServer.getPrimaryService(SPARK_SERVICE_UUID);
+            sparkWriteCharacteristic = await sparkService.getCharacteristic(SPARK_WRITE_UUID);
+            const sparkNotifyChar = await sparkService.getCharacteristic(SPARK_NOTIFY_UUID);
+            await sparkNotifyChar.startNotifications();
+            sparkNotifyChar.addEventListener('characteristicvaluechanged', () => { /* no-op */ });
+        } else {
+            const midiService = await gattServer.getPrimaryService(MIDI_SERVICE_UUID);
+            midiCharacteristic = await midiService.getCharacteristic(MIDI_CHARACTERISTIC_UUID);
+            try {
+                await midiCharacteristic.startNotifications();
+                midiCharacteristic.addEventListener('characteristicvaluechanged', () => { /* no-op */ });
+            } catch { /* continue */ }
+        }
+
+        const connection = {
+            id: connectionId,
+            name: bleDevice.name || 'BLE Device',
+            transport: 'ble',
+            profile: isSpark ? 'spark' : 'midi',
+            bleDevice,
+            gattServer,
+            midiChar: midiCharacteristic,
+            sparkWriteChar: sparkWriteCharacteristic,
+            bleQueue: Promise.resolve(),
+            sparkQueue: Promise.resolve(),
+            connectedAt: Date.now()
+        };
+
+        bleDevice.addEventListener('gattserverdisconnected', () => {
+            const removed = unregisterConnection(connection.id);
+            if (removed) showToast(`Disconnected: ${removed.name || 'MIDI device'}`);
+        });
+
+        if (!registerConnection(connection)) {
+            try { if (bleDevice.gatt.connected) bleDevice.gatt.disconnect(); } catch {}
+            setStatusText('Already connected');
+            return false;
+        }
+
+        setStatusText(`Connected: ${connection.name}`);
+        return true;
+    } catch (err) {
+        const isUserCancel = err && (err.name === 'NotFoundError' || err.name === 'AbortError');
+        if (isUserCancel) {
+            setStatusText('Connect');
+            return false;
+        }
+        setStatusText('Error');
+        return false;
+    }
+}
+
+async function beginAddConnectionFlow() {
+    if (connectInFlight) return;
+    connectInFlight = true;
+    try {
+        const access = await ensureMidiAccess();
+        if (access) {
+            const outputs = listUsbOutputs().filter(out => !isUsbOutputConnected(out));
+
+            if (outputs.length === 1) {
+                const candidate = outputs[0];
+                const ok = confirm(`Connect to USB MIDI output:\n\n${candidate.name || 'USB Output'}\n\nOK to connect, Cancel to choose BLE.`);
+                if (ok) {
+                    await connectUsbOutput(candidate);
+                    return;
+                }
+            } else if (outputs.length > 1) {
+                usbOutputEl.innerHTML = '';
+                outputs.forEach(out => {
+                    const opt = document.createElement('option');
+                    opt.value = out.id;
+                    opt.textContent = out.name || `Output ${out.id}`;
+                    usbOutputEl.appendChild(opt);
+                });
+
+                await new Promise(resolve => {
+                    usbDialog.showModal();
+
+                    const cleanup = () => {
+                        usbConnectBtn.removeEventListener('click', onConnect);
+                        usbCancelBtn.removeEventListener('click', onCancel);
+                    };
+
+                    const onConnect = async () => {
+                        const id = usbOutputEl.value;
+                        const output = access.outputs.get(id);
+                        usbDialog.close();
+                        cleanup();
+                        if (output) await connectUsbOutput(output);
+                        else await connectBleFlow();
+                        resolve();
+                    };
+
+                    const onCancel = async () => {
+                        usbDialog.close();
+                        cleanup();
+                        await connectBleFlow();
+                        resolve();
+                    };
+
+                    usbConnectBtn.addEventListener('click', onConnect, { once: true });
+                    usbCancelBtn.addEventListener('click', onCancel, { once: true });
+                });
+                return;
+            }
+        }
+
+        await connectBleFlow();
+    } finally {
+        connectInFlight = false;
+        renderMidiDevicesSheet();
+    }
+}
+
+async function sendCcTo(conn, channel, ccNumber, ccValue) {
+    if (!conn || conn.profile !== 'midi') return false;
+    const ch  = Math.min(16, Math.max(1, Number(channel)  || 1));
+    const cc  = Math.min(127, Math.max(0, Number(ccNumber) || 0));
+    const val = Math.min(127, Math.max(0, Number(ccValue)  || 0));
+    const status = 0xB0 + (ch - 1);
+    const midiBytes = new Uint8Array([status, cc, val]);
+
+    try {
+        if (conn.transport === 'usb') {
+            writeUsbTo(conn, midiBytes);
+            return true;
+        }
+        if (conn.transport === 'ble') {
+            return await enqueueBleTo(conn, midiBytes, { forceResponse: false, useZeroTimestamp: false });
+        }
+    } catch {}
+    return false;
+}
+
+async function sendPcTo(conn, channel, program) {
+    if (!conn || conn.profile !== 'midi') return false;
+    const ch  = Math.min(16, Math.max(1, Number(channel)  || 1));
+    const pg  = Math.min(127, Math.max(0, Number(program) || 0));
+    const status = 0xC0 + (ch - 1);
+    const midiBytes = new Uint8Array([status, pg]);
+
+    try {
+        if (conn.transport === 'usb') {
+            writeUsbTo(conn, midiBytes);
+            return true;
+        }
+        if (conn.transport === 'ble') {
+            return await enqueueBleTo(conn, midiBytes, { forceResponse: false, useZeroTimestamp: true });
+        }
+    } catch {}
+    return false;
 }
 
 // USB Web MIDI helpers
@@ -2945,20 +3418,6 @@ function listUsbOutputs() {
     for (const out of midiAccess.outputs.values()) outputs.push(out);
     return outputs;
 }
-function writeUsb(bytes) {
-    if (!usbOutput) throw new Error('Not connected');
-    usbOutput.send(bytes);
-}
-
-// Helper: connected device name (for routing CC vs PC)
-function getConnectedDeviceName() {
-    if (currentTransport === 'usb') {
-        return (usbOutput && usbOutput.name) ? usbOutput.name : '';
-    } else if (currentTransport === 'ble') {
-        return (device && device.name) ? device.name : '';
-    }
-    return '';
-}
 
 function shouldRoutePresetAsCc(deviceName) {
     const name = (deviceName || '').toLowerCase();
@@ -2970,184 +3429,36 @@ function presetToProgram(preset) { let p = parseInt(preset,10); if (isNaN(p)) p=
 
 // --- Public APIs (flash on both CC and PC) ---
 async function sendCc(channel, ccNumber, ccValue) {
-    const ch  = Math.min(16, Math.max(1, Number(channel)  || 1));
-    const cc  = Math.min(127, Math.max(0, Number(ccNumber) || 0));
-    const val = Math.min(127, Math.max(0, Number(ccValue)  || 0));
-    const status = 0xB0 + (ch - 1);
-    const midiBytes = new Uint8Array([status, cc, val]);
-
-    try {
-        if (currentTransport === 'usb') {
-            writeUsb(midiBytes);
-            flashCcStatus();
-        } else if (currentTransport === 'ble') {
-            enqueueBle(midiBytes, { forceResponse: false, useZeroTimestamp: false })
-                .then(() => { flashCcStatus(); });
-        }
-    } catch { /* swallow transient errors */ }
+    let sentAny = false;
+    for (const conn of midiConnections.values()) {
+        const ok = await sendCcTo(conn, channel, ccNumber, ccValue);
+        if (ok) sentAny = true;
+    }
+    if (sentAny) flashCcStatus();
 }
 window.sendCc = sendCc;
 
 async function sendPc(channel, program) {
-    const ch  = Math.min(16, Math.max(1, Number(channel)  || 1));
-    const pg  = Math.min(127, Math.max(0, Number(program) || 0));
-    const status = 0xC0 + (ch - 1);
-    const midiBytes = new Uint8Array([status, pg]);
-
-    try {
-        if (currentTransport === 'usb') {
-            writeUsb(midiBytes);
-            flashCcStatus();
-        } else if (currentTransport === 'ble') {
-            enqueueBle(midiBytes, { forceResponse: false, useZeroTimestamp: true })
-                .then(() => { flashCcStatus(); });
-        }
-    } catch { /* swallow transient errors */ }
+    let sentAny = false;
+    for (const conn of midiConnections.values()) {
+        const ok = await sendPcTo(conn, channel, program);
+        if (ok) sentAny = true;
+    }
+    if (sentAny) flashCcStatus();
 }
 window.sendPc = sendPc;
 
-let toDisconnect = 'x';
-let toConnect = 'C';
-let connectionStatus = toConnect;
+async function onConnectButtonClick(e) {
+    if (e) e.stopPropagation();
+    if (connectInFlight) return;
 
-async function connectOrDisconnect() {
-    if (connectionStatus === toDisconnect) {
-        if (currentTransport === 'ble') {
-            try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch {}
-            device = server = service = midiChar = sparkWriteChar = null;
-        } else if (currentTransport === 'usb') {
-            usbOutput = null;
-        }
-        currentTransport = null;
-        deviceType = null;
-        connectionStatus = toConnect;
-        setStatusText('Connect');
+    if (hasAnyConnection()) {
+        toggleMidiDevicesSheet();
         return;
     }
-
-    const access = await ensureMidiAccess();
-    if (access) {
-        const outputs = listUsbOutputs();
-
-        if (outputs.length === 1) {
-            const candidate = outputs[0];
-            const ok = confirm(`Connect to USB MIDI output:\n\n${candidate.name || 'USB Output'}\n\nOK to connect, Cancel to choose BLE.`);
-            if (ok) {
-                usbOutput = candidate;
-                currentTransport = 'usb';
-                deviceType = 'midi';
-                connectionStatus = toDisconnect;
-                setStatusText(usbOutput.name || 'USB Output');
-                finishUsbConnect();
-                return;
-            }
-        } else if (outputs.length > 1) {
-            usbOutputEl.innerHTML = '';
-            outputs.forEach(out => {
-                const opt = document.createElement('option');
-                opt.value = out.id;
-                opt.textContent = out.name || `Output ${out.id}`;
-                usbOutputEl.appendChild(opt);
-            });
-            usbDialog.showModal();
-
-            const onConnect = () => {
-                const id = usbOutputEl.value;
-                usbOutput = access.outputs.get(id);
-                usbDialog.close();
-                usbConnectBtn.removeEventListener('click', onConnect);
-                usbCancelBtn.removeEventListener('click', onCancel);
-                if (usbOutput) {
-                    currentTransport = 'usb';
-                    deviceType = 'midi';
-                    connectionStatus = toDisconnect;
-                    setStatusText(usbOutput.name || 'USB Output');
-                    finishUsbConnect();
-                } else {
-                    connectBleFlow();
-                }
-            };
-            const onCancel = () => {
-                usbDialog.close();
-                usbConnectBtn.removeEventListener('click', onConnect);
-                usbCancelBtn.removeEventListener('click', onCancel);
-                connectBleFlow();
-            };
-            usbConnectBtn.addEventListener('click', onConnect, { once: true });
-            usbCancelBtn.addEventListener('click', onCancel,  { once: true });
-            return;
-        }
-    }
-    connectBleFlow();
+    await beginAddConnectionFlow();
 }
-async function connectBleFlow() {
-    if (!navigator.bluetooth) { setStatusText('Web Bluetooth unavailable'); return; }
-    try {
-        setStatusText('Requesting BLE device...');
-        device = await navigator.bluetooth.requestDevice({
-            filters: [
-                { services: [MIDI_SERVICE_UUID] },
-                { services: [SPARK_SERVICE_UUID] },
-//                { namePrefix: 'Spark' }
-            ],
-            optionalServices: [MIDI_SERVICE_UUID, SPARK_SERVICE_UUID]
-        });
-
-        device.addEventListener('gattserverdisconnected', () => {
-            connectionStatus = toConnect;
-            setStatusText('Connect');
-            device = server = service = midiChar = sparkWriteChar = null;
-            deviceType = null;
-            currentTransport = null;
-        });
-
-        setStatusText('Connecting…');
-        server = await device.gatt.connect();
-
-        const devName = (device.name || '').toLowerCase();
-        if (devName.includes('thr')) {
-            device.gatt.disconnect();
-            device = server = service = midiChar = sparkWriteChar = null;
-            currentTransport = null;
-            deviceType = null;
-            connectionStatus = toConnect;
-            setStatusText('Connect');
-            alert('THRII connected via Bluetooth is not supported.\nPlease connect via USB.');
-            return;
-        }
-
-        const isSpark = devName.startsWith('spark');
-        if (isSpark) {
-            const sparkService = await server.getPrimaryService(SPARK_SERVICE_UUID);
-            sparkWriteChar = await sparkService.getCharacteristic(SPARK_WRITE_UUID);
-            const sparkNotifyChar = await sparkService.getCharacteristic(SPARK_NOTIFY_UUID);
-            await sparkNotifyChar.startNotifications();
-            sparkNotifyChar.addEventListener('characteristicvaluechanged', () => { /* no-op */ });
-            deviceType = 'spark';
-        } else {
-            service = await server.getPrimaryService(MIDI_SERVICE_UUID);
-            midiChar = await service.getCharacteristic(MIDI_CHARACTERISTIC_UUID);
-            try {
-                await midiChar.startNotifications();
-                midiChar.addEventListener('characteristicvaluechanged', () => { /* no-op */ });
-            } catch { /* continue */ }
-            deviceType = 'midi';
-        }
-
-        currentTransport = 'ble';
-        connectionStatus = toDisconnect;
-        setStatusText(device.name || 'BLE Device');
-    } catch (err) {
-        const isUserCancel = err && (err.name === 'NotFoundError' || err.name === 'AbortError');
-        if (isUserCancel) {
-            connectionStatus = toConnect;
-            setStatusText('Connect');
-            return;
-        }
-        setStatusText('Error');
-    }
-}
-btnConnect.addEventListener('click', connectOrDisconnect);
+btnConnect.addEventListener('click', onConnectButtonClick);
 
 /* =============================== Controls ================================ */
 function togglePlayPause() {
@@ -3177,6 +3488,8 @@ function closeAllSheets() {
     if (markerSheet) markerSheet.classList.remove('open');
     const markerMenuSheet = document.getElementById('marker-menu-sheet');
     if (markerMenuSheet) markerMenuSheet.classList.remove('open');
+    const midiDevicesSheet = document.getElementById('midi-devices-sheet');
+    if (midiDevicesSheet) midiDevicesSheet.classList.remove('open');
     const infoSheet = document.getElementById('info-sheet');
     if (infoSheet) infoSheet.classList.remove('open');
     const overlay = document.getElementById('sheetOverlay');
@@ -3208,6 +3521,8 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSpeedPitchChipState(audio.playbackRate || 1.0);
     updatePlaysetLabel();
     renderPlaysetSheet();
+    renderMidiDevicesSheet();
+    updateConnectButtonLabel();
 });
 
 function toggleSpeedMenu() {
@@ -3589,18 +3904,33 @@ function fireMarkerByIndex(i, evt, opts) {
     setActiveMarkerUIByIndex(i);
     updateTickFiredClassByIndex(i, true);
 
-    if (currentTransport && (forceSend || !firedBefore)) {
-        try {
-            if (deviceType === 'spark') {
-                sendSparkPreset(evt.preset);
-            } else if (deviceType === 'thrii') {
-                sendThriiPreset(evt.preset);
-            } else {
-                const name = getConnectedDeviceName();
-                if (shouldRoutePresetAsCc(name)) window.sendCc(1, 1, evt.preset);
-                else window.sendPc(1, presetToProgram(evt.preset));
+    if (hasAnyConnection() && (forceSend || !firedBefore)) {
+        (async () => {
+            let sentAny = false;
+            for (const conn of midiConnections.values()) {
+                try {
+                    if (conn.profile === 'spark') {
+                        const ok = await sendSparkPresetTo(conn, evt.preset);
+                        if (ok) sentAny = true;
+                        continue;
+                    }
+                    if (conn.profile === 'thrii') {
+                        const ok = sendThriiPresetTo(conn, evt.preset);
+                        if (ok) sentAny = true;
+                        continue;
+                    }
+
+                    if (shouldRoutePresetAsCc(conn.name)) {
+                        const ok = await sendCcTo(conn, 1, 1, evt.preset);
+                        if (ok) sentAny = true;
+                    } else {
+                        const ok = await sendPcTo(conn, 1, presetToProgram(evt.preset));
+                        if (ok) sentAny = true;
+                    }
+                } catch {}
             }
-        } catch {}
+            if (sentAny) flashCcStatus();
+        })();
     }
 }
 
@@ -5386,6 +5716,8 @@ window.addEventListener('resize', () => {
     if (songSheet && songSheet.classList.contains('open')) positionSongMenuSheet();
     const markerMenuSheet = document.getElementById('marker-menu-sheet');
     if (markerMenuSheet && markerMenuSheet.classList.contains('open')) positionMarkerMenuSheet();
+    const midiDevicesSheet = document.getElementById('midi-devices-sheet');
+    if (midiDevicesSheet && midiDevicesSheet.classList.contains('open')) positionMidiDevicesSheet();
     const infoSheet = document.getElementById('info-sheet');
     if (infoSheet && infoSheet.classList.contains('open')) positionInfoSheet();
 }, { passive: true });
@@ -5401,6 +5733,8 @@ if (sheetScrollHost) {
         if (songSheet && songSheet.classList.contains('open')) positionSongMenuSheet();
         const markerMenuSheet = document.getElementById('marker-menu-sheet');
         if (markerMenuSheet && markerMenuSheet.classList.contains('open')) positionMarkerMenuSheet();
+        const midiDevicesSheet = document.getElementById('midi-devices-sheet');
+        if (midiDevicesSheet && midiDevicesSheet.classList.contains('open')) positionMidiDevicesSheet();
     }, { passive: true });
 }
 
