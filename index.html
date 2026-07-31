@@ -45,6 +45,7 @@
             --tick-default: rgba(255,255,255,0.3);
             --tick-current: #fff;
             --tick-current-shadow: 0 0 4px rgba(255,255,255,0.6);
+            --secondary-activity: rgba(29,185,84,0.28);
             --backdrop-overlay: rgba(0,0,0,0.6);
             --accent-on-btn: #000;
             --mobile-tab-height: 56px;
@@ -86,6 +87,7 @@
             --tick-default: rgba(0,0,0,0.25);
             --tick-current: #1a1a1a;
             --tick-current-shadow: 0 0 4px rgba(0,0,0,0.3);
+            --secondary-activity: rgba(29,185,84,0.2);
             --backdrop-overlay: rgba(0,0,0,0.3);
             --accent-on-btn: #fff;
         }
@@ -446,6 +448,22 @@
             border-radius: var(--radius-full);
         }
         .progress-ab.enabled { background: rgba(245,158,11,0.45); }
+        .progress-secondary-band {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+        .progress-secondary-segment {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            border-radius: var(--radius-full);
+            background: var(--secondary-activity);
+        }
         .ab-handle {
             position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%;
             background: var(--amber); border: 2px solid var(--amber-dark);
@@ -784,6 +802,51 @@
             user-select: none;
             -webkit-touch-callout: none;
             touch-action: manipulation;
+        }
+        .marker-set-row-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 2px 0;
+        }
+        .marker-set-row-main {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        .marker-set-row-selected {
+            box-shadow: inset 0 0 0 1px var(--accent);
+        }
+        .marker-set-assign-badge {
+            flex: 0 0 auto;
+            min-height: 30px;
+            max-width: 48%;
+            padding: 5px 10px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--bg-muted);
+            color: var(--text-secondary);
+            font-size: 0.74rem;
+            font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+        .marker-set-assign-badge:active {
+            background: var(--bg-hover);
+        }
+        .marker-set-assign-badge.assigned {
+            border-color: var(--accent-soft);
+            color: var(--accent);
+            background: var(--accent-dim);
+        }
+        .marker-set-sheet-title {
+            padding: 10px 12px 4px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-light);
         }
         .marker-set-sheet-divider {
             height: 1px;
@@ -2121,9 +2184,7 @@ async function removeSongByName(songName) {
             audio.src = "";
             currentFileName = "";
             setCurrentTitleState('Select a song', false);
-            firedEvents.clear();
-            lastTriggeredMarkerTime = null;
-            lastTriggeredMarkerIndex = null;
+            clearMarkerTriggerState();
             activeBlobUrl = safeRevoke(activeBlobUrl);
             updateMarkerTicks();
         }
@@ -2319,6 +2380,9 @@ function openMarkerEditorSheet(e, idx) {
 }
 
 function saveMarkerSheetEdit() {
+    if (!currentFileName) return;
+    const markerData = getRawMarkerData(currentFileName);
+    const activeSetId = markerData.activeId;
     const idx = markerMenuContext.index;
     const events = getEvents();
     if (idx === null || idx < 0 || idx >= events.length) {
@@ -2344,6 +2408,7 @@ function saveMarkerSheetEdit() {
     saveEvents(updated);
 
     firedEvents.delete(old.time);
+    clearRouteFiredForSetTime(activeSetId, old.time);
     if (lastTriggeredMarkerIndex === idx || lastTriggeredMarkerTime === old.time) {
         lastTriggeredMarkerIndex = null;
         lastTriggeredMarkerTime = null;
@@ -3366,6 +3431,8 @@ function renameInOrder(oldName, newName) {
 let currentFileName = "";
 let activeBlobUrl = null;
 let firedEvents = new Set();
+let firedRouteEvents = new Set();
+let firedRouteSchedule = new Set();
 
 // Play mode: 'none' | 'loop' | 'queue'
 let playMode = loadPlayMode();
@@ -3391,6 +3458,14 @@ let audioCtx = null;
 let audioGraph = null;
 let isPitchShiftMode = false;
 let currentPitchSemitones = 0;
+
+function clearMarkerTriggerState() {
+    firedEvents.clear();
+    firedRouteEvents.clear();
+    firedRouteSchedule.clear();
+    lastTriggeredMarkerTime = null;
+    lastTriggeredMarkerIndex = null;
+}
 
 function applyPreservesPitch(enabled) {
     audio.preservesPitch = enabled;
@@ -3481,6 +3556,18 @@ const midiConnections = new Map();
 let midiPrimaryConnectionId = null;
 let connectInFlight = false;
 let connectStatusTimer = null;
+// Future extension: support per-instance family keys (for example pm_1, pm_2).
+const SUPPORTED_FAMILY_OPTIONS = [
+    { key: 'nux', label: 'NUX Mighty Plug Pro / Mighty Plug' },
+    { key: 'pm', label: 'Pocket Master / Smart Box' },
+    { key: 'spark', label: 'Spark Go / Spark 40' },
+    { key: 'thr', label: 'Yamaha THR-II' }
+];
+const midiSheetState = {
+    mode: 'connections',
+    assignmentSetId: null,
+    anchorEl: null
+};
 
 const CONNECT_LABEL_HTML = '<svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h6v3a3 3 0 0 1-6 0v-3z"/><line x1="10.5" y1="8" x2="10.5" y2="10"/><line x1="13.5" y1="8" x2="13.5" y2="10"/><line x1="12" y1="16" x2="12" y2="18"/></svg>\n      Connect';
 
@@ -3680,39 +3767,77 @@ function renderMidiDevicesSheet() {
     const sheet = document.getElementById('midi-devices-sheet');
     if (!sheet) return;
 
-    const devices = getConnectedDevices();
-    const rowsHtml = devices.length
-        ? devices.map(conn => `
-            <button type="button" class="speed-option marker-set-row" data-midi-connection-id="${escapeHtml(conn.id)}" aria-label="Disconnect ${escapeHtml(conn.name)}">
-                <span style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;min-width:0;">
-                    <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(conn.name)}</span>
-                    <span style="font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">${escapeHtml(getConnectionTypeLabel(conn))}</span>
-                </span>
-            </button>
-        `).join('')
-        : '<div class="speed-option marker-set-row" style="pointer-events:none;color:var(--text-muted);">No connected devices</div>';
+    const isAssignmentMode = midiSheetState.mode === 'assignment';
+    if (isAssignmentMode) {
+        const markerData = currentFileName ? getRawMarkerData(currentFileName) : createDefaultMarkerData();
+        const setId = midiSheetState.assignmentSetId;
+        const setDef = setId ? markerData.sets[setId] : null;
+        const currentFamily = normalizeAssignedFamily(setDef?.assignedFamily);
+        const title = setDef ? `Assign Marker Set: ${setDef.name}` : 'Assign Marker Set';
+        const rowsHtml = setDef
+            ? getAssignmentOptions().map((opt) => {
+                const isActive = currentFamily === normalizeAssignedFamily(opt.key);
+                const activeClass = isActive ? ' active' : '';
+                const keyValue = opt.key == null ? '' : opt.key;
+                return `<button type="button" class="speed-option marker-set-row${activeClass}" data-midi-family-key="${escapeHtml(keyValue)}" aria-label="Assign to ${escapeHtml(opt.label)}">${escapeHtml(opt.label)}</button>`;
+            }).join('')
+            : '<div class="speed-option marker-set-row" style="pointer-events:none;color:var(--text-muted);">Set unavailable</div>';
 
-    sheet.innerHTML = `
-        <div class="marker-set-sheet-list">${rowsHtml}</div>
-        <div class="marker-set-sheet-divider"></div>
-        <div class="marker-set-sheet-footer">
-            <button type="button" class="speed-chip marker-set-chip" data-midi-action="connect" aria-label="Connect another MIDI device" title="Connect">
-                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            </button>
-            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
-            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
-            <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
-            <button type="button" class="speed-chip marker-set-chip danger" data-midi-action="disconnect-all" aria-label="Disconnect all devices" title="Disconnect all"${devices.length ? '' : ' disabled'}>
-                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
-            </button>
-        </div>
-    `;
+        sheet.innerHTML = `
+            <div class="marker-set-sheet-title">${escapeHtml(title)}</div>
+            <div class="marker-set-sheet-list">${rowsHtml}</div>
+            <div class="marker-set-sheet-divider"></div>
+            <div class="marker-set-sheet-footer">
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <button type="button" class="speed-chip marker-set-chip" data-midi-action="close" aria-label="Close assignment picker" title="Close">Close</button>
+            </div>
+        `;
+    } else {
+        const devices = getConnectedDevices();
+        const rowsHtml = devices.length
+            ? devices.map(conn => `
+                <button type="button" class="speed-option marker-set-row" data-midi-connection-id="${escapeHtml(conn.id)}" aria-label="Disconnect ${escapeHtml(conn.name)}">
+                    <span style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;min-width:0;">
+                        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(conn.name)}</span>
+                        <span style="font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">${escapeHtml(getConnectionTypeLabel(conn))}</span>
+                    </span>
+                </button>
+            `).join('')
+            : '<div class="speed-option marker-set-row" style="pointer-events:none;color:var(--text-muted);">No connected devices</div>';
+
+        sheet.innerHTML = `
+            <div class="marker-set-sheet-list">${rowsHtml}</div>
+            <div class="marker-set-sheet-divider"></div>
+            <div class="marker-set-sheet-footer">
+                <button type="button" class="speed-chip marker-set-chip" data-midi-action="connect" aria-label="Connect another MIDI device" title="Connect">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <button type="button" class="speed-chip marker-set-chip danger" data-midi-action="disconnect-all" aria-label="Disconnect all devices" title="Disconnect all"${devices.length ? '' : ' disabled'}>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
+                </button>
+            </div>
+        `;
+    }
 
     if (!sheet.dataset.bound) {
         sheet.addEventListener('click', async (e) => {
             e.stopPropagation();
+            const familyRowEl = e.target.closest('[data-midi-family-key]');
             const rowEl = e.target.closest('[data-midi-connection-id]');
             const actionEl = e.target.closest('[data-midi-action]');
+
+            if (familyRowEl && midiSheetState.mode === 'assignment') {
+                const familyKeyRaw = familyRowEl.dataset.midiFamilyKey;
+                const familyKey = normalizeAssignedFamily(familyKeyRaw);
+                assignMarkerSetToFamily(midiSheetState.assignmentSetId, familyKey);
+                return;
+            }
 
             if (rowEl) {
                 disconnectConnectionById(rowEl.dataset.midiConnectionId, { notify: false });
@@ -3721,6 +3846,10 @@ function renderMidiDevicesSheet() {
             if (!actionEl) return;
 
             const action = actionEl.dataset.midiAction;
+            if (action === 'close') {
+                closeAllSheets();
+                return;
+            }
             if (action === 'connect') {
                 closeAllSheets();
                 await beginAddConnectionFlow();
@@ -3738,7 +3867,7 @@ function renderMidiDevicesSheet() {
 
 function positionMidiDevicesSheet() {
     const sheet = document.getElementById('midi-devices-sheet');
-    const anchor = document.getElementById('mobileMidiBar');
+    const anchor = midiSheetState.anchorEl || document.getElementById('mobileMidiBar');
     if (!sheet || !anchor) return;
 
     const rect = anchor.getBoundingClientRect();
@@ -3752,12 +3881,15 @@ function positionMidiDevicesSheet() {
     sheet.style.maxHeight = `${maxHeight}px`;
 }
 
-function openMidiDevicesSheet() {
+function openMidiDevicesSheet(options = {}) {
     const sheet = document.getElementById('midi-devices-sheet');
     const overlay = document.getElementById('sheetOverlay');
     if (!sheet || !overlay) return;
 
     closeAllSheets();
+    midiSheetState.mode = options.mode || 'connections';
+    midiSheetState.assignmentSetId = options.assignmentSetId || null;
+    midiSheetState.anchorEl = options.anchorEl || document.getElementById('mobileMidiBar');
     renderMidiDevicesSheet();
     positionMidiDevicesSheet();
     sheet.classList.add('open');
@@ -3772,7 +3904,7 @@ function toggleMidiDevicesSheet(e) {
         closeAllSheets();
         return;
     }
-    openMidiDevicesSheet();
+    openMidiDevicesSheet({ mode: 'connections', anchorEl: document.getElementById('mobileMidiBar') });
 }
 
 function registerConnection(conn) {
@@ -3782,6 +3914,16 @@ function registerConnection(conn) {
     if (!midiPrimaryConnectionId) midiPrimaryConnectionId = conn.id;
     updateConnectButtonLabel();
     renderMidiDevicesSheet();
+    if (currentFileName) {
+        const switched = syncUiActiveSetFromRoutingContext();
+        if (switched) {
+            refreshEventUI();
+        } else {
+            updateSetSelector(getRawMarkerData(currentFileName));
+            updateMarkerTicks();
+        }
+    }
+    notifyRoutingSummaryIfChanged('Routing updated');
     return true;
 }
 
@@ -3795,6 +3937,16 @@ function unregisterConnection(connectionId) {
     }
     updateConnectButtonLabel();
     renderMidiDevicesSheet();
+    if (currentFileName) {
+        const switched = syncUiActiveSetFromRoutingContext();
+        if (switched) {
+            refreshEventUI();
+        } else {
+            updateSetSelector(getRawMarkerData(currentFileName));
+            updateMarkerTicks();
+        }
+    }
+    notifyRoutingSummaryIfChanged('Routing updated');
     return removed;
 }
 
@@ -3844,6 +3996,50 @@ function showToast(message) {
     }
     toastQueue.push(message);
     if (!toastTimer) flushToastQueue();
+}
+
+let lastRoutingSummarySignature = '';
+
+function buildRoutingSummaryForCurrentSong() {
+    if (!currentFileName) return { signature: '', text: '' };
+
+    const markerData = getRawMarkerData(currentFileName);
+    const grouped = getConnectionsByFamily();
+    const familyKeys = Array.from(grouped.keys()).sort();
+    if (!familyKeys.length) return { signature: '', text: '' };
+
+    const parts = familyKeys.map((familyKey) => {
+        const setId = resolveEffectiveSetIdForFamily(familyKey, markerData);
+        const setName = markerData.sets[setId]?.name || setId;
+        const familyLabel = getFamilyLabel(familyKey);
+        return {
+            token: `${familyKey}:${setId}`,
+            label: `${familyLabel} -> ${setName}`
+        };
+    });
+
+    return {
+        signature: parts.map((p) => p.token).join('|'),
+        text: parts.map((p) => p.label).join(' | ')
+    };
+}
+
+function notifyRoutingSummaryIfChanged(reasonLabel) {
+    if (!hasAnyConnection()) {
+        if (lastRoutingSummarySignature) {
+            lastRoutingSummarySignature = '';
+            showToast('Routing idle: no connected devices');
+        }
+        return;
+    }
+
+    if (!currentFileName) return;
+    const summary = buildRoutingSummaryForCurrentSong();
+    if (!summary.signature || summary.signature === lastRoutingSummarySignature) return;
+
+    lastRoutingSummarySignature = summary.signature;
+    const prefix = reasonLabel ? `${reasonLabel}: ` : 'Routing: ';
+    showToast(`${prefix}${summary.text}`);
 }
 
 async function connectUsbOutput(output) {
@@ -4157,6 +4353,9 @@ function closeAllSheets() {
     if (infoSheet) infoSheet.classList.remove('open');
     const overlay = document.getElementById('sheetOverlay');
     if (overlay) overlay.classList.remove('open');
+    midiSheetState.mode = 'connections';
+    midiSheetState.assignmentSetId = null;
+    midiSheetState.anchorEl = null;
     playsetModalState.mode = null;
     playsetModalState.sourceSongName = '';
     playsetModalState.anchorEl = null;
@@ -4276,9 +4475,7 @@ function seekToTime(targetTime) {
 function stopAudio() {
     audio.pause();
     audio.currentTime = 0;
-    firedEvents.clear();
-    lastTriggeredMarkerTime = null;
-    lastTriggeredMarkerIndex = null;
+    clearMarkerTriggerState();
     activeBlobUrl = safeRevoke(activeBlobUrl);
     document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
     updateMarkerTicks();
@@ -4375,7 +4572,7 @@ function clearABLoop() {
 // Handle audio end event with queue/loop logic
 audio.addEventListener('ended', async () => {
     // Clear fired events so they can trigger again on replay/loop/queue
-    firedEvents.clear();
+    clearMarkerTriggerState();
     
     if (playMode === 'queue') {
         const nextSong = await getNextSongInPlaylist();
@@ -4558,7 +4755,10 @@ function hideGhostPreview() {
 /* ====================== Markers (with MIDI dispatch) ===================== */
 function fireMarkerByIndex(i, evt, opts) {
     const forceSend = (opts && opts.forceCc) ? true : false;
-    const firedBefore = firedEvents.has(evt.time);
+    const markerData = currentFileName ? getRawMarkerData(currentFileName) : null;
+    const routeEntries = markerData
+        ? buildRouteEntriesForPlayback(markerData).filter((entry) => Math.abs(entry.evt.time - evt.time) <= EPS_RECONCILE)
+        : [];
 
     firedEvents.add(evt.time);
     lastTriggeredMarkerTime = evt.time;
@@ -4567,30 +4767,13 @@ function fireMarkerByIndex(i, evt, opts) {
     setActiveMarkerUIByIndex(i);
     updateTickFiredClassByIndex(i, true);
 
-    if (hasAnyConnection() && (forceSend || !firedBefore)) {
+    if (hasAnyConnection() && routeEntries.length) {
         (async () => {
             let sentAny = false;
-            for (const conn of midiConnections.values()) {
-                try {
-                    if (conn.profile === 'spark') {
-                        const ok = await sendSparkPresetTo(conn, evt.preset);
-                        if (ok) sentAny = true;
-                        continue;
-                    }
-                    if (conn.profile === 'thrii') {
-                        const ok = sendThriiPresetTo(conn, evt.preset);
-                        if (ok) sentAny = true;
-                        continue;
-                    }
-
-                    if (shouldRoutePresetAsCc(conn.name)) {
-                        const ok = await sendCcTo(conn, 1, 1, evt.preset);
-                        if (ok) sentAny = true;
-                    } else {
-                        const ok = await sendPcTo(conn, 1, presetToProgram(evt.preset));
-                        if (ok) sentAny = true;
-                    }
-                } catch {}
+            for (const entry of routeEntries) {
+                const ok = await fireRouteEntry(entry, { forceSend });
+                if (ok) sentAny = true;
+                markRouteEntryFired(entry);
             }
             if (sentAny) flashCcStatus();
         })();
@@ -4837,9 +5020,7 @@ async function playSong(name) {
     const savedRate = speedMap[name] !== undefined ? speedMap[name] : 1.0;
     setPlaybackRate(savedRate);
 
-    firedEvents.clear();
-    lastTriggeredMarkerTime = null;
-    lastTriggeredMarkerIndex = null;
+    clearMarkerTriggerState();
 
     await refreshEventUI();
     loadABLoop();
@@ -5548,17 +5729,23 @@ function hasMeaningfulAbLoop(ab) {
 }
 
 function hasMeaningfulMarkerData(markerData) {
-    if (!markerData || typeof markerData !== 'object' || !markerData.sets || typeof markerData.sets !== 'object') {
-        return false;
-    }
-    return Object.values(markerData.sets).some((setDef) => {
+    const normalized = normalizeMarkerDataModel(markerData);
+    if (!normalized || !normalized.sets || typeof normalized.sets !== 'object') return false;
+    const hasEvents = Object.values(normalized.sets).some((setDef) => {
         const events = normalizeMarkerList(setDef?.events || []);
         return events.length > 0;
     });
+
+    if (hasEvents) return true;
+
+    // Preserve assignment-only marker routing metadata during export/share.
+    const hasAssignedFamilies = Object.values(normalized.sets).some((setDef) => setDef?.assignedFamily != null);
+    if (hasAssignedFamilies) return true;
+
+    return Object.keys(normalized.activeSetByFamily || {}).length > 0;
 }
 
 function songHasSavedAemMetadata(songName) {
-    const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
     const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
     const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
     const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
@@ -6325,42 +6512,367 @@ function togglePlaysetDropdown(e) {
 /* -------------------------- Markers (with preset) ------------------------ */
 let currentMarkerSetId = 'default';
 
+function createDefaultMarkerData() {
+    return {
+        activeId: 'default',
+        activeSetByFamily: {},
+        sets: {
+            default: {
+                name: 'Default Set',
+                events: [],
+                assignedFamily: null
+            }
+        }
+    };
+}
+
+function normalizeAssignedFamily(value) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim().toLowerCase();
+    return trimmed || null;
+}
+
+function normalizeMarkerSetDef(setDef, fallbackName) {
+    const safe = setDef && typeof setDef === 'object' ? setDef : {};
+    const name = String(safe.name || fallbackName || 'Marker Set').trim() || (fallbackName || 'Marker Set');
+    return {
+        name,
+        events: normalizeMarkerList(safe.events || []),
+        assignedFamily: normalizeAssignedFamily(safe.assignedFamily)
+    };
+}
+
+function resolveFallbackSetId(markerData) {
+    const data = markerData && markerData.sets ? markerData : createDefaultMarkerData();
+    const setIds = Object.keys(data.sets || {});
+    if (!setIds.length) return 'default';
+
+    const activeId = data.activeId;
+    if (activeId && data.sets[activeId] && data.sets[activeId].assignedFamily == null) {
+        return activeId;
+    }
+
+    const firstUnassigned = setIds.find((id) => data.sets[id] && data.sets[id].assignedFamily == null);
+    return firstUnassigned || setIds[0];
+}
+
+function normalizeMarkerDataModel(rawData) {
+    if (Array.isArray(rawData)) {
+        const base = createDefaultMarkerData();
+        base.sets.default.events = normalizeMarkerList(rawData);
+        return base;
+    }
+
+    const safeRaw = rawData && typeof rawData === 'object' ? rawData : {};
+    const rawSets = safeRaw.sets && typeof safeRaw.sets === 'object' ? safeRaw.sets : {};
+    const normalizedSets = {};
+
+    for (const [id, setDef] of Object.entries(rawSets)) {
+        if (!id) continue;
+        normalizedSets[id] = normalizeMarkerSetDef(setDef, setDef?.name || 'Marker Set');
+    }
+
+    if (!Object.keys(normalizedSets).length) {
+        return createDefaultMarkerData();
+    }
+
+    let activeId = (typeof safeRaw.activeId === 'string' && normalizedSets[safeRaw.activeId])
+        ? safeRaw.activeId
+        : null;
+    if (!activeId) {
+        const tempData = { sets: normalizedSets, activeId: null };
+        activeId = resolveFallbackSetId(tempData);
+    }
+
+    const rawFamilyMap = (safeRaw.activeSetByFamily && typeof safeRaw.activeSetByFamily === 'object')
+        ? safeRaw.activeSetByFamily
+        : {};
+    const activeSetByFamily = {};
+    for (const [familyKeyRaw, setId] of Object.entries(rawFamilyMap)) {
+        const familyKey = normalizeAssignedFamily(familyKeyRaw);
+        if (!familyKey) continue;
+        if (!normalizedSets[setId]) continue;
+        if (normalizedSets[setId].assignedFamily !== familyKey) continue;
+        activeSetByFamily[familyKey] = setId;
+    }
+
+    return {
+        activeId,
+        activeSetByFamily,
+        sets: normalizedSets
+    };
+}
+
+function resolveDeviceFamily(conn) {
+    const profile = String(conn?.profile || '').toLowerCase();
+    const name = String(conn?.name || '').toLowerCase();
+
+    if (profile === 'spark' || /spark\s*(go|40)?/.test(name)) return 'spark';
+    if (profile === 'thrii' || /yamaha\s*thr|\bthr\b|thr-?ii/.test(name)) return 'thr';
+    if (/pocket\s*master|smart\s*box/.test(name)) return 'pm';
+    if (/\bnux\b|mighty\s*plug/.test(name)) return 'nux';
+    return 'unknown';
+}
+
+function getFamilyLabel(familyKey) {
+    if (!familyKey) return 'Any';
+    const normalized = normalizeAssignedFamily(familyKey);
+    const match = SUPPORTED_FAMILY_OPTIONS.find((opt) => opt.key === normalized);
+    if (match) return match.label;
+    if (!normalized) return 'Any';
+    return normalized.toUpperCase();
+}
+
+function getAssignmentOptions() {
+    return [
+        ...SUPPORTED_FAMILY_OPTIONS,
+        { key: null, label: 'Any device' }
+    ];
+}
+
+function getRuntimeActiveSetIds(markerData) {
+    if (!markerData || !markerData.sets) return [];
+    const connectedFamilies = Array.from(getConnectionsByFamily().keys());
+    if (!connectedFamilies.length) return [markerData.activeId];
+
+    const activeSetIds = new Set();
+    connectedFamilies.forEach((familyKey) => {
+        const setId = resolveEffectiveSetIdForFamily(familyKey, markerData);
+        if (setId && markerData.sets[setId]) activeSetIds.add(setId);
+    });
+    if (!activeSetIds.size && markerData.activeId && markerData.sets[markerData.activeId]) {
+        activeSetIds.add(markerData.activeId);
+    }
+    return Array.from(activeSetIds);
+}
+
+function makeRouteEventKey(connectionId, setId, eventTime) {
+    return `${connectionId}|${setId}|${eventTime}`;
+}
+
+function makeRouteScheduleKey(familyKey, setId, eventTime) {
+    return `${familyKey}|${setId}|${eventTime}`;
+}
+
+function getConnectionsByFamily() {
+    const groups = new Map();
+    for (const conn of midiConnections.values()) {
+        const familyKey = resolveDeviceFamily(conn);
+        if (!groups.has(familyKey)) groups.set(familyKey, []);
+        groups.get(familyKey).push(conn);
+    }
+    return groups;
+}
+
+function resolveEffectiveSetIdForFamily(familyKey, markerData) {
+    if (!markerData || !markerData.sets || !Object.keys(markerData.sets).length) {
+        return 'default';
+    }
+
+    const overrideSetId = markerData.activeSetByFamily?.[familyKey];
+    if (overrideSetId && markerData.sets[overrideSetId]) {
+        return overrideSetId;
+    }
+
+    if (familyKey === 'unknown') {
+        return resolveFallbackSetId(markerData);
+    }
+
+    const setOrder = Object.keys(markerData.sets);
+    const assignedSetIds = setOrder.filter((setId) => markerData.sets[setId]?.assignedFamily === familyKey);
+
+    if (assignedSetIds.length) {
+        const familyActiveId = markerData.activeSetByFamily?.[familyKey];
+        if (familyActiveId && assignedSetIds.includes(familyActiveId)) return familyActiveId;
+        if (assignedSetIds.includes(markerData.activeId)) return markerData.activeId;
+        return assignedSetIds[0];
+    }
+
+    return resolveFallbackSetId(markerData);
+}
+
+function buildRouteEntriesForPlayback(markerData) {
+    const entries = [];
+    if (!markerData || !markerData.sets) return entries;
+
+    const grouped = getConnectionsByFamily();
+    for (const [familyKey, connections] of grouped.entries()) {
+        if (!connections.length) continue;
+        const setId = resolveEffectiveSetIdForFamily(familyKey, markerData);
+        const setDef = markerData.sets[setId];
+        if (!setDef || !Array.isArray(setDef.events)) continue;
+
+        setDef.events.forEach((evt, eventIndex) => {
+            entries.push({
+                familyKey,
+                connections,
+                setId,
+                eventIndex,
+                evt,
+                isPrimarySet: setId === markerData.activeId
+            });
+        });
+    }
+
+    return entries;
+}
+
+async function sendPresetToConnection(conn, presetNumber) {
+    try {
+        if (conn.profile === 'spark') {
+            return await sendSparkPresetTo(conn, presetNumber);
+        }
+        if (conn.profile === 'thrii') {
+            return sendThriiPresetTo(conn, presetNumber);
+        }
+        if (shouldRoutePresetAsCc(conn.name)) {
+            return await sendCcTo(conn, 1, 1, presetNumber);
+        }
+        return await sendPcTo(conn, 1, presetToProgram(presetNumber));
+    } catch {
+        return false;
+    }
+}
+
+function markRouteEntryFired(entry) {
+    const scheduleKey = makeRouteScheduleKey(entry.familyKey, entry.setId, entry.evt.time);
+    firedRouteSchedule.add(scheduleKey);
+    for (const conn of entry.connections) {
+        firedRouteEvents.add(makeRouteEventKey(conn.id, entry.setId, entry.evt.time));
+    }
+}
+
+function clearRouteEntryFired(entry) {
+    const scheduleKey = makeRouteScheduleKey(entry.familyKey, entry.setId, entry.evt.time);
+    firedRouteSchedule.delete(scheduleKey);
+    for (const conn of entry.connections) {
+        firedRouteEvents.delete(makeRouteEventKey(conn.id, entry.setId, entry.evt.time));
+    }
+}
+
+function clearRouteFiredForSetTime(setId, eventTime) {
+    const suffix = `|${setId}|${eventTime}`;
+    for (const scheduleKey of Array.from(firedRouteSchedule)) {
+        if (scheduleKey.endsWith(suffix)) firedRouteSchedule.delete(scheduleKey);
+    }
+    for (const conn of midiConnections.values()) {
+        firedRouteEvents.delete(makeRouteEventKey(conn.id, setId, eventTime));
+    }
+}
+
+function getSecondaryActivityTimes(markerData) {
+    if (!markerData || !markerData.sets) return [];
+
+    const runtimeSetIds = getRuntimeActiveSetIds(markerData);
+    if (!runtimeSetIds.length) return [];
+
+    const uniqueSecondarySetIds = Array.from(new Set(runtimeSetIds.filter((setId) => setId !== markerData.activeId)));
+    if (!uniqueSecondarySetIds.length) return [];
+
+    const times = [];
+    uniqueSecondarySetIds.forEach((setId) => {
+        const events = markerData.sets[setId]?.events;
+        if (!Array.isArray(events)) return;
+        events.forEach((evt) => {
+            if (evt && isFinite(evt.time) && evt.time >= 0) times.push(evt.time);
+        });
+    });
+
+    if (!times.length) return [];
+    times.sort((a, b) => a - b);
+
+    const deduped = [];
+    const EPS = 0.0001;
+    times.forEach((t) => {
+        if (!deduped.length || Math.abs(t - deduped[deduped.length - 1]) > EPS) deduped.push(t);
+    });
+    return deduped;
+}
+
+function buildSecondaryActivitySegments(markerData, duration) {
+    if (!duration || !isFinite(duration) || duration <= 0) return [];
+
+    const times = getSecondaryActivityTimes(markerData);
+    if (!times.length) return [];
+
+    const halfWidthPct = 0.32;
+    const mergeGapPct = 0.55;
+    const segments = [];
+
+    times.forEach((t) => {
+        const centerPct = clamp((t / duration) * 100, 0, 100);
+        const start = clamp(centerPct - halfWidthPct, 0, 100);
+        const end = clamp(centerPct + halfWidthPct, 0, 100);
+        const last = segments[segments.length - 1];
+
+        if (!last) {
+            segments.push({ start, end });
+            return;
+        }
+
+        if (start <= (last.end + mergeGapPct)) {
+            last.end = Math.max(last.end, end);
+            return;
+        }
+
+        segments.push({ start, end });
+    });
+
+    return segments;
+}
+
+function renderSecondaryActivityBand(markerData, duration) {
+    progressBar.querySelectorAll('.progress-secondary-band').forEach((el) => el.remove());
+
+    const segments = buildSecondaryActivitySegments(markerData, duration);
+    if (!segments.length) return;
+
+    const band = document.createElement('div');
+    band.className = 'progress-secondary-band';
+
+    segments.forEach((seg) => {
+        const el = document.createElement('div');
+        el.className = 'progress-secondary-segment';
+        el.style.left = `${seg.start}%`;
+        el.style.width = `${Math.max(0, seg.end - seg.start)}%`;
+        band.appendChild(el);
+    });
+
+    progressBar.appendChild(band);
+}
+
+async function fireRouteEntry(entry, { forceSend = false } = {}) {
+    let sentAny = false;
+    for (const conn of entry.connections) {
+        const routeKey = makeRouteEventKey(conn.id, entry.setId, entry.evt.time);
+        const alreadyFired = firedRouteEvents.has(routeKey);
+        if (!forceSend && alreadyFired) continue;
+
+        const ok = await sendPresetToConnection(conn, entry.evt.preset);
+        firedRouteEvents.add(routeKey);
+        if (ok) sentAny = true;
+    }
+    return sentAny;
+}
+
 function getRawMarkerData(songName) {
     const map = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
-    let data = map[songName];
-    if (!data) return { activeId: 'default', sets: { default: { name: 'Default Set', events: [] } } };
-    
-    // Auto-migrate from array to object
-    if (Array.isArray(data)) {
-        data = {
-            activeId: 'default',
-            sets: {
-                default: { name: 'Default Set', events: data }
-            }
-        };
-        map[songName] = data;
+    const data = map[songName];
+    if (!data) return createDefaultMarkerData();
+
+    const normalized = normalizeMarkerDataModel(data);
+    if (JSON.stringify(normalized) !== JSON.stringify(data)) {
+        map[songName] = normalized;
         localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
     }
-    
-    // Safety fallback
-    if (!data.sets || Object.keys(data.sets).length === 0) {
-        data.sets = { default: { name: 'Default Set', events: [] } };
-        data.activeId = 'default';
-    }
-    if (!data.sets[data.activeId]) {
-        data.activeId = Object.keys(data.sets)[0];
-    }
-    
-    return data;
+
+    return normalized;
 }
 
 function saveRawMarkerData(songName, data) {
     if (!songName) return;
     const map = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
-    for (const key in data.sets) {
-        data.sets[key].events = normalizeMarkerList(data.sets[key].events || []);
-    }
-    map[songName] = data;
+    map[songName] = normalizeMarkerDataModel(data);
     localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
 }
 
@@ -6379,6 +6891,46 @@ function saveEvents(list) {
     saveRawMarkerData(currentFileName, data);
 }
 
+function setActiveSetForFamily(familyKey, setId) {
+    if (!currentFileName) return;
+    const normalizedFamily = normalizeAssignedFamily(familyKey);
+    if (!normalizedFamily) return;
+
+    const data = getRawMarkerData(currentFileName);
+    if (!data.sets[setId]) return;
+    if (data.sets[setId].assignedFamily !== normalizedFamily) return;
+
+    data.activeSetByFamily = data.activeSetByFamily || {};
+    data.activeSetByFamily[normalizedFamily] = setId;
+    saveRawMarkerData(currentFileName, data);
+}
+
+function assignMarkerSetToFamily(setId, familyKeyOrNull) {
+    if (!currentFileName) return;
+    const data = getRawMarkerData(currentFileName);
+    const setDef = data.sets[setId];
+    if (!setDef) return;
+
+    setDef.assignedFamily = normalizeAssignedFamily(familyKeyOrNull);
+    saveRawMarkerData(currentFileName, data);
+
+    clearMarkerTriggerState();
+    const switched = syncUiActiveSetFromRoutingContext();
+    const refreshed = getRawMarkerData(currentFileName);
+    updateSetSelector(refreshed);
+    updateMarkerTicks();
+    if (switched) refreshEventUI();
+    renderMidiDevicesSheet();
+}
+
+function openMarkerSetAssignmentPicker(setId) {
+    if (!currentFileName) return;
+    const markerData = getRawMarkerData(currentFileName);
+    if (!markerData.sets[setId]) return;
+    const header = document.querySelector('.card-events .markers-header');
+    openMidiDevicesSheet({ mode: 'assignment', assignmentSetId: setId, anchorEl: header || document.getElementById('mobileMidiBar') });
+}
+
 function updateSetSelector(data) {
     const label = document.getElementById('marker-set-label');
     if (label && data.sets[data.activeId]) {
@@ -6387,9 +6939,19 @@ function updateSetSelector(data) {
     const sheet = document.getElementById('marker-set-sheet');
     if (!sheet) return;
 
+    const runtimeActiveSetIds = new Set(getRuntimeActiveSetIds(data));
     const rows = Object.entries(data.sets).map(([id, setDef]) => {
-        const activeClass = id === data.activeId ? ' active' : '';
-        return `<button type="button" class="speed-option marker-set-row${activeClass}" data-set-id="${escapeHtml(id)}">${escapeHtml(setDef.name)}</button>`;
+        const runtimeActiveClass = runtimeActiveSetIds.has(id) ? ' active' : '';
+        const selectedClass = id === data.activeId ? ' marker-set-row-selected' : '';
+        const assignedFamily = normalizeAssignedFamily(setDef.assignedFamily);
+        const assignmentLabel = assignedFamily ? getFamilyLabel(assignedFamily) : 'Any';
+        const badgeAssignedClass = assignedFamily ? ' assigned' : '';
+        return `
+            <div class="marker-set-row-wrap">
+                <button type="button" class="speed-option marker-set-row marker-set-row-main${runtimeActiveClass}${selectedClass}" data-marker-set-main-id="${escapeHtml(id)}">${escapeHtml(setDef.name)}</button>
+                <button type="button" class="marker-set-assign-badge${badgeAssignedClass}" data-marker-assign-set-id="${escapeHtml(id)}" aria-label="Assign ${escapeHtml(setDef.name)}">${escapeHtml(assignmentLabel)}</button>
+            </div>
+        `;
     }).join('');
 
     sheet.innerHTML = `
@@ -6407,9 +6969,15 @@ function updateSetSelector(data) {
     if (!sheet.dataset.bound) {
         sheet.addEventListener('click', (e) => {
             e.stopPropagation();
-            const setRow = e.target.closest('[data-set-id]');
+            const assignBtn = e.target.closest('[data-marker-assign-set-id]');
+            if (assignBtn) {
+                openMarkerSetAssignmentPicker(assignBtn.dataset.markerAssignSetId);
+                return;
+            }
+
+            const setRow = e.target.closest('[data-marker-set-main-id]');
             if (setRow) {
-                changeMarkerSet(setRow.dataset.setId);
+                changeMarkerSet(setRow.dataset.markerSetMainId);
                 if (shouldAutoCloseMarkerSetSheetOnSelect()) {
                     closeAllSheets();
                 }
@@ -6513,13 +7081,22 @@ function changeMarkerSet(newId) {
     let data = getRawMarkerData(currentFileName);
     if (!data.sets[newId]) return;
     data.activeId = newId;
+    const connectedFamilies = Array.from(getConnectionsByFamily().keys());
+    const selectedFamily = normalizeAssignedFamily(data.sets[newId].assignedFamily);
+
+    if (connectedFamilies.length === 1) {
+        data.activeSetByFamily = data.activeSetByFamily || {};
+        data.activeSetByFamily[connectedFamilies[0]] = newId;
+    } else if (selectedFamily && hasAnyConnection()) {
+        data.activeSetByFamily = data.activeSetByFamily || {};
+        data.activeSetByFamily[selectedFamily] = newId;
+    }
     currentMarkerSetId = newId;
     saveRawMarkerData(currentFileName, data);
     
-    firedEvents.clear();
-    lastTriggeredMarkerTime = null;
-    lastTriggeredMarkerIndex = null;
+    clearMarkerTriggerState();
     refreshEventUI();
+    closeAllSheets();
 }
 
 function toggleSetMenu() {
@@ -6532,13 +7109,11 @@ function newMarkerSet() {
     if (!name || name.trim() === '') return;
     const id = 'set_' + Date.now();
     let data = getRawMarkerData(currentFileName);
-    data.sets[id] = { name: name.trim(), events: [] };
+    data.sets[id] = { name: name.trim(), events: [], assignedFamily: null };
     data.activeId = id;
     saveRawMarkerData(currentFileName, data);
     
-    firedEvents.clear();
-    lastTriggeredMarkerTime = null;
-    lastTriggeredMarkerIndex = null;
+    clearMarkerTriggerState();
     refreshEventUI();
 }
 
@@ -6549,13 +7124,15 @@ function duplicateMarkerSet() {
     const name = prompt("Enter name for duplicated marker set:", currSet.name + " Copy");
     if (!name || name.trim() === '') return;
     const id = 'set_' + Date.now();
-    data.sets[id] = { name: name.trim(), events: JSON.parse(JSON.stringify(currSet.events)) };
+    data.sets[id] = {
+        name: name.trim(),
+        events: JSON.parse(JSON.stringify(currSet.events)),
+        assignedFamily: normalizeAssignedFamily(currSet.assignedFamily)
+    };
     data.activeId = id;
     saveRawMarkerData(currentFileName, data);
     
-    firedEvents.clear();
-    lastTriggeredMarkerTime = null;
-    lastTriggeredMarkerIndex = null;
+    clearMarkerTriggerState();
     refreshEventUI();
 }
 
@@ -6578,9 +7155,7 @@ function deleteMarkerSet() {
         if (confirm("This is the only marker set. Clear all markers from it?")) {
             data.sets[data.activeId].events = [];
             saveRawMarkerData(currentFileName, data);
-            firedEvents.clear();
-            lastTriggeredMarkerTime = null;
-            lastTriggeredMarkerIndex = null;
+            clearMarkerTriggerState();
             refreshEventUI();
         }
         return;
@@ -6588,13 +7163,19 @@ function deleteMarkerSet() {
     
     if (!confirm("Are you sure you want to delete this marker set?")) return;
     
-    delete data.sets[data.activeId];
+    const deletedSetId = data.activeId;
+    delete data.sets[deletedSetId];
+
+    if (data.activeSetByFamily && typeof data.activeSetByFamily === 'object') {
+        for (const [familyKey, setId] of Object.entries(data.activeSetByFamily)) {
+            if (setId === deletedSetId) delete data.activeSetByFamily[familyKey];
+        }
+    }
+
     data.activeId = Object.keys(data.sets)[0];
     saveRawMarkerData(currentFileName, data);
-    
-    firedEvents.clear();
-    lastTriggeredMarkerTime = null;
-    lastTriggeredMarkerIndex = null;
+
+    clearMarkerTriggerState();
     refreshEventUI();
 }
 function formatPreset(preset) {
@@ -6650,12 +7231,16 @@ function setEvent() {
     }
 }
 function deleteEvent(idx) {
+    if (!currentFileName) return;
+    const markerData = getRawMarkerData(currentFileName);
+    const activeSetId = markerData.activeId;
     const events = getEvents();
     const t = (events[idx] && events[idx].time) ?? null;
     const updated = events.filter((_, i) => i !== idx);
     saveEvents(updated);
     if (t !== null) {
         firedEvents.delete(t);
+        clearRouteFiredForSetTime(activeSetId, t);
         if (lastTriggeredMarkerIndex === idx || lastTriggeredMarkerTime === t) {
             lastTriggeredMarkerIndex = null;
             lastTriggeredMarkerTime = null;
@@ -6666,9 +7251,15 @@ function deleteEvent(idx) {
 }
 function updateMarkerTicks() {
     progressBar.querySelectorAll('.progress-tick').forEach(el => el.remove());
+    progressBar.querySelectorAll('.progress-secondary-band').forEach(el => el.remove());
     const dur = audio.duration;
-    const events = getEvents();
-    if (!dur || !isFinite(dur) || !events.length) return;
+    if (!dur || !isFinite(dur)) return;
+
+    const markerData = currentFileName ? getRawMarkerData(currentFileName) : createDefaultMarkerData();
+    renderSecondaryActivityBand(markerData, dur);
+
+    const events = markerData.sets[markerData.activeId]?.events || [];
+    if (!events.length) return;
 
     events.forEach((evt, i) => {
         const pct = (evt.time / dur) * 100;
@@ -6706,50 +7297,114 @@ function nearestMarkerAtOrBefore(time, epsilon = EPS_RECONCILE) {
     );
 }
 
+function syncUiActiveSetFromRoutingContext() {
+    if (!currentFileName) return false;
+
+    const markerData = getRawMarkerData(currentFileName);
+    const familyKeys = Array.from(getConnectionsByFamily().keys());
+    if (familyKeys.length !== 1) return false;
+
+    const resolvedSetId = resolveEffectiveSetIdForFamily(familyKeys[0], markerData);
+    if (!resolvedSetId || !markerData.sets[resolvedSetId]) return false;
+    if (markerData.activeId === resolvedSetId) return false;
+
+    markerData.activeId = resolvedSetId;
+    currentMarkerSetId = resolvedSetId;
+    saveRawMarkerData(currentFileName, markerData);
+    clearMarkerTriggerState();
+    return true;
+}
+
+function buildNearestRouteEntriesByFamily(targetTime, epsilon = EPS_RECONCILE) {
+    if (!currentFileName) return [];
+
+    const markerData = getRawMarkerData(currentFileName);
+    const routeEntries = buildRouteEntriesForPlayback(markerData);
+    if (!routeEntries.length) return [];
+
+    const nearestByFamily = new Map();
+    routeEntries.forEach((entry) => {
+        const t = entry.evt.time;
+        if (t > targetTime + epsilon) return;
+
+        const prev = nearestByFamily.get(entry.familyKey);
+        if (!prev || Math.abs(t - targetTime) < Math.abs(prev.evt.time - targetTime)) {
+            nearestByFamily.set(entry.familyKey, entry);
+        }
+    });
+
+    return Array.from(nearestByFamily.values());
+}
+
+function fireNearestRouteEntriesAtTime(targetTime) {
+    const nearestEntries = buildNearestRouteEntriesByFamily(targetTime, EPS_RECONCILE);
+
+    const nearestPrimary = nearestEntries
+        .filter((entry) => entry.isPrimarySet)
+        .sort((a, b) => Math.abs(a.evt.time - targetTime) - Math.abs(b.evt.time - targetTime))[0] || null;
+
+    if (nearestPrimary) {
+        firedEvents.add(nearestPrimary.evt.time);
+        lastTriggeredMarkerTime = nearestPrimary.evt.time;
+        lastTriggeredMarkerIndex = nearestPrimary.eventIndex;
+        setActiveMarkerUIByIndex(nearestPrimary.eventIndex);
+        updateTickFiredClassByIndex(nearestPrimary.eventIndex, true);
+    } else {
+        lastTriggeredMarkerTime = null;
+        lastTriggeredMarkerIndex = null;
+        progressBar.querySelectorAll('.progress-tick').forEach(el => el.classList.remove('current'));
+        document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
+    }
+
+    if (!hasAnyConnection() || !nearestEntries.length) return;
+
+    (async () => {
+        let sentAny = false;
+        for (const entry of nearestEntries) {
+            const ok = await fireRouteEntry(entry, { forceSend: true });
+            if (ok) sentAny = true;
+            markRouteEntryFired(entry);
+        }
+        if (sentAny) flashCcStatus();
+    })();
+}
+
 /* =================== Reconciliation (scrub/rewind/forward) ================== */
 function reconcileMarkersOnBackwardJump(targetTime, prevTime) {
-    const events = getEvents();
-    if (!events.length) return;
+    if (!currentFileName) return;
+    const markerData = getRawMarkerData(currentFileName);
+    const routeEntries = buildRouteEntriesForPlayback(markerData);
 
-    events.forEach((evt, i) => {
-        const t = evt.time;
+    routeEntries.forEach((entry) => {
+        const t = entry.evt.time;
         if (t > targetTime && t <= prevTime) {
-            firedEvents.delete(t);
-            updateTickFiredClassByIndex(i, false);
+            clearRouteEntryFired(entry);
+            if (entry.isPrimarySet) {
+                firedEvents.delete(t);
+                updateTickFiredClassByIndex(entry.eventIndex, false);
+            }
         }
     });
 
-    const nearest = nearestMarkerAtOrBefore(targetTime, EPS_RECONCILE);
-    if (nearest) {
-        fireMarkerByIndex(nearest.i, nearest, { forceCc: true });
-    } else {
-        lastTriggeredMarkerTime = null;
-        lastTriggeredMarkerIndex = null;
-        progressBar.querySelectorAll('.progress-tick').forEach(el => el.classList.remove('current'));
-        document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
-    }
+    fireNearestRouteEntriesAtTime(targetTime);
 }
 function reconcileMarkersOnForwardJump(prevTime, targetTime) {
-    const events = getEvents();
-    if (!events.length) return;
+    if (!currentFileName) return;
+    const markerData = getRawMarkerData(currentFileName);
+    const routeEntries = buildRouteEntriesForPlayback(markerData);
 
-    events.forEach((evt, i) => {
-        const t = evt.time;
+    routeEntries.forEach((entry) => {
+        const t = entry.evt.time;
         if (t >= prevTime && t <= targetTime) {
-            firedEvents.add(t);
-            updateTickFiredClassByIndex(i, true);
+            markRouteEntryFired(entry);
+            if (entry.isPrimarySet) {
+                firedEvents.add(t);
+                updateTickFiredClassByIndex(entry.eventIndex, true);
+            }
         }
     });
 
-    const nearest = nearestMarkerAtOrBefore(targetTime, EPS_RECONCILE);
-    if (nearest) {
-        fireMarkerByIndex(nearest.i, nearest, { forceCc: true });
-    } else {
-        lastTriggeredMarkerTime = null;
-        lastTriggeredMarkerIndex = null;
-        progressBar.querySelectorAll('.progress-tick').forEach(el => el.classList.remove('current'));
-        document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
-    }
+    fireNearestRouteEntriesAtTime(targetTime);
 }
 function reconcileMarkersOnLoopRewind(loopStartA, loopEndB) {
     reconcileMarkersOnBackwardJump(loopStartA, loopEndB);
@@ -6764,14 +7419,54 @@ audio.addEventListener('timeupdate', () => {
         fireNow = Math.min(now, abLoop.b);
     }
 
-    getEvents().forEach((evt, i) => {
-        const t = evt.time;
-        if (!firedEvents.has(t) && fireNow >= t) {
-            fireMarkerByIndex(i, evt, { forceCc: false });
+    if (currentFileName) {
+        const markerData = getRawMarkerData(currentFileName);
+        const routeEntries = buildRouteEntriesForPlayback(markerData);
+        const triggerTasks = [];
+
+        routeEntries.forEach((entry) => {
+            const t = entry.evt.time;
+            const scheduleKey = makeRouteScheduleKey(entry.familyKey, entry.setId, t);
+
+            if (!firedRouteSchedule.has(scheduleKey) && fireNow >= t) {
+                if (entry.isPrimarySet && !firedEvents.has(t)) {
+                    firedEvents.add(t);
+                    lastTriggeredMarkerTime = t;
+                    lastTriggeredMarkerIndex = entry.eventIndex;
+                    setActiveMarkerUIByIndex(entry.eventIndex);
+                    updateTickFiredClassByIndex(entry.eventIndex, true);
+                }
+
+                triggerTasks.push((async () => {
+                    const sent = await fireRouteEntry(entry, { forceSend: false });
+                    markRouteEntryFired(entry);
+                    return sent;
+                })());
+            }
+
+            if (now < t - 0.5) {
+                clearRouteEntryFired(entry);
+                if (entry.isPrimarySet) {
+                    firedEvents.delete(t);
+                    updateTickFiredClassByIndex(entry.eventIndex, false);
+                }
+            }
+
+            if (audio.loop && !audio.paused && now === 0.0 && t === 0.0) {
+                clearRouteEntryFired(entry);
+                if (entry.isPrimarySet) {
+                    firedEvents.delete(t);
+                    updateTickFiredClassByIndex(entry.eventIndex, false);
+                }
+            }
+        });
+
+        if (triggerTasks.length) {
+            Promise.all(triggerTasks).then((results) => {
+                if (results.some(Boolean)) flashCcStatus();
+            }).catch(() => {});
         }
-        if (now < t - 0.5) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
-        if (audio.loop && !audio.paused && now === 0.0 && t === 0.0) { firedEvents.delete(t); updateTickFiredClassByIndex(i, false); }
-    });
+    }
 
     updateProgressUI();
 
@@ -7395,7 +8090,7 @@ async function packAem(songName) {
         name: song.name,
         type: audioBlob.type || song.type || '',
         lastModified: song.lastModified || Date.now(),
-        markerData: eventMap[songName] || null,
+        markerData: getRawMarkerData(songName),
         volume: volMap[songName] !== undefined ? volMap[songName] : 1.0,
         speed: speedMap[songName] !== undefined ? speedMap[songName] : 1.0,
         abLoop: abMap[songName] || null,
@@ -7555,13 +8250,10 @@ async function importSong(file) {
         // Always write imported values so overwriting a selected song correctly
         // replaces existing settings (including clearing markers or AB loop).
         const eventMap = JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
-        if (metadata.markerData && typeof metadata.markerData === 'object' && metadata.markerData.sets) {
-            eventMap[finalName] = metadata.markerData;
+        if (metadata.markerData && typeof metadata.markerData === 'object') {
+            eventMap[finalName] = normalizeMarkerDataModel(metadata.markerData);
         } else {
-            eventMap[finalName] = {
-                activeId: 'default',
-                sets: { default: { name: 'Default Set', events: normalizeMarkerList(Array.isArray(metadata.markers) ? metadata.markers : []) } }
-            };
+            eventMap[finalName] = normalizeMarkerDataModel(Array.isArray(metadata.markers) ? metadata.markers : []);
         }
         localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(eventMap));
 
@@ -7609,9 +8301,7 @@ async function importSong(file) {
             applyPlaybackGain(finalName, { syncSlider: true, updateUi: false });
             const savedRate = speedMap[finalName] ?? 1.0;
             setPlaybackRate(savedRate);
-            firedEvents.clear();
-            lastTriggeredMarkerTime = null;
-            lastTriggeredMarkerIndex = null;
+            clearMarkerTriggerState();
             await refreshEventUI();
             loadABLoop();
             updateMarkerTicks();
