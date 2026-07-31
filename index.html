@@ -180,6 +180,8 @@
         .btn-connect {
             background: transparent; border: none; width: 100%; cursor: pointer;
             -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
         }
         .midi-status {
             font-size: 0.98rem;
@@ -194,6 +196,8 @@
             justify-content: center;
             gap: 6px;
             width: 100%;
+            -webkit-user-select: none;
+            user-select: none;
         }
         .midi-status.cc-flash {
             background: var(--amber-dim) !important;
@@ -566,6 +570,19 @@
         .info-sheet-content {
             padding: 10px 12px 14px;
         }
+        .info-sheet-content .info-heading,
+        .info-sheet-content .info-version,
+        .info-sheet-content .info-vendor,
+        .info-sheet-content .info-model,
+        .info-sheet-content .info-setting-label,
+        .info-sheet-content .info-setting-actions,
+        .info-sheet-content .info-action-btn,
+        .info-sheet-content .info-folder-value,
+        .info-sheet-content .info-clear-btn {
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
         .info-popup .info-heading,
         .info-sheet-content .info-heading {
             font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
@@ -804,6 +821,11 @@
         .song-menu-chip {
             font-size: 0.78rem;
             white-space: nowrap;
+        }
+        .song-menu-title {
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
         }
         .marker-edit-sheet-fields {
             display: grid;
@@ -1050,10 +1072,30 @@
         .speed-chip:active { background: var(--border); }
         .speed-chip.active { color: var(--accent); background: var(--accent-dim); border-color: var(--border); font-weight: 700; }
         .speed-chip.center-hero { grid-row: span 2; height: 100%; font-size: 0.95rem; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid var(--border); }
+        #speedPopup h3,
+        #speedPopup .menu-btn,
+        #speedPopup .pitch-chips-grid,
+        #speedPopup .speed-chips-grid,
+        #speedPopup .speed-chip,
+        #speedPopup .speed-slider-container,
+        #speedPopup #speed-slider-val {
+            -webkit-user-select: none;
+            user-select: none;
+        }
         
         .eq-container { display: flex; gap: 20px; align-items: stretch; margin-top: 8px;}
         .eq-presets { display: flex; flex-direction: column; gap: 8px; width: 100px; justify-content: space-between; }
         .eq-sliders { display: flex; flex: 1; justify-content: space-around; align-items: center; }
+        #volumePopup h3,
+        #volumePopup .menu-btn,
+        #volumePopup .eq-presets,
+        #volumePopup .eq-slider-col,
+        #volumePopup .eq-val-label,
+        #volumePopup .eq-slider-col span,
+        #volumePopup .eq-presets .speed-option {
+            -webkit-user-select: none;
+            user-select: none;
+        }
         .eq-slider-col {
             display: flex; flex-direction: column; align-items: center; gap: 12px;
             font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; font-variant-numeric: tabular-nums;
@@ -1563,11 +1605,12 @@ function renderInfoSheet() {
     const sheet = document.getElementById('info-sheet');
     if (!sheet) return;
     const settings = loadUiSettings();
+    const autoGainEnabled = loadAutoGainEnabled();
     const hasExportFolder = !!getExportFolderName();
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.18</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.19</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -1577,6 +1620,19 @@ function renderInfoSheet() {
                 <span class="info-setting-label">Marker sets: one-click select</span>
                 <input type="checkbox" id="settingMarkerSetOneClick" ${settings.markerSetOneClickSelect ? 'checked' : ''}>
             </label>
+            <br>
+            <label class="info-setting-row" for="settingAutoNormalizedGain">
+                <span class="info-setting-label">Auto normalized volume</span>
+                <input type="checkbox" id="settingAutoNormalizedGain" ${autoGainEnabled ? 'checked' : ''}>
+            </label>
+            <div class="info-setting-row">
+                <button type="button" id="recalculateNormalizationBtn" class="speed-chip info-action-btn is-active">Recalculate</button>
+                <span class="info-setting-actions">
+                    <span class="info-setting-label" style="font-size:0.8rem">All songs</span>
+                    <input type="checkbox" id="settingRecalculateAllSongs">
+                </span>
+            </div>
+            <br>
             <p class="info-heading">Export/Import</p>
             <label class="info-setting-row" for="settingOverwriteSongsOnExport">
                 <span class="info-setting-label">Overwrite songs on export</span>
@@ -1638,6 +1694,47 @@ function renderInfoSheet() {
     if (markerToggle) {
         markerToggle.addEventListener('change', () => {
             updateUiSetting('markerSetOneClickSelect', markerToggle.checked);
+        });
+    }
+
+    const autoNormalizedGainToggle = sheet.querySelector('#settingAutoNormalizedGain');
+    if (autoNormalizedGainToggle) {
+        autoNormalizedGainToggle.addEventListener('change', () => {
+            const enabled = saveAutoGainEnabled(autoNormalizedGainToggle.checked);
+            clearManualOverrides();
+            if (currentFileName) {
+                applyPlaybackGain(currentFileName, { syncSlider: true, updateUi: true });
+            }
+            showExportNotice(`Auto normalized volume ${enabled ? 'enabled' : 'disabled'}`);
+        });
+    }
+
+    const recalculateNormalizationBtn = sheet.querySelector('#recalculateNormalizationBtn');
+    if (recalculateNormalizationBtn) {
+        recalculateNormalizationBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const allSongsToggle = sheet.querySelector('#settingRecalculateAllSongs');
+            const forceAllSongs = !!allSongsToggle?.checked;
+
+            try {
+                showIoBusy('Recalculating normalization 0/0...');
+                const summary = await recalculateNormalizationForLibrary({
+                    forceAllSongs,
+                    onProgress(current, total) {
+                        setIoBusyLabel(`Recalculating normalization ${current}/${total}...`);
+                    }
+                });
+
+                if (currentFileName) {
+                    applyPlaybackGain(currentFileName, { syncSlider: true, updateUi: true });
+                }
+
+                showExportNotice(`Normalization: analyzed ${summary.analyzed}/${summary.total}, skipped ${summary.skipped}`);
+            } catch (err) {
+                showExportNotice(`Normalization recalc failed: ${err?.message || err || 'Unknown error'}`);
+            } finally {
+                hideIoBusy();
+            }
         });
     }
 
@@ -2052,7 +2149,7 @@ function renderSongMenuSheet(songName) {
 
     sheet.innerHTML = `
         <div class="marker-set-sheet-list" style="padding:10px 12px 8px;">
-            <div style="font-size:0.95rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(songName || '')}</div>
+            <div class="song-menu-title" style="font-size:0.95rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(songName || '')}</div>
         </div>
         <div class="marker-set-sheet-divider"></div>
         <div class="marker-set-sheet-footer">
@@ -2554,6 +2651,571 @@ const SPEED_MAP_KEY = 'audio_speed_map_v1';
 const EQ_MAP_KEY = 'audio_eq_map_v1';
 const UI_SETTINGS_KEY = 'audio_ui_settings_v1';
 const PLAY_MODE_KEY = 'audio_play_mode_v1';
+const NORMALIZATION_MAP_KEY = 'audio_normalization_map_v1';
+const AUTO_GAIN_ENABLED_STORAGE_KEY = 'audio_auto_gain_enabled_v1';
+const MANUAL_OVERRIDE_MAP_KEY = 'audio_manual_override_map_v1';
+const NORMALIZATION_METHOD_VERSION = 'hprms-gated-v1';
+
+function loadJsonMap(mapKey) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(mapKey) || '{}');
+        return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function saveJsonMap(mapKey, mapValue) {
+    const safeMap = (mapValue && typeof mapValue === 'object' && !Array.isArray(mapValue)) ? mapValue : {};
+    localStorage.setItem(mapKey, JSON.stringify(safeMap));
+    return safeMap;
+}
+
+function loadVolumeMap() {
+    return loadJsonMap(VOLUME_MAP_KEY);
+}
+
+function saveVolumeMap(volMap) {
+    return saveJsonMap(VOLUME_MAP_KEY, volMap);
+}
+
+function normalizeNormalizationEntry(raw) {
+    const fallback = {
+        gain: 1.0,
+        measuredRms: 0,
+        peak: 0,
+        analyzedAt: 0,
+        methodVersion: NORMALIZATION_METHOD_VERSION
+    };
+    if (!raw || typeof raw !== 'object') return fallback;
+
+    const gain = Number(raw.gain);
+    const measuredRms = Number(raw.measuredRms);
+    const peak = Number(raw.peak);
+    const analyzedAt = Number(raw.analyzedAt);
+    const methodVersion = String(raw.methodVersion || NORMALIZATION_METHOD_VERSION);
+
+    return {
+        gain: Number.isFinite(gain) && gain > 0 ? gain : fallback.gain,
+        measuredRms: Number.isFinite(measuredRms) && measuredRms >= 0 ? measuredRms : fallback.measuredRms,
+        peak: Number.isFinite(peak) && peak >= 0 ? peak : fallback.peak,
+        analyzedAt: Number.isFinite(analyzedAt) && analyzedAt >= 0 ? analyzedAt : fallback.analyzedAt,
+        methodVersion
+    };
+}
+
+function loadNormalizationMap() {
+    const rawMap = loadJsonMap(NORMALIZATION_MAP_KEY);
+    const normalized = {};
+    Object.keys(rawMap).forEach(songName => {
+        normalized[songName] = normalizeNormalizationEntry(rawMap[songName]);
+    });
+    return normalized;
+}
+
+function saveNormalizationMap(normalizationMap) {
+    return saveJsonMap(NORMALIZATION_MAP_KEY, normalizationMap);
+}
+
+function loadAutoGainEnabled() {
+    const raw = localStorage.getItem(AUTO_GAIN_ENABLED_STORAGE_KEY);
+    if (raw === null) return true;
+    return raw !== '0' && raw !== 'false';
+}
+
+function saveAutoGainEnabled(enabled) {
+    const value = !!enabled;
+    localStorage.setItem(AUTO_GAIN_ENABLED_STORAGE_KEY, value ? '1' : '0');
+    return value;
+}
+
+function loadManualOverrideMap() {
+    const rawMap = loadJsonMap(MANUAL_OVERRIDE_MAP_KEY);
+    const normalized = {};
+    Object.keys(rawMap).forEach(songName => {
+        normalized[songName] = !!rawMap[songName];
+    });
+    return normalized;
+}
+
+function saveManualOverrideMap(overrideMap) {
+    return saveJsonMap(MANUAL_OVERRIDE_MAP_KEY, overrideMap);
+}
+
+function clearManualOverrides() {
+    localStorage.removeItem(MANUAL_OVERRIDE_MAP_KEY);
+}
+
+function setPerSongManualOverride(songName, enabled) {
+    const key = String(songName || '').trim();
+    if (!key) return;
+    const map = loadManualOverrideMap();
+    if (enabled) {
+        map[key] = true;
+    } else {
+        delete map[key];
+    }
+    saveManualOverrideMap(map);
+}
+
+function getVolumeSliderBounds() {
+    const min = Number(volSlider?.min);
+    const max = Number(volSlider?.max);
+    return {
+        min: Number.isFinite(min) ? min : 0,
+        max: Number.isFinite(max) ? max : 2
+    };
+}
+
+function resolveEffectiveGain(songName) {
+    const key = String(songName || '').trim();
+    const autoGainEnabled = loadAutoGainEnabled();
+    const volumeMap = loadVolumeMap();
+    const normalizationMap = loadNormalizationMap();
+    const manualOverrideMap = loadManualOverrideMap();
+
+    const manualVolumeRaw = Number(volumeMap[key]);
+    const manualVolume = Number.isFinite(manualVolumeRaw) && manualVolumeRaw >= 0 ? manualVolumeRaw : 1.0;
+
+    const normalization = normalizeNormalizationEntry(normalizationMap[key]);
+    const normalizedGain = normalization.gain;
+    const perSongManualOverride = !!manualOverrideMap[key];
+
+    const useManual = !autoGainEnabled || perSongManualOverride;
+    return {
+        gain: useManual ? manualVolume : normalizedGain,
+        modeLabel: useManual ? 'MANUAL' : 'AUTO',
+        autoGainEnabled,
+        perSongManualOverride,
+        manualVolume,
+        normalizedGain,
+        normalization
+    };
+}
+
+function applyPlaybackGain(songName = currentFileName, options = {}) {
+    const resolved = resolveEffectiveGain(songName);
+    const bounds = getVolumeSliderBounds();
+    const appliedGain = clamp(resolved.gain, bounds.min, bounds.max);
+
+    if (audioGraph) {
+        audioGraph.gain.gain.value = appliedGain;
+    }
+
+    const syncSlider = options.syncSlider !== false;
+    if (syncSlider && volSlider) {
+        volSlider.value = String(appliedGain);
+    }
+
+    if (options.updateUi !== false) {
+        updateMuteUI();
+    }
+
+    return { ...resolved, appliedGain };
+}
+
+const NORMALIZATION_TARGET_RMS = 0.12;
+const NORMALIZATION_EPSILON = 1e-8;
+const NORMALIZATION_HPF_FREQ_HZ = 190;
+const NORMALIZATION_HPF_Q = 0.707;
+const NORMALIZATION_SHELF_FREQ_HZ = 3000;
+const NORMALIZATION_SHELF_GAIN_DB = 3;
+const NORMALIZATION_BLOCK_MS = 400;
+const NORMALIZATION_RELATIVE_GATE_DB = -20;
+const NORMALIZATION_GAIN_MIN = 0.25;
+const NORMALIZATION_GAIN_MAX = 2.0;
+const NORMALIZATION_PEAK_HEADROOM = 0.98;
+
+let normalizationDecodeCtx = null;
+
+function getNormalizationDecodeAudioContext() {
+    if (normalizationDecodeCtx && normalizationDecodeCtx.state !== 'closed') {
+        return normalizationDecodeCtx;
+    }
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) {
+        throw new Error('AudioContext is not supported in this browser');
+    }
+    normalizationDecodeCtx = new AudioContextCtor();
+    return normalizationDecodeCtx;
+}
+
+function decodeAudioDataAsync(audioContext, arrayBuffer) {
+    if (!audioContext) {
+        return Promise.reject(new Error('Missing audio context for decodeAudioData'));
+    }
+    if (!(arrayBuffer instanceof ArrayBuffer)) {
+        return Promise.reject(new Error('decodeAudioDataAsync expects an ArrayBuffer'));
+    }
+
+    const bufferCopy = arrayBuffer.slice(0);
+
+    return new Promise((resolve, reject) => {
+        try {
+            if (audioContext.decodeAudioData.length <= 1) {
+                audioContext.decodeAudioData(bufferCopy).then(resolve, reject);
+                return;
+            }
+            audioContext.decodeAudioData(bufferCopy, resolve, reject);
+        } catch (err) {
+            reject(err);
+        }
+    });
+}
+
+async function decodeFileToAudioBuffer(file, audioContext = null) {
+    if (!file || typeof file.arrayBuffer !== 'function') {
+        throw new Error('decodeFileToAudioBuffer expects a File or Blob-like object');
+    }
+    const decodeCtx = audioContext || getNormalizationDecodeAudioContext();
+    const arrayBuffer = await file.arrayBuffer();
+    return decodeAudioDataAsync(decodeCtx, arrayBuffer);
+}
+
+async function renderPerceptualBuffer(decodedBuffer, options = {}) {
+    if (!decodedBuffer) throw new Error('renderPerceptualBuffer requires a decoded AudioBuffer');
+
+    const OfflineCtor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OfflineCtor) throw new Error('OfflineAudioContext is not supported in this browser');
+
+    const channelCount = Math.max(1, decodedBuffer.numberOfChannels || 1);
+    const frameCount = Math.max(1, decodedBuffer.length || 1);
+    const sampleRate = Math.max(8000, decodedBuffer.sampleRate || 44100);
+
+    const offlineCtx = new OfflineCtor(channelCount, frameCount, sampleRate);
+    const source = offlineCtx.createBufferSource();
+    source.buffer = decodedBuffer;
+
+    const highpass = offlineCtx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = Number.isFinite(options.hpfFreqHz) ? options.hpfFreqHz : NORMALIZATION_HPF_FREQ_HZ;
+    highpass.Q.value = Number.isFinite(options.hpfQ) ? options.hpfQ : NORMALIZATION_HPF_Q;
+
+    const useHighShelf = options.useHighShelf !== false;
+    let chainTail = highpass;
+    if (useHighShelf) {
+        const shelf = offlineCtx.createBiquadFilter();
+        shelf.type = 'highshelf';
+        shelf.frequency.value = Number.isFinite(options.shelfFreqHz) ? options.shelfFreqHz : NORMALIZATION_SHELF_FREQ_HZ;
+        shelf.gain.value = Number.isFinite(options.shelfGainDb) ? options.shelfGainDb : NORMALIZATION_SHELF_GAIN_DB;
+        highpass.connect(shelf);
+        chainTail = shelf;
+    }
+
+    source.connect(highpass);
+    chainTail.connect(offlineCtx.destination);
+
+    source.start(0);
+    return offlineCtx.startRendering();
+}
+
+function computeWindowedRms(filteredBuffer, blockMs = NORMALIZATION_BLOCK_MS) {
+    if (!filteredBuffer) return [];
+
+    const channelCount = filteredBuffer.numberOfChannels || 0;
+    const frameCount = filteredBuffer.length || 0;
+    const sampleRate = filteredBuffer.sampleRate || 0;
+    if (!channelCount || !frameCount || !sampleRate) return [];
+
+    const framesPerBlock = Math.max(1, Math.floor(sampleRate * (blockMs / 1000)));
+    const channels = [];
+    for (let ch = 0; ch < channelCount; ch++) {
+        channels.push(filteredBuffer.getChannelData(ch));
+    }
+
+    const blockRmsValues = [];
+    for (let start = 0; start < frameCount; start += framesPerBlock) {
+        const end = Math.min(frameCount, start + framesPerBlock);
+        const blockFrames = end - start;
+        if (blockFrames <= 0) continue;
+
+        let sumSquares = 0;
+        for (let ch = 0; ch < channelCount; ch++) {
+            const data = channels[ch];
+            for (let i = start; i < end; i++) {
+                const s = data[i];
+                sumSquares += s * s;
+            }
+        }
+
+        const sampleCount = blockFrames * channelCount;
+        const rms = sampleCount > 0 ? Math.sqrt(sumSquares / sampleCount) : 0;
+        blockRmsValues.push(Number.isFinite(rms) ? rms : 0);
+    }
+
+    return blockRmsValues;
+}
+
+function computeIntegratedRms(blockRmsValues) {
+    if (!Array.isArray(blockRmsValues) || !blockRmsValues.length) return 0;
+
+    let sumSquares = 0;
+    let count = 0;
+    for (let i = 0; i < blockRmsValues.length; i++) {
+        const v = Number(blockRmsValues[i]);
+        if (!Number.isFinite(v) || v < 0) continue;
+        sumSquares += v * v;
+        count++;
+    }
+
+    if (!count) return 0;
+    return Math.sqrt(sumSquares / count);
+}
+
+function applyRelativeGate(blockRmsValues, gateDb = NORMALIZATION_RELATIVE_GATE_DB) {
+    const prelimRms = computeIntegratedRms(blockRmsValues);
+    const gateLinear = prelimRms * Math.pow(10, gateDb / 20);
+    const gatedRmsValues = (Array.isArray(blockRmsValues) ? blockRmsValues : []).filter(v => (
+        Number.isFinite(v) && v >= gateLinear
+    ));
+
+    const usedFallback = gatedRmsValues.length === 0;
+    const finalRms = computeIntegratedRms(usedFallback ? blockRmsValues : gatedRmsValues);
+
+    return {
+        prelimRms,
+        gateLinear,
+        gatedRmsValues,
+        usedFallback,
+        finalRms
+    };
+}
+
+function computePeak(audioBuffer) {
+    if (!audioBuffer) return 0;
+    const channelCount = audioBuffer.numberOfChannels || 0;
+    const frameCount = audioBuffer.length || 0;
+    if (!channelCount || !frameCount) return 0;
+
+    let peak = 0;
+    for (let ch = 0; ch < channelCount; ch++) {
+        const data = audioBuffer.getChannelData(ch);
+        for (let i = 0; i < frameCount; i++) {
+            const abs = Math.abs(data[i]);
+            if (abs > peak) peak = abs;
+        }
+    }
+    return peak;
+}
+
+function computeNormalizationGain(measuredRms, targetRms, peak, options = {}) {
+    const epsilon = Number.isFinite(options.epsilon) ? options.epsilon : NORMALIZATION_EPSILON;
+    const gainMin = Number.isFinite(options.gainMin) ? options.gainMin : NORMALIZATION_GAIN_MIN;
+    const gainMax = Number.isFinite(options.gainMax) ? options.gainMax : NORMALIZATION_GAIN_MAX;
+    const peakHeadroom = Number.isFinite(options.peakHeadroom) ? options.peakHeadroom : NORMALIZATION_PEAK_HEADROOM;
+
+    const safeMeasured = Number(measuredRms);
+    const safeTarget = Number.isFinite(targetRms) && targetRms > 0 ? targetRms : NORMALIZATION_TARGET_RMS;
+    const safePeak = Number(peak);
+
+    if (!Number.isFinite(safeMeasured) || safeMeasured <= epsilon) {
+        return {
+            gain: 1.0,
+            gainRaw: 1.0,
+            gainNoClip: 1.0,
+            usedSilentFallback: true
+        };
+    }
+
+    const gainRaw = safeTarget / Math.max(safeMeasured, epsilon);
+    const gainNoClip = peakHeadroom / Math.max(Number.isFinite(safePeak) ? safePeak : 0, epsilon);
+    const unclamped = Math.min(gainRaw, gainNoClip);
+    const gain = Math.min(gainMax, Math.max(gainMin, unclamped));
+
+    return {
+        gain: Number.isFinite(gain) ? gain : 1.0,
+        gainRaw,
+        gainNoClip,
+        usedSilentFallback: false
+    };
+}
+
+async function analyzeAudioBufferForNormalization(decodedBuffer, options = {}) {
+    const methodVersion = String(options.methodVersion || NORMALIZATION_METHOD_VERSION);
+
+    const filteredBuffer = await renderPerceptualBuffer(decodedBuffer, options);
+    const blockRmsValues = computeWindowedRms(
+        filteredBuffer,
+        Number.isFinite(options.blockMs) ? options.blockMs : NORMALIZATION_BLOCK_MS
+    );
+    const gateInfo = applyRelativeGate(
+        blockRmsValues,
+        Number.isFinite(options.relativeGateDb) ? options.relativeGateDb : NORMALIZATION_RELATIVE_GATE_DB
+    );
+
+    let measuredRms = gateInfo.finalRms;
+    if (!Number.isFinite(measuredRms)) measuredRms = 0;
+
+    const peak = computePeak(decodedBuffer);
+    const gainInfo = computeNormalizationGain(
+        measuredRms,
+        Number.isFinite(options.targetRms) ? options.targetRms : NORMALIZATION_TARGET_RMS,
+        peak,
+        options
+    );
+
+    return {
+        gain: gainInfo.gain,
+        measuredRms,
+        peak,
+        analyzedAt: Date.now(),
+        methodVersion,
+        diagnostics: {
+            blockCount: blockRmsValues.length,
+            gatedBlockCount: gateInfo.gatedRmsValues.length,
+            usedGateFallback: gateInfo.usedFallback,
+            prelimRms: gateInfo.prelimRms,
+            gateLinear: gateInfo.gateLinear,
+            gainRaw: gainInfo.gainRaw,
+            gainNoClip: gainInfo.gainNoClip,
+            usedSilentFallback: gainInfo.usedSilentFallback
+        }
+    };
+}
+
+async function analyzeTrackForNormalization(file, options = {}) {
+    const methodVersion = String(options.methodVersion || NORMALIZATION_METHOD_VERSION);
+    try {
+        const decodeCtx = options.audioContext || getNormalizationDecodeAudioContext();
+        const decodedBuffer = await decodeFileToAudioBuffer(file, decodeCtx);
+        return await analyzeAudioBufferForNormalization(decodedBuffer, { ...options, methodVersion });
+    } catch (err) {
+        return {
+            gain: 1.0,
+            measuredRms: 0,
+            peak: 0,
+            analyzedAt: Date.now(),
+            methodVersion,
+            diagnostics: {
+                error: String(err && err.message ? err.message : err || 'Normalization analysis failed')
+            }
+        };
+    }
+}
+
+function buildFallbackNormalizationEntry(methodVersion = NORMALIZATION_METHOD_VERSION) {
+    return {
+        gain: 1.0,
+        measuredRms: 0,
+        peak: 0,
+        analyzedAt: Date.now(),
+        methodVersion: String(methodVersion || NORMALIZATION_METHOD_VERSION)
+    };
+}
+
+function isNormalizationEntryUsable(entry, options = {}) {
+    if (!entry || typeof entry !== 'object') return false;
+
+    const gain = Number(entry.gain);
+    if (!Number.isFinite(gain) || gain <= 0) return false;
+
+    const requireCurrentMethod = !!options.requireCurrentMethod;
+    if (requireCurrentMethod) {
+        const methodVersion = String(options.methodVersion || NORMALIZATION_METHOD_VERSION);
+        const entryMethod = String(entry.methodVersion || '');
+        if (entryMethod !== methodVersion) return false;
+    }
+
+    return true;
+}
+
+async function analyzeAndPersistNormalizationForSong(songName, file, options = {}) {
+    const key = String(songName || '').trim();
+    if (!key || !file) return null;
+
+    const methodVersion = String(options.methodVersion || NORMALIZATION_METHOD_VERSION);
+    const map = options.normalizationMap || loadNormalizationMap();
+
+    let result;
+    try {
+        result = await analyzeTrackForNormalization(file, { ...options, methodVersion });
+    } catch {
+        result = buildFallbackNormalizationEntry(methodVersion);
+    }
+
+    map[key] = normalizeNormalizationEntry(result);
+    saveNormalizationMap(map);
+    return map[key];
+}
+
+async function getNormalizationSourceForSong(songName, fallbackFile = null) {
+    const key = String(songName || '').trim();
+    if (!key) return fallbackFile;
+    try {
+        const song = await getSongByName(key);
+        if (song && song.data && typeof song.data.arrayBuffer === 'function') {
+            return song.data;
+        }
+    } catch {}
+    return fallbackFile;
+}
+
+async function analyzeAndPersistNormalizationBatch(entries, options = {}) {
+    const list = Array.isArray(entries) ? entries : [];
+    const map = loadNormalizationMap();
+    const total = list.length;
+    const methodVersion = String(options.methodVersion || NORMALIZATION_METHOD_VERSION);
+
+    for (let i = 0; i < total; i++) {
+        const entry = list[i] || {};
+        const songName = String(entry.songName || '').trim();
+        const file = entry.file;
+        if (!songName || !file) continue;
+
+        if (typeof options.onProgress === 'function') {
+            try { options.onProgress(i + 1, total, songName); } catch {}
+        }
+
+        await analyzeAndPersistNormalizationForSong(songName, file, {
+            ...options,
+            methodVersion,
+            normalizationMap: map
+        });
+    }
+
+    return map;
+}
+
+async function recalculateNormalizationForLibrary(options = {}) {
+    const forceAllSongs = !!options.forceAllSongs;
+    const songs = await getAllSongs();
+    const normalizationMap = loadNormalizationMap();
+    const total = Array.isArray(songs) ? songs.length : 0;
+    const methodVersion = String(options.methodVersion || NORMALIZATION_METHOD_VERSION);
+
+    let analyzed = 0;
+    let skipped = 0;
+
+    for (let i = 0; i < total; i++) {
+        const song = songs[i];
+        if (!song || !song.name || !song.data) {
+            skipped++;
+            continue;
+        }
+
+        const existing = normalizationMap[song.name];
+        const hasExisting = isNormalizationEntryUsable(existing, {
+            requireCurrentMethod: true,
+            methodVersion
+        });
+        if (!forceAllSongs && hasExisting) {
+            skipped++;
+            continue;
+        }
+
+        if (typeof options.onProgress === 'function') {
+            try { options.onProgress(i + 1, total, song.name); } catch {}
+        }
+
+        await analyzeAndPersistNormalizationForSong(song.name, song.data, {
+            methodVersion,
+            normalizationMap
+        });
+        analyzed++;
+    }
+
+    return { total, analyzed, skipped, forceAllSongs };
+}
 
 const DEFAULT_UI_SETTINGS = {
     playsetOneClickSelect: false,
@@ -2643,6 +3305,7 @@ function savePlayMode(mode) {
 
 const volValueText = document.getElementById('volValueText');
 const volIcon = document.getElementById('volIcon');
+const eqVolValueText = document.getElementById('eq-vol-val');
 const eqBassSlider = document.getElementById('eq-bass');
 const eqMidSlider = document.getElementById('eq-mid');
 const eqTrebleSlider = document.getElementById('eq-treble');
@@ -4051,8 +4714,26 @@ fileInput.onchange = async () => {
     fileInput.value = '';
     if (!files.length || !db) return;
 
-    await putSongs(files);
-    await renderPlaylist();
+    showIoBusy(`Adding songs 0/${files.length}...`);
+    try {
+        await putSongs(files);
+        const entries = [];
+        for (const file of files) {
+            const sourceFile = await getNormalizationSourceForSong(file.name, file);
+            entries.push({ songName: file.name, file: sourceFile || file });
+        }
+        await analyzeAndPersistNormalizationBatch(
+            entries,
+            {
+                onProgress(current, total) {
+                    setIoBusyLabel(`Analyzing loudness ${current}/${total}...`);
+                }
+            }
+        );
+        await renderPlaylist();
+    } finally {
+        hideIoBusy();
+    }
 };
 
 async function renderPlaylist() {
@@ -4141,13 +4822,9 @@ async function playSong(name) {
     if (!audioCtx) initWebAudio();
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
-    const savedVol = volMap[name] !== undefined ? volMap[name] : 1.0;
     audio.volume = 1.0; // Native volume must stay at max
     audio.muted = false;
-    volSlider.value = savedVol;
-    if (audioGraph) audioGraph.gain.gain.value = savedVol;
-    updateMuteUI();
+    applyPlaybackGain(name, { syncSlider: true, updateUi: true });
 
     const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
     const savedEq = eqMap[name] || { bass: 0, mid: 0, treble: 0 };
@@ -4196,10 +4873,28 @@ function toggleVolumePanel() {
 }
 
 function updateMuteUI() {
-    const vol = parseFloat(volSlider.value);
+    const fallbackVol = parseFloat(volSlider.value);
+    const resolved = currentFileName ? resolveEffectiveGain(currentFileName) : null;
+    const vol = resolved ? resolved.gain : (Number.isFinite(fallbackVol) ? fallbackVol : 1.0);
+    const isAutoMode = resolved ? resolved.modeLabel === 'AUTO' : false;
+    const valueText = vol.toFixed(2);
+    const displayText = isAutoMode ? `A ${valueText}` : valueText;
+    const modeColor = isAutoMode ? 'var(--accent)' : 'var(--text-primary)';
+
     if (!volValueText) return;
-    volValueText.textContent = vol.toFixed(2);
-    document.getElementById('eq-vol-val').textContent = vol.toFixed(2);
+    volValueText.textContent = displayText;
+    volValueText.style.color = modeColor;
+
+    if (eqVolValueText) {
+        eqVolValueText.textContent = displayText;
+        eqVolValueText.style.color = modeColor;
+    }
+
+    const volBtn = document.getElementById('volBtn');
+    if (volBtn) {
+        const modeText = isAutoMode ? 'auto mode' : 'manual mode';
+        volBtn.setAttribute('aria-label', `Volume ${valueText}, ${modeText}`);
+    }
     
     if (vol === 0) {
         volIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>`; // X
@@ -4210,22 +4905,62 @@ function updateMuteUI() {
     }
 }
 
+function toggleCurrentSongGainModeFromValueClick(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    if (!currentFileName) return;
+    if (!loadAutoGainEnabled()) return;
+
+    const current = resolveEffectiveGain(currentFileName);
+    // Toggle per-song override: AUTO -> MANUAL, MANUAL -> AUTO.
+    setPerSongManualOverride(currentFileName, current.modeLabel === 'AUTO');
+    applyPlaybackGain(currentFileName, { syncSlider: true, updateUi: true });
+}
+
+if (volValueText) {
+    volValueText.style.display = 'inline-block';
+    volValueText.style.minWidth = '3.8em';
+}
+if (eqVolValueText) {
+    eqVolValueText.style.display = 'inline-block';
+    eqVolValueText.style.minWidth = '3.8em';
+    eqVolValueText.style.cursor = 'pointer';
+    eqVolValueText.style.userSelect = 'none';
+    eqVolValueText.style.webkitUserSelect = 'none';
+    eqVolValueText.title = 'Toggle Auto/Manual for this song';
+    eqVolValueText.addEventListener('click', toggleCurrentSongGainModeFromValueClick);
+}
+
 volSlider.oninput = (e) => {
     let val = parseFloat(e.target.value);
+    const bounds = getVolumeSliderBounds();
+    val = clamp(Number.isFinite(val) ? val : 1.0, bounds.min, bounds.max);
     
     // Snap to precisely 1.00 if handled near the middle
     if (Math.abs(val - 1.0) <= 0.05) {
         val = 1.0;
         e.target.value = 1.0;
+    } else {
+        e.target.value = val;
     }
-    
-    if (audioGraph) audioGraph.gain.gain.value = val;
-    updateMuteUI();
-    if (currentFileName) {
-        const volMap = JSON.parse(localStorage.getItem(VOLUME_MAP_KEY) || '{}');
-        volMap[currentFileName] = val;
-        localStorage.setItem(VOLUME_MAP_KEY, JSON.stringify(volMap));
+
+    if (!currentFileName) {
+        if (audioGraph) audioGraph.gain.gain.value = val;
+        updateMuteUI();
+        return;
     }
+
+    const volMap = loadVolumeMap();
+    volMap[currentFileName] = val;
+    saveVolumeMap(volMap);
+
+    if (loadAutoGainEnabled()) {
+        setPerSongManualOverride(currentFileName, true);
+    }
+
+    applyPlaybackGain(currentFileName, { syncSlider: true, updateUi: true });
 };
 
 function applyEqToNodes(e) {
@@ -4828,6 +5563,7 @@ function songHasSavedAemMetadata(songName) {
     const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
     const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
     const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
+    const normalizationMap = loadNormalizationMap();
 
     const hasMarkers = hasMeaningfulMarkerData(eventMap[songName]);
     const volume = volMap[songName];
@@ -4836,8 +5572,12 @@ function songHasSavedAemMetadata(songName) {
     const hasSpeed = Number.isFinite(speed) && Math.abs(speed - 1.0) > 0.0001;
     const hasAbLoop = hasMeaningfulAbLoop(abMap[songName]);
     const hasEq = hasNonDefaultEq(eqMap[songName]);
+    const norm = normalizationMap[songName];
+    const hasNormalization = !!norm
+        && Number.isFinite(Number(norm.gain))
+        && Math.abs(Number(norm.gain) - 1.0) > 0.0001;
 
-    return hasMarkers || hasVolume || hasSpeed || hasAbLoop || hasEq;
+    return hasMarkers || hasVolume || hasSpeed || hasAbLoop || hasEq || hasNormalization;
 }
 
 function isLikelyAudioFile(file) {
@@ -4867,6 +5607,8 @@ async function importAudioFileToLibrary(file) {
     });
 
     await putSongs([audioFile]);
+    const sourceForAnalysis = await getNormalizationSourceForSong(finalName, audioFile);
+    await analyzeAndPersistNormalizationForSong(finalName, sourceForAnalysis || audioFile);
     return true;
 }
 
@@ -6635,6 +7377,34 @@ async function promptChangeExportFolder() {
     }
 }
 
+async function unwrapNestedAemBlobIfNeeded(blob, maxDepth = 2) {
+    let current = blob instanceof Blob ? blob : new Blob([blob]);
+
+    for (let depth = 0; depth < maxDepth; depth++) {
+        try {
+            const arr = await current.arrayBuffer();
+            const bytes = new Uint8Array(arr);
+            if (bytes.length < 4) break;
+
+            const hasAemMagic = (
+                bytes[0] === AEM_MAGIC[0] &&
+                bytes[1] === AEM_MAGIC[1] &&
+                bytes[2] === AEM_MAGIC[2] &&
+                bytes[3] === AEM_MAGIC[3]
+            );
+            if (!hasAemMagic) break;
+
+            const unpacked = unpackAem(arr);
+            if (!unpacked || !(unpacked.audioBlob instanceof Blob)) break;
+            current = unpacked.audioBlob;
+        } catch {
+            break;
+        }
+    }
+
+    return current;
+}
+
 async function packAem(songName) {
     const song = await getSongByName(songName);
     if (!song) throw new Error('Song not found: ' + songName);
@@ -6644,21 +7414,25 @@ async function packAem(songName) {
     const speedMap = JSON.parse(localStorage.getItem(SPEED_MAP_KEY) || '{}');
     const abMap = JSON.parse(localStorage.getItem(AB_LOOP_MAP_KEY) || '{}');
     const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
+    const normalizationMap = loadNormalizationMap();
+
+    let audioBlob = song.data instanceof Blob ? song.data : new Blob([song.data]);
+    audioBlob = await unwrapNestedAemBlobIfNeeded(audioBlob);
 
     const metadata = {
         version: AEM_VERSION,
         name: song.name,
-        type: song.type || '',
+        type: audioBlob.type || song.type || '',
         lastModified: song.lastModified || Date.now(),
         markerData: eventMap[songName] || null,
         volume: volMap[songName] !== undefined ? volMap[songName] : 1.0,
         speed: speedMap[songName] !== undefined ? speedMap[songName] : 1.0,
         abLoop: abMap[songName] || null,
-        eq: eqMap[songName] || { bass: 0, mid: 0, treble: 0 }
+        eq: eqMap[songName] || { bass: 0, mid: 0, treble: 0 },
+        normalization: normalizeNormalizationEntry(normalizationMap[songName])
     };
 
     const metaJson = new TextEncoder().encode(JSON.stringify(metadata));
-    const audioBlob = song.data instanceof Blob ? song.data : new Blob([song.data]);
     const audioBuffer = await audioBlob.arrayBuffer();
 
     // Layout: [4 magic][1 version][4 meta-length][N meta][rest audio]
@@ -6783,6 +7557,7 @@ async function importSong(file) {
     try {
         const arrayBuffer = await file.arrayBuffer();
         const { metadata, audioBlob } = unpackAem(arrayBuffer);
+        const normalizedAudioBlob = await unwrapNestedAemBlobIfNeeded(audioBlob);
 
         const allSongs = await getAllSongs();
         const existingNames = allSongs.map(s => s.name);
@@ -6801,8 +7576,8 @@ async function importSong(file) {
             if (!finalName) return;
         }
 
-        const audioFile = new File([audioBlob], finalName, {
-            type: metadata.type || 'audio/mpeg',
+        const audioFile = new File([normalizedAudioBlob], finalName, {
+            type: normalizedAudioBlob.type || metadata.type || 'audio/mpeg',
             lastModified: metadata.lastModified || Date.now()
         });
         await putSongs([audioFile]);
@@ -6840,12 +7615,28 @@ async function importSong(file) {
         }
         localStorage.setItem(AB_LOOP_MAP_KEY, JSON.stringify(abMap));
 
+        const normalizationMap = loadNormalizationMap();
+        const metadataNormalization = metadata && metadata.normalization && typeof metadata.normalization === 'object'
+            ? normalizeNormalizationEntry(metadata.normalization)
+            : null;
+        const hasMetadataNormalization = !!metadataNormalization
+            && Number.isFinite(Number(metadataNormalization.gain))
+            && Number(metadataNormalization.gain) > 0;
+
+        if (hasMetadataNormalization) {
+            normalizationMap[finalName] = metadataNormalization;
+            saveNormalizationMap(normalizationMap);
+        } else {
+            setIoBusyLabel('Analyzing loudness 1/1...');
+            const sourceForAnalysis = await getNormalizationSourceForSong(finalName, audioFile);
+            await analyzeAndPersistNormalizationForSong(finalName, sourceForAnalysis || audioFile, { normalizationMap });
+        }
+
         // If the imported song is currently selected, sync the live player state.
         if (finalName === currentFileName) {
-            const savedVol = volMap[finalName];
-            audio.volume = savedVol;
+            audio.volume = 1.0;
             audio.muted = false;
-            volSlider.value = savedVol;
+            applyPlaybackGain(finalName, { syncSlider: true, updateUi: false });
             const savedRate = speedMap[finalName] ?? 1.0;
             setPlaybackRate(savedRate);
             firedEvents.clear();
