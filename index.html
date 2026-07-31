@@ -1673,7 +1673,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.191</p>
+            <p class="info-version" id="infoVersionLabel">v1.4.0</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -3556,13 +3556,23 @@ const midiConnections = new Map();
 let midiPrimaryConnectionId = null;
 let connectInFlight = false;
 let connectStatusTimer = null;
-// Future extension: support per-instance family keys (for example pm_1, pm_2).
-const SUPPORTED_FAMILY_OPTIONS = [
-    { key: 'nux', label: 'NUX Mighty Plug Pro / Mighty Plug' },
-    { key: 'pm', label: 'Pocket Master / Smart Box' },
-    { key: 'spark', label: 'Spark Go / Spark 40' },
-    { key: 'thr', label: 'Yamaha THR-II' }
+const SUPPORTED_DEVICE_OPTIONS = [
+    { key: 'nux-pro', label: 'NUX Mighty Plug Pro', family: 'nux', routeMode: 'pc' },
+    { key: 'nux', label: 'NUX Mighty Plug', family: 'nux', routeMode: 'pc' },
+    { key: 'pocket-master', label: 'Pocket Master', family: 'pm', routeMode: 'cc' },
+    { key: 'smart-box', label: 'Smart Box', family: 'pm', routeMode: 'cc' },
+    { key: 'spark-go', label: 'Spark Go', family: 'spark', routeMode: 'spark' },
+    { key: 'spark-40', label: 'Spark 40 (gen 1)', family: 'spark', routeMode: 'spark' },
+    { key: 'thr-ii', label: 'Yamaha THR-II', family: 'thr', routeMode: 'thrii' }
 ];
+const SUPPORTED_FAMILY_OPTIONS = SUPPORTED_DEVICE_OPTIONS;
+const SUPPORTED_DEVICE_BY_KEY = new Map(SUPPORTED_DEVICE_OPTIONS.map((opt) => [opt.key, opt]));
+const SUPPORTED_DEVICE_DEFAULT_BY_FAMILY = new Map();
+SUPPORTED_DEVICE_OPTIONS.forEach((opt) => {
+    if (!SUPPORTED_DEVICE_DEFAULT_BY_FAMILY.has(opt.family)) {
+        SUPPORTED_DEVICE_DEFAULT_BY_FAMILY.set(opt.family, opt.key);
+    }
+});
 const midiSheetState = {
     mode: 'connections',
     assignmentSetId: null,
@@ -4056,6 +4066,7 @@ async function connectUsbOutput(output) {
         name,
         transport: 'usb',
         profile,
+        deviceKey: resolveDeviceFamily({ name, profile }),
         usbOutput: output,
         connectedAt: Date.now()
     };
@@ -4127,6 +4138,7 @@ async function connectBleFlow() {
             name: bleDevice.name || 'BLE Device',
             transport: 'ble',
             profile: isSpark ? 'spark' : 'midi',
+            deviceKey: resolveDeviceFamily({ name: bleDevice.name || 'BLE Device', profile: isSpark ? 'spark' : 'midi' }),
             bleDevice,
             gattServer,
             midiChar: midiCharacteristic,
@@ -4279,8 +4291,8 @@ function listUsbOutputs() {
 }
 
 function shouldRoutePresetAsCc(deviceName) {
-    const name = (deviceName || '').toLowerCase();
-    return /pocket\s*master|smart\s*box/.test(name);
+    const deviceKey = resolveDeviceFamily({ name: deviceName });
+    return getSupportedDeviceProfile(deviceKey)?.routeMode === 'cc';
 }
 
 // Map preset (1..100) → PC program (0..127)
@@ -4476,7 +4488,8 @@ function stopAudio() {
     audio.pause();
     audio.currentTime = 0;
     clearMarkerTriggerState();
-    activeBlobUrl = safeRevoke(activeBlobUrl);
+    // Keep the current blob URL alive so the same song can be played again
+    // after stopping (or accidental click-through on Stop).
     document.querySelectorAll('#event-list li').forEach(el => el.classList.remove('active-event'));
     updateMarkerTicks();
     updatePlayPauseUI();
@@ -6529,7 +6542,33 @@ function createDefaultMarkerData() {
 function normalizeAssignedFamily(value) {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim().toLowerCase();
-    return trimmed || null;
+    if (!trimmed) return null;
+
+    if (SUPPORTED_DEVICE_BY_KEY.has(trimmed)) return trimmed;
+
+    const directMatch = SUPPORTED_DEVICE_OPTIONS.find((opt) => opt.label.toLowerCase() === trimmed);
+    if (directMatch) return directMatch.key;
+
+    if (trimmed === 'nux' || trimmed === 'mighty plug' || trimmed === 'mighty plug pro') return 'nux-pro';
+    if (trimmed === 'pm' || trimmed === 'pocket master') return 'pocket-master';
+    if (trimmed === 'smart box') return 'smart-box';
+    if (trimmed === 'spark') return 'spark-go';
+    if (trimmed === 'spark go') return 'spark-go';
+    if (trimmed === 'spark 40' || trimmed === 'spark 40 (gen 1)') return 'spark-40';
+    if (trimmed === 'thr' || trimmed === 'thr-ii' || trimmed === 'yamaha thr-ii') return 'thr-ii';
+
+    const familyMatch = SUPPORTED_DEVICE_OPTIONS.find((opt) => opt.family === trimmed);
+    if (familyMatch) {
+        return SUPPORTED_DEVICE_DEFAULT_BY_FAMILY.get(trimmed) || familyMatch.key;
+    }
+
+    return null;
+}
+
+function getSupportedDeviceProfile(deviceKey) {
+    const normalized = normalizeAssignedFamily(deviceKey);
+    if (!normalized) return null;
+    return SUPPORTED_DEVICE_BY_KEY.get(normalized) || null;
 }
 
 function normalizeMarkerSetDef(setDef, fallbackName) {
@@ -6604,12 +6643,19 @@ function normalizeMarkerDataModel(rawData) {
 }
 
 function resolveDeviceFamily(conn) {
+    const cachedKey = normalizeAssignedFamily(conn?.deviceKey);
+    if (cachedKey) return cachedKey;
+
     const profile = String(conn?.profile || '').toLowerCase();
     const name = String(conn?.name || '').toLowerCase();
 
-    if (profile === 'spark' || /spark\s*(go|40)?/.test(name)) return 'spark';
-    if (profile === 'thrii' || /yamaha\s*thr|\bthr\b|thr-?ii/.test(name)) return 'thr';
-    if (/pocket\s*master|smart\s*box/.test(name)) return 'pm';
+    if (profile === 'spark' || /spark\s*(go|40)?/.test(name)) {
+        return /spark\s*40/.test(name) ? 'spark-40' : 'spark-go';
+    }
+    if (profile === 'thrii' || /yamaha\s*thr|\bthr\b|thr-?ii/.test(name)) return 'thr-ii';
+    if (/smart\s*box/.test(name)) return 'smart-box';
+    if (/pocket\s*master/.test(name)) return 'pocket-master';
+    if (/mighty\s*plug\s*pro/.test(name)) return 'nux-pro';
     if (/\bnux\b|mighty\s*plug/.test(name)) return 'nux';
     return 'unknown';
 }
@@ -6617,7 +6663,7 @@ function resolveDeviceFamily(conn) {
 function getFamilyLabel(familyKey) {
     if (!familyKey) return 'Any';
     const normalized = normalizeAssignedFamily(familyKey);
-    const match = SUPPORTED_FAMILY_OPTIONS.find((opt) => opt.key === normalized);
+    const match = getSupportedDeviceProfile(normalized);
     if (match) return match.label;
     if (!normalized) return 'Any';
     return normalized.toUpperCase();
@@ -6625,7 +6671,7 @@ function getFamilyLabel(familyKey) {
 
 function getAssignmentOptions() {
     return [
-        ...SUPPORTED_FAMILY_OPTIONS,
+        ...SUPPORTED_DEVICE_OPTIONS,
         { key: null, label: 'Any device' }
     ];
 }
@@ -6719,13 +6765,14 @@ function buildRouteEntriesForPlayback(markerData) {
 
 async function sendPresetToConnection(conn, presetNumber) {
     try {
-        if (conn.profile === 'spark') {
+        const profile = getSupportedDeviceProfile(resolveDeviceFamily(conn));
+        if (profile?.routeMode === 'spark') {
             return await sendSparkPresetTo(conn, presetNumber);
         }
-        if (conn.profile === 'thrii') {
+        if (profile?.routeMode === 'thrii') {
             return sendThriiPresetTo(conn, presetNumber);
         }
-        if (shouldRoutePresetAsCc(conn.name)) {
+        if (profile?.routeMode === 'cc') {
             return await sendCcTo(conn, 1, 1, presetNumber);
         }
         return await sendPcTo(conn, 1, presetToProgram(presetNumber));

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'audio-midi-v1.3.191';
+const CACHE_NAME = 'audio-midi-v1.4.0';
 const ASSETS = [
   './',
   './index.html',
