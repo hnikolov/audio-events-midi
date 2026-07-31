@@ -1610,7 +1610,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.3.19</p>
+            <p class="info-version" id="infoVersionLabel">v1.3.191</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -7377,34 +7377,6 @@ async function promptChangeExportFolder() {
     }
 }
 
-async function unwrapNestedAemBlobIfNeeded(blob, maxDepth = 2) {
-    let current = blob instanceof Blob ? blob : new Blob([blob]);
-
-    for (let depth = 0; depth < maxDepth; depth++) {
-        try {
-            const arr = await current.arrayBuffer();
-            const bytes = new Uint8Array(arr);
-            if (bytes.length < 4) break;
-
-            const hasAemMagic = (
-                bytes[0] === AEM_MAGIC[0] &&
-                bytes[1] === AEM_MAGIC[1] &&
-                bytes[2] === AEM_MAGIC[2] &&
-                bytes[3] === AEM_MAGIC[3]
-            );
-            if (!hasAemMagic) break;
-
-            const unpacked = unpackAem(arr);
-            if (!unpacked || !(unpacked.audioBlob instanceof Blob)) break;
-            current = unpacked.audioBlob;
-        } catch {
-            break;
-        }
-    }
-
-    return current;
-}
-
 async function packAem(songName) {
     const song = await getSongByName(songName);
     if (!song) throw new Error('Song not found: ' + songName);
@@ -7416,8 +7388,7 @@ async function packAem(songName) {
     const eqMap = JSON.parse(localStorage.getItem(EQ_MAP_KEY) || '{}');
     const normalizationMap = loadNormalizationMap();
 
-    let audioBlob = song.data instanceof Blob ? song.data : new Blob([song.data]);
-    audioBlob = await unwrapNestedAemBlobIfNeeded(audioBlob);
+    const audioBlob = song.data instanceof Blob ? song.data : new Blob([song.data]);
 
     const metadata = {
         version: AEM_VERSION,
@@ -7557,7 +7528,6 @@ async function importSong(file) {
     try {
         const arrayBuffer = await file.arrayBuffer();
         const { metadata, audioBlob } = unpackAem(arrayBuffer);
-        const normalizedAudioBlob = await unwrapNestedAemBlobIfNeeded(audioBlob);
 
         const allSongs = await getAllSongs();
         const existingNames = allSongs.map(s => s.name);
@@ -7576,8 +7546,8 @@ async function importSong(file) {
             if (!finalName) return;
         }
 
-        const audioFile = new File([normalizedAudioBlob], finalName, {
-            type: normalizedAudioBlob.type || metadata.type || 'audio/mpeg',
+        const audioFile = new File([audioBlob], finalName, {
+            type: audioBlob.type || metadata.type || 'audio/mpeg',
             lastModified: metadata.lastModified || Date.now()
         });
         await putSongs([audioFile]);
