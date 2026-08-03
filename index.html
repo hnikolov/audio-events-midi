@@ -1732,7 +1732,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.4.2</p>
+            <p class="info-version" id="infoVersionLabel">v1.4.3</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -6930,6 +6930,26 @@ function buildRouteEntriesForPlayback(markerData) {
     return entries;
 }
 
+function buildPrimarySetEntries(markerData) {
+    const entries = [];
+    if (!markerData || !markerData.sets) return entries;
+
+    const setId = markerData.activeId;
+    const setDef = setId ? markerData.sets[setId] : null;
+    if (!setDef || !Array.isArray(setDef.events)) return entries;
+
+    setDef.events.forEach((evt, eventIndex) => {
+        entries.push({
+            setId,
+            eventIndex,
+            evt,
+            isPrimarySet: true
+        });
+    });
+
+    return entries;
+}
+
 async function sendPresetToConnection(conn, presetNumber) {
     try {
         const profile = getSupportedDeviceProfile(resolveDeviceFamily(conn));
@@ -7449,6 +7469,19 @@ async function refreshEventUI() {
             if (!e.target.closest('button') && !e.target.closest('.dropdown-menu') && !e.target.closest('input') && e.isTrusted) {
                 const wasPlaying = !audio.paused;
                 seekToTime(evt.time);
+                // Keep row/tick highlight locked to the marker the user explicitly selected.
+                // Mark all markers up to the clicked time as fired so the next timeupdate
+                // cannot step the highlight back to a previously unfired earlier row.
+                const currentEvents = getEvents();
+                firedEvents.clear();
+                currentEvents.forEach((entry, entryIdx) => {
+                    const isFired = entry.time <= evt.time + EPS_RECONCILE;
+                    if (isFired) firedEvents.add(entry.time);
+                    updateTickFiredClassByIndex(entryIdx, isFired);
+                });
+                lastTriggeredMarkerTime = evt.time;
+                lastTriggeredMarkerIndex = i;
+                setActiveMarkerUIByIndex(i, false);
                 if (wasPlaying) {
                     audio.play().catch(() => {
                         updatePlayPauseUI();
@@ -7579,10 +7612,14 @@ function buildNearestRouteEntriesByFamily(targetTime, epsilon = EPS_RECONCILE) {
 }
 
 function fireNearestRouteEntriesAtTime(targetTime) {
+    if (!currentFileName) return;
+
+    const markerData = getRawMarkerData(currentFileName);
+    const primaryEntries = buildPrimarySetEntries(markerData);
     const nearestEntries = buildNearestRouteEntriesByFamily(targetTime, EPS_RECONCILE);
 
-    const nearestPrimary = nearestEntries
-        .filter((entry) => entry.isPrimarySet)
+    const nearestPrimary = primaryEntries
+        .filter((entry) => entry.evt.time <= targetTime + EPS_RECONCILE)
         .sort((a, b) => Math.abs(a.evt.time - targetTime) - Math.abs(b.evt.time - targetTime))[0] || null;
 
     if (nearestPrimary) {
@@ -7615,16 +7652,21 @@ function fireNearestRouteEntriesAtTime(targetTime) {
 function reconcileMarkersOnBackwardJump(targetTime, prevTime) {
     if (!currentFileName) return;
     const markerData = getRawMarkerData(currentFileName);
+    const primaryEntries = buildPrimarySetEntries(markerData);
     const routeEntries = buildRouteEntriesForPlayback(markerData);
+
+    primaryEntries.forEach((entry) => {
+        const t = entry.evt.time;
+        if (t > targetTime && t <= prevTime) {
+            firedEvents.delete(t);
+            updateTickFiredClassByIndex(entry.eventIndex, false);
+        }
+    });
 
     routeEntries.forEach((entry) => {
         const t = entry.evt.time;
         if (t > targetTime && t <= prevTime) {
             clearRouteEntryFired(entry);
-            if (entry.isPrimarySet) {
-                firedEvents.delete(t);
-                updateTickFiredClassByIndex(entry.eventIndex, false);
-            }
         }
     });
 
@@ -7633,16 +7675,21 @@ function reconcileMarkersOnBackwardJump(targetTime, prevTime) {
 function reconcileMarkersOnForwardJump(prevTime, targetTime) {
     if (!currentFileName) return;
     const markerData = getRawMarkerData(currentFileName);
+    const primaryEntries = buildPrimarySetEntries(markerData);
     const routeEntries = buildRouteEntriesForPlayback(markerData);
+
+    primaryEntries.forEach((entry) => {
+        const t = entry.evt.time;
+        if (t >= prevTime && t <= targetTime) {
+            firedEvents.add(t);
+            updateTickFiredClassByIndex(entry.eventIndex, true);
+        }
+    });
 
     routeEntries.forEach((entry) => {
         const t = entry.evt.time;
         if (t >= prevTime && t <= targetTime) {
             markRouteEntryFired(entry);
-            if (entry.isPrimarySet) {
-                firedEvents.add(t);
-                updateTickFiredClassByIndex(entry.eventIndex, true);
-            }
         }
     });
 
@@ -7663,22 +7710,37 @@ audio.addEventListener('timeupdate', () => {
 
     if (currentFileName) {
         const markerData = getRawMarkerData(currentFileName);
+        const primaryEntries = buildPrimarySetEntries(markerData);
         const routeEntries = buildRouteEntriesForPlayback(markerData);
         const triggerTasks = [];
+
+        primaryEntries.forEach((entry) => {
+            const t = entry.evt.time;
+
+            if (!firedEvents.has(t) && fireNow >= t) {
+                firedEvents.add(t);
+                lastTriggeredMarkerTime = t;
+                lastTriggeredMarkerIndex = entry.eventIndex;
+                setActiveMarkerUIByIndex(entry.eventIndex);
+                updateTickFiredClassByIndex(entry.eventIndex, true);
+            }
+
+            if (now < t - 0.5) {
+                firedEvents.delete(t);
+                updateTickFiredClassByIndex(entry.eventIndex, false);
+            }
+
+            if (audio.loop && !audio.paused && now === 0.0 && t === 0.0) {
+                firedEvents.delete(t);
+                updateTickFiredClassByIndex(entry.eventIndex, false);
+            }
+        });
 
         routeEntries.forEach((entry) => {
             const t = entry.evt.time;
             const scheduleKey = makeRouteScheduleKey(entry.familyKey, entry.setId, t);
 
             if (!firedRouteSchedule.has(scheduleKey) && fireNow >= t) {
-                if (entry.isPrimarySet && !firedEvents.has(t)) {
-                    firedEvents.add(t);
-                    lastTriggeredMarkerTime = t;
-                    lastTriggeredMarkerIndex = entry.eventIndex;
-                    setActiveMarkerUIByIndex(entry.eventIndex);
-                    updateTickFiredClassByIndex(entry.eventIndex, true);
-                }
-
                 triggerTasks.push((async () => {
                     const sent = await fireRouteEntry(entry, { forceSend: false });
                     markRouteEntryFired(entry);
@@ -7688,18 +7750,10 @@ audio.addEventListener('timeupdate', () => {
 
             if (now < t - 0.5) {
                 clearRouteEntryFired(entry);
-                if (entry.isPrimarySet) {
-                    firedEvents.delete(t);
-                    updateTickFiredClassByIndex(entry.eventIndex, false);
-                }
             }
 
             if (audio.loop && !audio.paused && now === 0.0 && t === 0.0) {
                 clearRouteEntryFired(entry);
-                if (entry.isPrimarySet) {
-                    firedEvents.delete(t);
-                    updateTickFiredClassByIndex(entry.eventIndex, false);
-                }
             }
         });
 
