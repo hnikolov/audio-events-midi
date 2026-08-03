@@ -760,7 +760,7 @@
             transition: background 0.1s;
         }
         .speed-option:active { background: var(--bg-hover); }
-        .speed-option.active { font-weight: 700; color: var(--accent); background: var(--accent-dim); }
+        .speed-option.active { font-weight: 700; color: var(--accent); }
 
         /* ===== MARKER SET TOP SHEET ===== */
         .marker-top-sheet {
@@ -808,13 +808,50 @@
             align-items: center;
             gap: 8px;
             padding: 2px 0;
+            border-radius: var(--radius-sm);
+        }
+        .marker-set-row-wrap.marker-set-row-selected {
+            background: var(--accent-dim);
         }
         .marker-set-row-main {
             flex: 1 1 auto;
             min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .marker-set-drag-handle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            min-width: 30px;
+            height: 30px;
+            color: var(--text-muted);
+            cursor: grab;
+            touch-action: none;
+            flex-shrink: 0;
+            border-radius: var(--radius-sm);
+        }
+        .marker-set-drag-handle:active {
+            color: var(--text-secondary);
+            background: var(--bg-hover);
+        }
+        .marker-set-drag-handle svg {
+            width: 16px;
+            height: 16px;
+            pointer-events: none;
+        }
+        .marker-set-row-label {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: left;
         }
         .marker-set-row-selected {
-            box-shadow: inset 0 0 0 1px var(--accent);
+            box-shadow: none;
         }
         .marker-set-assign-badge {
             flex: 0 0 auto;
@@ -1673,7 +1710,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.4.0</p>
+            <p class="info-version" id="infoVersionLabel">v1.4.1</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -2476,6 +2513,11 @@ let playsetDragSrcIdx = null;
 let playsetDropIndicator = null;
 let isDraggingPlayset = false;
 let playsetRecentlyDragged = false;
+let markerSetDragSrcEl = null;
+let markerSetDragSrcIdx = null;
+let markerSetDropIndicator = null;
+let isDraggingMarkerSet = false;
+let markerSetRecentlyDragged = false;
 const DRAG_ACTIVATE_PX = 6;  // min movement before drag "activates" visually
 
 function onPlaylistPointerDown(e) {
@@ -2659,6 +2701,107 @@ function onPlaysetSheetPointerDown(e) {
         handle.removeEventListener('pointerup', onUp);
         handle.removeEventListener('pointercancel', onUp);
         finishPlaysetDrag();
+    }
+
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
+}
+
+function onMarkerSetSheetPointerDown(e) {
+    const handle = e.target.closest('.marker-set-drag-handle');
+    if (!handle) return;
+
+    const row = handle.closest('[data-marker-set-row-idx]');
+    if (!row) return;
+    const idx = parseInt(row.dataset.markerSetRowIdx, 10);
+    if (isNaN(idx)) return;
+
+    const sheet = document.getElementById('marker-set-sheet');
+    const listEl = sheet ? sheet.querySelector('.marker-set-sheet-list') : null;
+    if (!listEl) return;
+
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+
+    markerSetDragSrcEl = row;
+    markerSetDragSrcIdx = idx;
+    isDraggingMarkerSet = false;
+    const startY = e.clientY;
+
+    markerSetDropIndicator = document.createElement('div');
+    markerSetDropIndicator.className = 'drop-indicator';
+    markerSetDropIndicator.dataset.targetIdx = idx;
+
+    function updateMarkerSetDragPosition(clientY) {
+        if (!markerSetDragSrcEl || !isDraggingMarkerSet) return;
+        const allRows = Array.from(listEl.querySelectorAll('[data-marker-set-row-idx]'));
+        const items = allRows.filter(r => !r.classList.contains('dragging'));
+        let targetIdx = allRows.length;
+
+        for (let i = 0; i < items.length; i++) {
+            const rect = items[i].getBoundingClientRect();
+            if (clientY < rect.top + rect.height / 2) {
+                targetIdx = parseInt(items[i].dataset.markerSetRowIdx, 10);
+                break;
+            }
+        }
+
+        if (markerSetDropIndicator.parentNode) markerSetDropIndicator.parentNode.removeChild(markerSetDropIndicator);
+        if (targetIdx < allRows.length) {
+            const refEl = allRows.find(it => parseInt(it.dataset.markerSetRowIdx, 10) === targetIdx && !it.classList.contains('dragging'));
+            if (refEl) listEl.insertBefore(markerSetDropIndicator, refEl);
+            else listEl.appendChild(markerSetDropIndicator);
+        } else {
+            listEl.appendChild(markerSetDropIndicator);
+        }
+        markerSetDropIndicator.dataset.targetIdx = targetIdx;
+    }
+
+    function finishMarkerSetDrag() {
+        if (markerSetDragSrcEl) markerSetDragSrcEl.classList.remove('dragging');
+        if (markerSetDropIndicator) {
+            const targetIdx = parseInt(markerSetDropIndicator.dataset.targetIdx, 10);
+            markerSetDropIndicator.remove();
+            if (isDraggingMarkerSet && typeof markerSetDragSrcIdx === 'number') {
+                let finalIdx = targetIdx;
+                if (targetIdx > markerSetDragSrcIdx) finalIdx = targetIdx - 1;
+                if (finalIdx !== markerSetDragSrcIdx && currentFileName) {
+                    if (moveMarkerSetOrder(currentFileName, markerSetDragSrcIdx, finalIdx)) {
+                        const refreshed = getRawMarkerData(currentFileName);
+                        updateSetSelector(refreshed);
+                        refreshEventUI();
+                        updateMarkerTicks();
+                        markerSetRecentlyDragged = true;
+                        setTimeout(() => { markerSetRecentlyDragged = false; }, 150);
+                    }
+                }
+            }
+        }
+
+        markerSetDragSrcEl = null;
+        markerSetDragSrcIdx = null;
+        markerSetDropIndicator = null;
+        isDraggingMarkerSet = false;
+    }
+
+    function onMove(ev) {
+        const dy = Math.abs(ev.clientY - startY);
+        if (!isDraggingMarkerSet) {
+            if (dy < DRAG_ACTIVATE_PX) return;
+            isDraggingMarkerSet = true;
+            markerSetDragSrcEl.classList.add('dragging');
+            if (navigator.vibrate) navigator.vibrate(30);
+        }
+        updateMarkerSetDragPosition(ev.clientY);
+    }
+
+    function onUp(ev) {
+        handle.releasePointerCapture(ev.pointerId);
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+        finishMarkerSetDrag();
     }
 
     handle.addEventListener('pointermove', onMove);
@@ -6923,6 +7066,31 @@ function saveRawMarkerData(songName, data) {
     localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
 }
 
+function moveMarkerSetOrder(songName, from, to) {
+    const key = String(songName || '').trim();
+    if (!key) return false;
+
+    const data = getRawMarkerData(key);
+    const entries = Object.entries(data.sets || {});
+    if (!entries.length) return false;
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return false;
+    if (from < 0 || to < 0 || from >= entries.length || to >= entries.length) return false;
+    if (from === to) return false;
+
+    const moved = entries.splice(from, 1)[0];
+    if (!moved) return false;
+    entries.splice(to, 0, moved);
+
+    const reorderedSets = {};
+    entries.forEach(([setId, setDef]) => {
+        reorderedSets[setId] = setDef;
+    });
+
+    data.sets = reorderedSets;
+    saveRawMarkerData(key, data);
+    return true;
+}
+
 function getEvents() {
     if (!currentFileName) return [];
     let data = getRawMarkerData(currentFileName);
@@ -6987,15 +7155,15 @@ function updateSetSelector(data) {
     if (!sheet) return;
 
     const runtimeActiveSetIds = new Set(getRuntimeActiveSetIds(data));
-    const rows = Object.entries(data.sets).map(([id, setDef]) => {
+    const rows = Object.entries(data.sets).map(([id, setDef], idx) => {
         const runtimeActiveClass = runtimeActiveSetIds.has(id) ? ' active' : '';
         const selectedClass = id === data.activeId ? ' marker-set-row-selected' : '';
         const assignedFamily = normalizeAssignedFamily(setDef.assignedFamily);
         const assignmentLabel = assignedFamily ? getFamilyLabel(assignedFamily) : 'Any';
         const badgeAssignedClass = assignedFamily ? ' assigned' : '';
         return `
-            <div class="marker-set-row-wrap">
-                <button type="button" class="speed-option marker-set-row marker-set-row-main${runtimeActiveClass}${selectedClass}" data-marker-set-main-id="${escapeHtml(id)}">${escapeHtml(setDef.name)}</button>
+            <div class="marker-set-row-wrap${selectedClass}" data-marker-set-row-idx="${idx}">
+                <button type="button" class="speed-option marker-set-row marker-set-row-main${runtimeActiveClass}${selectedClass}" data-marker-set-main-id="${escapeHtml(id)}"><span class="marker-set-drag-handle" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></span><span class="marker-set-row-label">${escapeHtml(setDef.name)}</span></button>
                 <button type="button" class="marker-set-assign-badge${badgeAssignedClass}" data-marker-assign-set-id="${escapeHtml(id)}" aria-label="Assign ${escapeHtml(setDef.name)}">${escapeHtml(assignmentLabel)}</button>
             </div>
         `;
@@ -7024,6 +7192,8 @@ function updateSetSelector(data) {
 
             const setRow = e.target.closest('[data-marker-set-main-id]');
             if (setRow) {
+                if (markerSetRecentlyDragged) return;
+                if (e.target.closest('.marker-set-drag-handle')) return;
                 changeMarkerSet(setRow.dataset.markerSetMainId);
                 if (shouldAutoCloseMarkerSetSheetOnSelect()) {
                     closeAllSheets();
@@ -7040,6 +7210,7 @@ function updateSetSelector(data) {
             else if (action === 'rename') renameMarkerSet();
             else if (action === 'delete') deleteMarkerSet();
         });
+        sheet.addEventListener('pointerdown', onMarkerSetSheetPointerDown);
         sheet.dataset.bound = '1';
     }
 
