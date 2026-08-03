@@ -297,7 +297,7 @@
             color: var(--accent);
             font-weight: 600;
         }
-        .playlist-item.dragging { opacity: 0.4; cursor: grabbing; }
+        .playlist-item.dragging { opacity: 0.45; cursor: grabbing; }
         .drag-handle {
             display: flex; align-items: center; justify-content: center;
             width: 42px;
@@ -540,6 +540,7 @@
             cursor: pointer; flex-shrink: 0;
             transition: background 0.12s, transform 0.1s, color 0.12s;
             padding: 0;
+            user-select: none;
         }
         .control-btn:active { transform: scale(0.9); }
         .control-btn.play-btn {
@@ -760,7 +761,7 @@
             transition: background 0.1s;
         }
         .speed-option:active { background: var(--bg-hover); }
-        .speed-option.active { font-weight: 700; color: var(--accent); }
+        .speed-option.active { font-weight: 700; color: var(--accent); background: var(--accent-dim); }
 
         /* ===== MARKER SET TOP SHEET ===== */
         .marker-top-sheet {
@@ -813,12 +814,29 @@
         .marker-set-row-wrap.marker-set-row-selected {
             background: var(--accent-dim);
         }
+        .marker-set-row-wrap.drag-armed {
+            background: var(--bg-hover);
+        }
+        .marker-set-row-wrap.marker-set-row-selected.drag-armed {
+            background: var(--accent-dim);
+        }
         .marker-set-row-main {
             flex: 1 1 auto;
             min-width: 0;
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+        .marker-set-row-main.active,
+        .marker-set-row-main.marker-set-row-selected,
+        .marker-set-row-main:active,
+        .marker-set-row-wrap.dragging .marker-set-row-main {
+            background: transparent;
+        }
+        .marker-set-row-wrap.dragging {
+            background: var(--accent-dim);
+            opacity: 0.45;
+            cursor: grabbing;
         }
         .marker-set-drag-handle {
             display: flex;
@@ -835,7 +853,7 @@
         }
         .marker-set-drag-handle:active {
             color: var(--text-secondary);
-            background: var(--bg-hover);
+            background: transparent;
         }
         .marker-set-drag-handle svg {
             width: 16px;
@@ -1065,6 +1083,10 @@
             align-items: center;
             gap: 8px;
         }
+        .playset-selector-row.dragging {
+            opacity: 0.45;
+            cursor: grabbing;
+        }
         .playset-row-label {
             flex: 1;
             min-width: 0;
@@ -1088,7 +1110,7 @@
         }
         .playset-drag-handle:active {
             color: var(--text-secondary);
-            background: var(--bg-hover);
+            background: transparent;
         }
         .playset-drag-handle svg {
             width: 16px;
@@ -1710,7 +1732,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.4.1</p>
+            <p class="info-version" id="infoVersionLabel">v1.4.2</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -2726,6 +2748,7 @@ function onMarkerSetSheetPointerDown(e) {
 
     markerSetDragSrcEl = row;
     markerSetDragSrcIdx = idx;
+    markerSetDragSrcEl.classList.add('drag-armed');
     isDraggingMarkerSet = false;
     const startY = e.clientY;
 
@@ -2760,6 +2783,7 @@ function onMarkerSetSheetPointerDown(e) {
 
     function finishMarkerSetDrag() {
         if (markerSetDragSrcEl) markerSetDragSrcEl.classList.remove('dragging');
+        if (markerSetDragSrcEl) markerSetDragSrcEl.classList.remove('drag-armed');
         if (markerSetDropIndicator) {
             const targetIdx = parseInt(markerSetDropIndicator.dataset.targetIdx, 10);
             markerSetDropIndicator.remove();
