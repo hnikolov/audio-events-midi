@@ -6,7 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0f0f0f" />
-    <link rel="manifest" href="manifest.json" />
+    <script>
+        (function () {
+            const isFileOrigin = window.location.protocol === 'file:' || window.location.origin === 'null';
+            if (!isFileOrigin) {
+                const manifestLink = document.createElement('link');
+                manifestLink.rel = 'manifest';
+                manifestLink.href = 'manifest.json';
+                document.head.appendChild(manifestLink);
+            }
+        })();
+    </script>
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon-192.png" />
     <title>Audio Events MIDI</title>
@@ -2372,12 +2382,15 @@ function renderMarkerMenuSheet(idx) {
     const evt = events[idx];
     if (!sheet || !evt) return;
 
+    const presetRange = getPresetRangeForFamily(getCurrentPresetFormatFamily());
+    const maxAttr = Number.isFinite(presetRange.max) ? ` max="${presetRange.max}"` : '';
+
     sheet.innerHTML = `
         <div class="marker-set-sheet-list" style="padding:10px 12px 8px;">
             <div style="font-size:0.95rem;font-weight:600;color:var(--text-primary);">Edit marker</div>
             <div class="marker-edit-sheet-fields">
                 <input type="text" inputmode="decimal" class="marker-edit-sheet-input" id="marker-sheet-time" value="${escapeHtml(formatClock(evt.time))}" aria-label="Marker time (m:ss.s or seconds)">
-                <input type="number" min="1" max="100" step="1" class="marker-edit-sheet-input" id="marker-sheet-preset" value="${escapeHtml(evt.preset)}" aria-label="Marker preset">
+                <input type="number" min="1" step="1" class="marker-edit-sheet-input" id="marker-sheet-preset" value="${escapeHtml(evt.preset)}" aria-label="Marker preset"${maxAttr}>
                 <input type="text" maxlength="24" class="marker-edit-sheet-input" id="marker-sheet-text" value="${escapeHtml(evt.text || '')}" placeholder="Description" aria-label="Marker description">
             </div>
         </div>
@@ -2467,7 +2480,7 @@ function saveMarkerSheetEdit() {
 
     if (isNaN(newTime)) return;
     if (isNaN(newPreset)) newPreset = 1;
-    newPreset = Math.min(100, Math.max(1, newPreset));
+    newPreset = clampPresetNumber(newPreset, getCurrentPresetFormatFamily());
 
     const updated = events.slice();
     updated[idx] = { time: newTime, preset: newPreset, text: newText };
@@ -3734,6 +3747,7 @@ const SUPPORTED_DEVICE_OPTIONS = [
     { key: 'nux-pro', label: 'NUX Mighty Plug Pro', family: 'nux', routeMode: 'pc' },
     { key: 'nux', label: 'NUX Mighty Plug', family: 'nux', routeMode: 'pc' },
     { key: 'pocket-master', label: 'Pocket Master', family: 'pm', routeMode: 'cc' },
+    { key: 'pocket-amp', label: 'Pocket Amp', family: 'pocket-amp', routeMode: 'pc' },
     { key: 'smart-box', label: 'Smart Box', family: 'pm', routeMode: 'cc' },
     { key: 'gt-100', label: 'Boss GT-100', family: 'gt100', routeMode: 'gt100' },
     { key: 'spark-go', label: 'Spark Go', family: 'spark', routeMode: 'spark' },
@@ -3748,6 +3762,85 @@ SUPPORTED_DEVICE_OPTIONS.forEach((opt) => {
         SUPPORTED_DEVICE_DEFAULT_BY_FAMILY.set(opt.family, opt.key);
     }
 });
+
+const PRESET_FORMAT_PROFILES = new Map([
+    ['pocket-master', { max: 100, format: (preset) => {
+        const n = Math.max(1, Math.min(100, Number(preset) || 1));
+        if (n <= 50) return `P${String(n).padStart(2, '0')}`;
+        return `F${String(n - 50).padStart(2, '0')}`;
+    } }],
+    ['smart-box', { max: 100, format: (preset) => {
+        const n = Math.max(1, Math.min(100, Number(preset) || 1));
+        if (n <= 50) return `P${String(n).padStart(2, '0')}`;
+        return `F${String(n - 50).padStart(2, '0')}`;
+    } }],
+    ['pocket-amp', { max: 80, format: (preset) => `P${String(Math.max(1, Math.min(80, Number(preset) || 1))).padStart(2, '0')}` }],
+    ['gt-100', { max: 400, format: (preset) => {
+        const slot = Math.max(1, Math.min(400, Number(preset) || 1));
+        const bank = Math.floor((slot - 1) / 100);
+        const innerIndex = (slot - 1) % 100;
+        const prefix = bank < 2 ? 'U' : 'P';
+        const groupStart = bank % 2 === 0 ? 1 : 26;
+        const group = groupStart + Math.floor(innerIndex / 4);
+        const sub = (innerIndex % 4) + 1;
+        return `${prefix}${String(group).padStart(2, '0')}-${sub}`;
+    } }],
+    ['nux', { max: 7, format: (preset) => String(Math.max(1, Math.min(7, Number(preset) || 1))).padStart(2, '0') }],
+    ['nux-pro', { max: 7, format: (preset) => String(Math.max(1, Math.min(7, Number(preset) || 1))).padStart(2, '0') }]
+]);
+
+function getPresetFormatProfile(familyKey) {
+    const normalized = normalizeAssignedFamily(familyKey);
+    if (!normalized) return null;
+    if (normalized === 'smart-box') return PRESET_FORMAT_PROFILES.get('smart-box') || PRESET_FORMAT_PROFILES.get('pocket-master');
+    if (normalized === 'nux-pro') return PRESET_FORMAT_PROFILES.get('nux-pro') || PRESET_FORMAT_PROFILES.get('nux');
+    return PRESET_FORMAT_PROFILES.get(normalized) || null;
+}
+
+function getPresetRangeForFamily(familyKey) {
+    const profile = getPresetFormatProfile(familyKey);
+    if (!profile) return { min: 1, max: null };
+    return { min: 1, max: Number.isFinite(profile.max) ? profile.max : null };
+}
+
+let markerFormattingNormalizationDepth = 0;
+
+function getCurrentPresetFormatFamily() {
+    if (markerFormattingNormalizationDepth > 0) {
+        const familyKeys = Array.from(getConnectionsByFamily().keys());
+        if (familyKeys.length === 1) return familyKeys[0];
+        return null;
+    }
+
+    if (!currentFileName) {
+        const familyKeys = Array.from(getConnectionsByFamily().keys());
+        if (familyKeys.length === 1) return familyKeys[0];
+        return null;
+    }
+
+    const markerData = getRawMarkerData(currentFileName);
+    const activeSetDef = markerData?.sets?.[markerData.activeId];
+    const activeFamily = normalizeAssignedFamily(activeSetDef?.assignedFamily);
+    if (activeFamily) return activeFamily;
+
+    const familyKeys = Array.from(getConnectionsByFamily().keys());
+    if (familyKeys.length === 1) return familyKeys[0];
+    return null;
+}
+
+function clampPresetNumber(preset, familyKey = null) {
+    let value = Number.parseInt(preset, 10);
+    if (!Number.isFinite(value)) value = 1;
+
+    const resolvedFamily = familyKey || getCurrentPresetFormatFamily();
+    const { min, max } = getPresetRangeForFamily(resolvedFamily);
+    const safeMin = Number.isFinite(min) ? min : 1;
+    if (Number.isFinite(max)) {
+        return Math.min(max, Math.max(safeMin, value));
+    }
+    return Math.max(safeMin, value);
+}
+
 const midiSheetState = {
     mode: 'connections',
     assignmentSetId: null,
@@ -5431,7 +5524,7 @@ function sanitizeMarkerText(text) {
 
 function normalizeMarkerEntry(entry) {
     if (typeof entry === 'number') {
-        return { time: entry, preset: 1, text: '' };
+        return { time: entry, preset: clampPresetNumber(1), text: '' };
     }
     if (!entry || typeof entry !== 'object') {
         return null;
@@ -5444,7 +5537,7 @@ function normalizeMarkerEntry(entry) {
 
     let preset = parseInt(entry.preset, 10);
     if (isNaN(preset)) preset = 1;
-    preset = Math.min(100, Math.max(1, preset));
+    preset = clampPresetNumber(preset, getCurrentPresetFormatFamily());
 
     return {
         time,
@@ -6763,6 +6856,7 @@ function normalizeAssignedFamily(value) {
 
     if (trimmed === 'nux' || trimmed === 'mighty plug' || trimmed === 'mighty plug pro') return 'nux-pro';
     if (trimmed === 'pm' || trimmed === 'pocket master') return 'pocket-master';
+    if (trimmed === 'pocket amp') return 'pocket-amp';
     if (trimmed === 'smart box') return 'smart-box';
     if (trimmed === 'gt100' || trimmed === 'gt-100' || trimmed === 'boss gt-100') return 'gt-100';
     if (trimmed === 'spark') return 'spark-go';
@@ -6809,50 +6903,55 @@ function resolveFallbackSetId(markerData) {
 }
 
 function normalizeMarkerDataModel(rawData) {
-    if (Array.isArray(rawData)) {
-        const base = createDefaultMarkerData();
-        base.sets.default.events = normalizeMarkerList(rawData);
-        return base;
+    markerFormattingNormalizationDepth += 1;
+    try {
+        if (Array.isArray(rawData)) {
+            const base = createDefaultMarkerData();
+            base.sets.default.events = normalizeMarkerList(rawData);
+            return base;
+        }
+
+        const safeRaw = rawData && typeof rawData === 'object' ? rawData : {};
+        const rawSets = safeRaw.sets && typeof safeRaw.sets === 'object' ? safeRaw.sets : {};
+        const normalizedSets = {};
+
+        for (const [id, setDef] of Object.entries(rawSets)) {
+            if (!id) continue;
+            normalizedSets[id] = normalizeMarkerSetDef(setDef, setDef?.name || 'Marker Set');
+        }
+
+        if (!Object.keys(normalizedSets).length) {
+            return createDefaultMarkerData();
+        }
+
+        let activeId = (typeof safeRaw.activeId === 'string' && normalizedSets[safeRaw.activeId])
+            ? safeRaw.activeId
+            : null;
+        if (!activeId) {
+            const tempData = { sets: normalizedSets, activeId: null };
+            activeId = resolveFallbackSetId(tempData);
+        }
+
+        const rawFamilyMap = (safeRaw.activeSetByFamily && typeof safeRaw.activeSetByFamily === 'object')
+            ? safeRaw.activeSetByFamily
+            : {};
+        const activeSetByFamily = {};
+        for (const [familyKeyRaw, setId] of Object.entries(rawFamilyMap)) {
+            const familyKey = normalizeAssignedFamily(familyKeyRaw);
+            if (!familyKey) continue;
+            if (!normalizedSets[setId]) continue;
+            if (normalizedSets[setId].assignedFamily !== familyKey) continue;
+            activeSetByFamily[familyKey] = setId;
+        }
+
+        return {
+            activeId,
+            activeSetByFamily,
+            sets: normalizedSets
+        };
+    } finally {
+        markerFormattingNormalizationDepth = Math.max(0, markerFormattingNormalizationDepth - 1);
     }
-
-    const safeRaw = rawData && typeof rawData === 'object' ? rawData : {};
-    const rawSets = safeRaw.sets && typeof safeRaw.sets === 'object' ? safeRaw.sets : {};
-    const normalizedSets = {};
-
-    for (const [id, setDef] of Object.entries(rawSets)) {
-        if (!id) continue;
-        normalizedSets[id] = normalizeMarkerSetDef(setDef, setDef?.name || 'Marker Set');
-    }
-
-    if (!Object.keys(normalizedSets).length) {
-        return createDefaultMarkerData();
-    }
-
-    let activeId = (typeof safeRaw.activeId === 'string' && normalizedSets[safeRaw.activeId])
-        ? safeRaw.activeId
-        : null;
-    if (!activeId) {
-        const tempData = { sets: normalizedSets, activeId: null };
-        activeId = resolveFallbackSetId(tempData);
-    }
-
-    const rawFamilyMap = (safeRaw.activeSetByFamily && typeof safeRaw.activeSetByFamily === 'object')
-        ? safeRaw.activeSetByFamily
-        : {};
-    const activeSetByFamily = {};
-    for (const [familyKeyRaw, setId] of Object.entries(rawFamilyMap)) {
-        const familyKey = normalizeAssignedFamily(familyKeyRaw);
-        if (!familyKey) continue;
-        if (!normalizedSets[setId]) continue;
-        if (normalizedSets[setId].assignedFamily !== familyKey) continue;
-        activeSetByFamily[familyKey] = setId;
-    }
-
-    return {
-        activeId,
-        activeSetByFamily,
-        sets: normalizedSets
-    };
 }
 
 function resolveDeviceFamily(conn) {
@@ -6868,6 +6967,7 @@ function resolveDeviceFamily(conn) {
     if (profile === 'thrii' || /yamaha\s*thr|\bthr\b|thr-?ii/.test(name)) return 'thr-ii';
     if (profile === 'gt100' || /boss\s*gt-?100|\bgt-?100\b/.test(name)) return 'gt-100';
     if (/smart\s*box/.test(name)) return 'smart-box';
+    if (/pocket\s*amp/.test(name)) return 'pocket-amp';
     if (/pocket\s*master/.test(name)) return 'pocket-master';
     if (/mighty\s*plug\s*pro/.test(name)) return 'nux-pro';
     if (/\bnux\b|mighty\s*plug/.test(name)) return 'nux';
@@ -7224,11 +7324,11 @@ function assignMarkerSetToFamily(setId, familyKeyOrNull) {
     saveRawMarkerData(currentFileName, data);
 
     clearMarkerTriggerState();
-    const switched = syncUiActiveSetFromRoutingContext();
+    syncUiActiveSetFromRoutingContext();
     const refreshed = getRawMarkerData(currentFileName);
     updateSetSelector(refreshed);
     updateMarkerTicks();
-    if (switched) refreshEventUI();
+    refreshEventUI();
     renderMidiDevicesSheet();
 }
 
@@ -7490,12 +7590,13 @@ function deleteMarkerSet() {
     clearMarkerTriggerState();
     refreshEventUI();
 }
-function formatPreset(preset) {
+function formatPreset(preset, familyKey = getCurrentPresetFormatFamily()) {
     let n = parseInt(preset, 10);
     if (isNaN(n)) n = 1;
-    n = Math.min(100, Math.max(1, n));
-    if (n <= 50) { return `P${String(n).padStart(2, '0')}`; }
-    return `F${String(n - 50).padStart(2, '0')}`;
+    const profile = getPresetFormatProfile(familyKey);
+    const clamped = clampPresetNumber(n, familyKey);
+    if (profile?.format) return profile.format(clamped);
+    return String(clamped);
 }
 async function refreshEventUI() {
     const events = getEvents();
@@ -8760,44 +8861,49 @@ importInput.onchange = async () => {
 </script>
 
 <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js');
-}
-
-// Portrait orientation lock for installed PWA
 (function () {
-  function lockPortrait() {
-    if (screen.orientation && typeof screen.orientation.lock === 'function') {
-      screen.orientation.lock('portrait').catch(function (err) {
-        console.warn('[orientation-lock]', err.name, err.message);
-      });
+  const isFileOrigin = window.location.protocol === 'file:' || window.location.origin === 'null';
+  const isStandalonePwa = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+
+  if (!isFileOrigin && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(function () {
+      // Service workers are unsupported or blocked in non-HTTP contexts.
+    });
+  }
+
+  // Portrait orientation lock is only valid for installed PWAs / secure browser contexts.
+  (function () {
+    function lockPortrait() {
+      if (isFileOrigin || !isStandalonePwa) return;
+      if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        screen.orientation.lock('portrait').catch(function (err) {
+          console.warn('[orientation-lock]', err && err.name, err && err.message);
+        });
+      }
     }
-  }
-  // Try immediately (works if already in standalone context)
-  lockPortrait();
-  // Retry after DOM is ready
-  document.addEventListener('DOMContentLoaded', lockPortrait);
-  // Retry every time the app comes back to foreground
-  document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) lockPortrait();
-  });
-})();
+    lockPortrait();
+    document.addEventListener('DOMContentLoaded', lockPortrait);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) lockPortrait();
+    });
+  })();
 
-// Screen Wake Lock: keep screen on while the app is visible
-(function () {
-  var wl = null;
-  function acquire() {
-    if (wl || !('wakeLock' in navigator)) return;
-    navigator.wakeLock.request('screen').then(function (lock) {
-      wl = lock;
-      wl.addEventListener('release', function () { wl = null; });
-    }).catch(function () { /* OS refused */ });
-  }
-  function release() { if (wl) { wl.release(); wl = null; } }
-  document.addEventListener('visibilitychange', function () {
-    document.visibilityState === 'visible' ? acquire() : release();
-  });
-  acquire();
+  // Screen Wake Lock: keep screen on while the app is visible
+  (function () {
+    var wl = null;
+    function acquire() {
+      if (isFileOrigin || wl || !('wakeLock' in navigator)) return;
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wl = lock;
+        wl.addEventListener('release', function () { wl = null; });
+      }).catch(function () { /* OS refused */ });
+    }
+    function release() { if (wl) { wl.release(); wl = null; } }
+    document.addEventListener('visibilitychange', function () {
+      document.visibilityState === 'visible' ? acquire() : release();
+    });
+    acquire();
+  })();
 })();
 </script>
 </body>
