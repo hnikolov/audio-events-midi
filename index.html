@@ -1732,7 +1732,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.4.3</p>
+            <p class="info-version" id="infoVersionLabel">v1.4.4</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -1798,10 +1798,15 @@ function renderInfoSheet() {
             <div class="info-vendor">Sonicake</div>
             <div class="info-model">Pocket Master</div>
             <div class="info-model">Smart Box</div>
+            <div class="info-vendor">Yamaha</div>
+            <div class="info-model">THR-II</div>
+            <div class="info-vendor">M-VAVE</div>
+            <div class="info-model">Pocket Amp</div>
+            <div class="info-vendor">LIVTRA</div>
+            <div class="info-model">Nanocore</div>
             <div class="info-vendor">Positive Grid <span style="color: var(--text-muted);">(BLE only)</span></div>
             <div class="info-model">Spark Go</div>
             <div class="info-model">Spark 40 (gen 1)</div>
-            <div class="info-vendor">Yamaha THR-II <span style="color: var(--text-muted);">(USB only)</span></div>
         </div>
     `;
 
@@ -3790,9 +3795,25 @@ function buildBleMidiPacket(midiBytes, useZeroTimestamp = false) {
     packet.set(midiBytes, 2);
     return packet;
 }
+
+function prepareMidiBytesForConnection(conn, midiBytes) {
+    // BLE-MIDI SysEx uses a 0x80 escape (timestamp) before the final 0xF7 byte.
+    if (!conn || !midiBytes || midiBytes.length < 2) return midiBytes;
+    if (conn.transport !== 'ble' || conn.profile !== 'thrii') return midiBytes;
+    if (midiBytes[0] !== 0xF0 || midiBytes[midiBytes.length - 1] !== 0xF7) return midiBytes;
+
+    // Example of wrapped SysEx for BLE-MIDI: [0x80] [0x80] [F0 7E 7F 06 01] [0x80] [F7]
+    const wrapped = new Uint8Array(midiBytes.length + 1);
+    wrapped.set(midiBytes.subarray(0, midiBytes.length - 1), 0);
+    wrapped[midiBytes.length - 1] = 0x80;
+    wrapped[midiBytes.length] = 0xF7;
+    return wrapped;
+}
+
 async function writeBleTo(conn, bytes, { forceResponse = false, useZeroTimestamp = false } = {}) {
     if (!conn || !conn.midiChar) throw new Error('Not connected');
-    const packet = buildBleMidiPacket(bytes, useZeroTimestamp);
+    const payload = prepareMidiBytesForConnection(conn, bytes);
+    const packet = buildBleMidiPacket(payload, useZeroTimestamp);
     if (!forceResponse && typeof conn.midiChar.writeValueWithoutResponse === 'function') {
         await conn.midiChar.writeValueWithoutResponse(packet);
     } else {
@@ -3853,7 +3874,11 @@ async function activateThr10iiFor(conn) {
     try {
         for (let i = 0; i < THR10II_ACTIVATION_SEQUENCE.length; i++) {
             const syx = parseSysExHex(THR10II_ACTIVATION_SEQUENCE[i]);
-            writeUsbTo(conn, syx);
+            if (conn.transport === 'ble') {
+                await writeBleTo(conn, syx);
+            } else {
+                writeUsbTo(conn, syx);
+            }
             await sleep(500);
         }
     } catch (err) {
@@ -3861,13 +3886,17 @@ async function activateThr10iiFor(conn) {
     }
 }
 
-function sendThriiPresetTo(conn, presetNumber) {
+async function sendThriiPresetTo(conn, presetNumber) {
     if (!conn || conn.profile !== 'thrii') return false;
     const index = Math.max(0, Math.min(4, presetNumber - 1));
     const hex = `f000010c24014d0108000e0b000e0000000400000000${index.toString(16).padStart(2, '0')}0000000000f7`;
     const cmd = parseSysExHex(hex);
     try {
-        writeUsbTo(conn, cmd);
+        if (conn.transport === 'ble') {
+            await writeBleTo(conn, cmd);
+        } else {
+            writeUsbTo(conn, cmd);
+        }
         return true;
     } catch {
         return false;
@@ -3936,7 +3965,7 @@ function updateConnectButtonLabel() {
 function getConnectionTypeLabel(conn) {
     if (!conn) return '';
     if (conn.profile === 'spark') return 'BLE Spark';
-    if (conn.profile === 'thrii') return 'USB THRII';
+    if (conn.profile === 'thrii') return conn.transport === 'usb' ? 'USB THRII' : 'BLE THRII';
     return conn.transport === 'usb' ? 'USB MIDI' : 'BLE MIDI';
 }
 
@@ -4274,14 +4303,9 @@ async function connectBleFlow() {
         const gattServer = await bleDevice.gatt.connect();
 
         const devName = (bleDevice.name || '').toLowerCase();
-        if (devName.includes('thr')) {
-            bleDevice.gatt.disconnect();
-            setStatusText('Connect');
-            alert('THRII connected via Bluetooth is not supported.\nPlease connect via USB.');
-            return false;
-        }
-
+        const isThrii = /yamaha\s*thr|thr-?ii|\bthr\b/.test(devName);
         const isSpark = devName.startsWith('spark');
+        const profile = isSpark ? 'spark' : isThrii ? 'thrii' : 'midi';
         let midiCharacteristic = null;
         let sparkWriteCharacteristic = null;
 
@@ -4304,8 +4328,8 @@ async function connectBleFlow() {
             id: connectionId,
             name: bleDevice.name || 'BLE Device',
             transport: 'ble',
-            profile: isSpark ? 'spark' : 'midi',
-            deviceKey: resolveDeviceFamily({ name: bleDevice.name || 'BLE Device', profile: isSpark ? 'spark' : 'midi' }),
+            profile,
+            deviceKey: resolveDeviceFamily({ name: bleDevice.name || 'BLE Device', profile }),
             bleDevice,
             gattServer,
             midiChar: midiCharacteristic,
@@ -4326,6 +4350,7 @@ async function connectBleFlow() {
             return false;
         }
 
+        if (connection.profile === 'thrii') activateThr10iiFor(connection);
         setStatusText(`Connected: ${connection.name}`);
         return true;
     } catch (err) {
