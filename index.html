@@ -1804,6 +1804,8 @@ function renderInfoSheet() {
             <div class="info-model">Pocket Amp</div>
             <div class="info-vendor">LIVTRA</div>
             <div class="info-model">Nanocore</div>
+            <div class="info-vendor">ROLAND/BOSS</div>
+            <div class="info-model">GT-100</div>
             <div class="info-vendor">Positive Grid <span style="color: var(--text-muted);">(BLE only)</span></div>
             <div class="info-model">Spark Go</div>
             <div class="info-model">Spark 40 (gen 1)</div>
@@ -3733,6 +3735,7 @@ const SUPPORTED_DEVICE_OPTIONS = [
     { key: 'nux', label: 'NUX Mighty Plug', family: 'nux', routeMode: 'pc' },
     { key: 'pocket-master', label: 'Pocket Master', family: 'pm', routeMode: 'cc' },
     { key: 'smart-box', label: 'Smart Box', family: 'pm', routeMode: 'cc' },
+    { key: 'gt-100', label: 'Boss GT-100', family: 'gt100', routeMode: 'gt100' },
     { key: 'spark-go', label: 'Spark Go', family: 'spark', routeMode: 'spark' },
     { key: 'spark-40', label: 'Spark 40 (gen 1)', family: 'spark', routeMode: 'spark' },
     { key: 'thr-ii', label: 'Yamaha THR-II', family: 'thr', routeMode: 'thrii' }
@@ -3966,6 +3969,7 @@ function getConnectionTypeLabel(conn) {
     if (!conn) return '';
     if (conn.profile === 'spark') return 'BLE Spark';
     if (conn.profile === 'thrii') return conn.transport === 'usb' ? 'USB THRII' : 'BLE THRII';
+    if (conn.profile === 'gt100') return conn.transport === 'usb' ? 'USB GT-100' : 'BLE GT-100';
     return conn.transport === 'usb' ? 'USB MIDI' : 'BLE MIDI';
 }
 
@@ -4256,7 +4260,10 @@ async function connectUsbOutput(output) {
     }
 
     const name = output.name || 'USB Output';
-    const profile = String(name).toLowerCase().includes('thr') ? 'thrii' : 'midi';
+    const lowerName = String(name).toLowerCase();
+    const isThrii = /yamaha\s*thr|thr-?ii|\bthr\b/.test(lowerName);
+    const isGt100 = /boss\s*gt-?100|\bgt-?100\b/.test(lowerName);
+    const profile = isThrii ? 'thrii' : isGt100 ? 'gt100' : 'midi';
     const connection = {
         id: buildConnectionId({ transport: 'usb', usbOutput: output }),
         name,
@@ -4305,7 +4312,8 @@ async function connectBleFlow() {
         const devName = (bleDevice.name || '').toLowerCase();
         const isThrii = /yamaha\s*thr|thr-?ii|\bthr\b/.test(devName);
         const isSpark = devName.startsWith('spark');
-        const profile = isSpark ? 'spark' : isThrii ? 'thrii' : 'midi';
+        const isGt100 = /boss\s*gt-?100|\bgt-?100\b/.test(devName);
+        const profile = isSpark ? 'spark' : isThrii ? 'thrii' : isGt100 ? 'gt100' : 'midi';
         let midiCharacteristic = null;
         let sparkWriteCharacteristic = null;
 
@@ -4428,7 +4436,7 @@ async function beginAddConnectionFlow() {
 }
 
 async function sendCcTo(conn, channel, ccNumber, ccValue) {
-    if (!conn || conn.profile !== 'midi') return false;
+    if (!conn || (conn.profile !== 'midi' && conn.profile !== 'gt100')) return false;
     const ch  = Math.min(16, Math.max(1, Number(channel)  || 1));
     const cc  = Math.min(127, Math.max(0, Number(ccNumber) || 0));
     const val = Math.min(127, Math.max(0, Number(ccValue)  || 0));
@@ -4448,7 +4456,7 @@ async function sendCcTo(conn, channel, ccNumber, ccValue) {
 }
 
 async function sendPcTo(conn, channel, program) {
-    if (!conn || conn.profile !== 'midi') return false;
+    if (!conn || (conn.profile !== 'midi' && conn.profile !== 'gt100')) return false;
     const ch  = Math.min(16, Math.max(1, Number(channel)  || 1));
     const pg  = Math.min(127, Math.max(0, Number(program) || 0));
     const status = 0xC0 + (ch - 1);
@@ -4489,6 +4497,18 @@ function shouldRoutePresetAsCc(deviceName) {
 
 // Map preset (1..100) → PC program (0..127)
 function presetToProgram(preset) { let p = parseInt(preset,10); if (isNaN(p)) p=1; return Math.max(0, Math.min(127, p-1)); }
+
+async function sendGt100PresetTo(conn, presetNumber) {
+    const slot = Math.max(1, Math.min(400, Number(presetNumber) || 1));
+    const bank = Math.floor((slot - 1) / 100);
+    const program = (slot - 1) % 100;
+
+    const okBank = await sendCcTo(conn, 1, 0, bank);
+    if (!okBank) return false;
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return await sendPcTo(conn, 1, program);
+}
 
 // --- Public APIs (flash on both CC and PC) ---
 async function sendCc(channel, ccNumber, ccValue) {
@@ -6744,6 +6764,7 @@ function normalizeAssignedFamily(value) {
     if (trimmed === 'nux' || trimmed === 'mighty plug' || trimmed === 'mighty plug pro') return 'nux-pro';
     if (trimmed === 'pm' || trimmed === 'pocket master') return 'pocket-master';
     if (trimmed === 'smart box') return 'smart-box';
+    if (trimmed === 'gt100' || trimmed === 'gt-100' || trimmed === 'boss gt-100') return 'gt-100';
     if (trimmed === 'spark') return 'spark-go';
     if (trimmed === 'spark go') return 'spark-go';
     if (trimmed === 'spark 40' || trimmed === 'spark 40 (gen 1)') return 'spark-40';
@@ -6845,6 +6866,7 @@ function resolveDeviceFamily(conn) {
         return /spark\s*40/.test(name) ? 'spark-40' : 'spark-go';
     }
     if (profile === 'thrii' || /yamaha\s*thr|\bthr\b|thr-?ii/.test(name)) return 'thr-ii';
+    if (profile === 'gt100' || /boss\s*gt-?100|\bgt-?100\b/.test(name)) return 'gt-100';
     if (/smart\s*box/.test(name)) return 'smart-box';
     if (/pocket\s*master/.test(name)) return 'pocket-master';
     if (/mighty\s*plug\s*pro/.test(name)) return 'nux-pro';
@@ -6983,6 +7005,9 @@ async function sendPresetToConnection(conn, presetNumber) {
         }
         if (profile?.routeMode === 'thrii') {
             return sendThriiPresetTo(conn, presetNumber);
+        }
+        if (profile?.routeMode === 'gt100') {
+            return await sendGt100PresetTo(conn, presetNumber);
         }
         if (profile?.routeMode === 'cc') {
             return await sendCcTo(conn, 1, 1, presetNumber);
