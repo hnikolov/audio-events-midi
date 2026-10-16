@@ -129,6 +129,7 @@
             overflow-y: auto;
             overscroll-behavior-y: contain;
             -webkit-overflow-scrolling: touch;
+            scroll-padding-top: calc(var(--sticky-title-height, 43px) + var(--sticky-marker-header-height, 50px));
         }
         .card {
             background: var(--bg-base);
@@ -1278,18 +1279,15 @@
 
         /* ===== STICKY HEADERS ===== */
         .card-playlist .header-row,
-        .card-events #current-title,
-        .card-events .markers-header {
+        .card-events .card-events-sticky-header {
             position: sticky;
             top: 0;
             z-index: 10;
             background: var(--bg-base);
         }
-        .card-events #current-title {
-            z-index: 11;
-        }
-        .card-events .markers-header {
-            top: var(--sticky-title-height, 43px);
+        .card-events .card-events-sticky-header {
+            z-index: 12;
+            box-shadow: 0 1px 0 rgba(0,0,0,0);
         }
         .card-events #current-title {
             margin: 0; display: block;
@@ -1299,6 +1297,11 @@
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
             -webkit-user-select: none; user-select: none;
             -webkit-touch-callout: none;
+        }
+        .card-events .markers-header {
+            position: relative;
+            top: auto;
+            z-index: 1;
         }
         .card-events #current-title.selected-song {
             background: var(--accent-dim);
@@ -1434,22 +1437,24 @@
 
         <!-- EVENTS/MARKERS CARD -->
         <div class="card card-events">
-            <h2 id="current-title">Select a song</h2>
-            <audio id="audioTrack"></audio>
+            <div class="card-events-sticky-header">
+                <h2 id="current-title">Select a song</h2>
+                <audio id="audioTrack"></audio>
 
-            <div class="markers-header">
-                <div style="display:flex;align-items:center;min-width:0;flex:1;">
-                    <div id="marker-set-trigger" onclick="toggleMarkerSetDropdown(event)" style="display:flex;align-items:center;flex:1;min-width:0;cursor:pointer;">
-                        <h4 style="margin-right:6px;flex-shrink:0;">Markers:</h4>
-                        <div style="display:flex;align-items:center;flex:1;min-width:0;">
-                            <span id="marker-set-label" style="font-size:1.05rem;font-weight:600;color:var(--text-secondary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden;"></span>
+                <div class="markers-header">
+                    <div style="display:flex;align-items:center;min-width:0;flex:1;">
+                        <div id="marker-set-trigger" onclick="toggleMarkerSetDropdown(event)" style="display:flex;align-items:center;flex:1;min-width:0;cursor:pointer;">
+                            <h4 style="margin-right:6px;flex-shrink:0;">Markers:</h4>
+                            <div style="display:flex;align-items:center;flex:1;min-width:0;">
+                                <span id="marker-set-label" style="font-size:1.05rem;font-weight:600;color:var(--text-secondary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden;"></span>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <button class="btn-primary" onclick="setEvent()" style="flex-shrink:0;">
+                    <button class="btn-primary" onclick="setEvent()" style="flex-shrink:0;">
                   <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                   <!-- Add -->
                 </button>
+                </div>
             </div>
             <ul id="event-list"></ul>
         </div>
@@ -1742,7 +1747,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.4.4</p>
+            <p class="info-version" id="infoVersionLabel">v1.4.5</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -2186,6 +2191,7 @@ function setCurrentTitleState(title, hasSelectedSong) {
     if (!titleEl) return;
     titleEl.textContent = title;
     titleEl.classList.toggle('selected-song', !!hasSelectedSong);
+    requestAnimationFrame(() => measureStickyTitle());
 }
 async function renameSongInDB(oldName) {
     const newName = prompt(`Rename "${oldName}" to:`, oldName);
@@ -7344,6 +7350,7 @@ function updateSetSelector(data) {
     const label = document.getElementById('marker-set-label');
     if (label && data.sets[data.activeId]) {
         label.textContent = data.sets[data.activeId].name;
+        requestAnimationFrame(() => measureStickyTitle());
     }
     const sheet = document.getElementById('marker-set-sheet');
     if (!sheet) return;
@@ -8029,9 +8036,14 @@ function switchTab(newIndex) {
 }
 
 function measureStickyTitle() {
-    const el = document.getElementById('current-title');
-    if (el && el.offsetHeight > 0) {
-        document.documentElement.style.setProperty('--sticky-title-height', el.offsetHeight + 'px');
+    const titleEl = document.getElementById('current-title');
+    if (titleEl && titleEl.offsetHeight > 0) {
+        document.documentElement.style.setProperty('--sticky-title-height', titleEl.offsetHeight + 'px');
+    }
+
+    const headerEl = document.querySelector('.card-events .markers-header');
+    if (headerEl && headerEl.offsetHeight > 0) {
+        document.documentElement.style.setProperty('--sticky-marker-header-height', headerEl.offsetHeight + 'px');
     }
 }
 
@@ -8056,7 +8068,7 @@ function scrollIntoGridView(el) {
 function getStickyBottomEdge(el, gridTop) {
     const card = el.closest('.card');
     if (!card) return gridTop;
-    const stickies = card.querySelectorAll('.header-row, #current-title, .markers-header');
+    const stickies = card.querySelectorAll('.header-row, .card-events-sticky-header, #current-title, .markers-header');
     let bottom = gridTop;
     stickies.forEach(s => {
         const r = s.getBoundingClientRect();
