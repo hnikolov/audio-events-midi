@@ -88,8 +88,8 @@ The metadata block is a UTF-8 JSON object with the following fields:
 | `lastModified`   | number         | no       | now     | Unix timestamp (ms) of the original file |
 | `markers`        | array          | no       | `[]`    | Array of marker objects |
 | `markers[].time` | number         | yes      | —       | Marker position in seconds (e.g. `12.5`) |
-| `markers[].preset` | number       | yes      | —       | MIDI preset number (1–100). 1–50 = P01–P50, 51–100 = F01–F50 |
-| `markers[].text` | number         | yes      | —       | Optional description of the marker |
+| `markers[].preset` | number       | yes      | —       | Device-specific MIDI preset number. The raw value is stored as a number and then rendered using the active device family format (for example Pocket Master `P01–P50 / F01–F50`, Pocket Amp `P01–P80`, or GT-100 `U01-1` / `P01-1`) |
+| `markers[].text` | string         | no       | `""`   | Optional description of the marker |
 | `volume`         | number         | no       | `1.0`   | Playback volume gain (0.0 to 2.0) |
 | `speed`          | number         | no       | `1.0`   | Playback speed (e.g. `0.8`, `1.0`, `1.5`) |
 | `eq`             | object         | no       | `0,0,0` | 3-band equalizer settings |
