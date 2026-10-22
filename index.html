@@ -1821,6 +1821,8 @@ function renderInfoSheet() {
             <div class="info-model">Nanocore</div>
             <div class="info-vendor">ROLAND/BOSS</div>
             <div class="info-model">GT-100</div>
+            <div class="info-vendor">ZOOM <span style="color: var(--text-muted);">(USB only)</span></div>
+            <div class="info-model">G1 / G1X Four</div>
             <div class="info-vendor">Positive Grid <span style="color: var(--text-muted);">(BLE only)</span></div>
             <div class="info-model">Spark Go</div>
             <div class="info-model">Spark 40 (gen 1)</div>
@@ -3755,7 +3757,8 @@ const SUPPORTED_DEVICE_OPTIONS = [
     { key: 'pocket-master', label: 'Pocket Master', family: 'pm', routeMode: 'cc' },
     { key: 'pocket-amp', label: 'Pocket Amp', family: 'pocket-amp', routeMode: 'pc' },
     { key: 'smart-box', label: 'Smart Box', family: 'pm', routeMode: 'cc' },
-    { key: 'gt-100', label: 'Boss GT-100', family: 'gt100', routeMode: 'gt100' },
+    { key: 'zoom-g1-four', label: 'Zoom G1 / G1X Four', family: 'zoom', routeMode: 'cc-pc' },
+    { key: 'gt-100', label: 'Boss GT-100', family: 'gt100', routeMode: 'cc-pc' },
     { key: 'spark-go', label: 'Spark Go', family: 'spark', routeMode: 'spark' },
     { key: 'spark-40', label: 'Spark 40 (gen 1)', family: 'spark', routeMode: 'spark' },
     { key: 'thr-ii', label: 'Yamaha THR-II', family: 'thr', routeMode: 'thrii' }
@@ -3791,22 +3794,55 @@ const PRESET_FORMAT_PROFILES = new Map([
         const sub = (innerIndex % 4) + 1;
         return `${prefix}${String(group).padStart(2, '0')}-${sub}`;
     } }],
+    ['zoom-g1-four', { min: 10, max: 59, format: (preset) => String(Math.max(10, Math.min(59, Number(preset) || 10))) }],
+    ['thr-ii', { min: 1, max: 5, format: (preset) => String(Math.max(1, Math.min(5, Number(preset) || 1))).padStart(2, '0') }],
     ['nux', { max: 7, format: (preset) => String(Math.max(1, Math.min(7, Number(preset) || 1))).padStart(2, '0') }],
     ['nux-pro', { max: 7, format: (preset) => String(Math.max(1, Math.min(7, Number(preset) || 1))).padStart(2, '0') }]
 ]);
+
+const BANKED_PC_ROUTE_PROFILES = new Map([
+    ['gt-100', {
+        channel: 1,
+        ccNumber: 0,
+        min: 1,
+        max: 400,
+        bankValue: (preset) => Math.floor((Math.max(1, Math.min(400, Number(preset) || 1)) - 1) / 100),
+        programValue: (preset) => (Math.max(1, Math.min(400, Number(preset) || 1)) - 1) % 100
+    }],
+    ['zoom-g1-four', {
+        channel: 1,
+        ccNumber: 0x20,
+        min: 10,
+        max: 59,
+        bankValue: (preset) => Math.floor((Math.max(10, Math.min(59, Number(preset) || 10)) - 10) / 10),
+        programValue: (preset) => (Math.max(10, Math.min(59, Number(preset) || 10)) - 10) % 10
+    }]
+]);
+
+function getBankedPcRouteProfile(familyKey) {
+    const normalized = normalizeAssignedFamily(familyKey);
+    if (!normalized) return null;
+    if (normalized === 'zoom') return BANKED_PC_ROUTE_PROFILES.get('zoom-g1-four');
+    if (normalized === 'gt100') return BANKED_PC_ROUTE_PROFILES.get('gt-100');
+    return BANKED_PC_ROUTE_PROFILES.get(normalized) || null;
+}
 
 function getPresetFormatProfile(familyKey) {
     const normalized = normalizeAssignedFamily(familyKey);
     if (!normalized) return null;
     if (normalized === 'smart-box') return PRESET_FORMAT_PROFILES.get('smart-box') || PRESET_FORMAT_PROFILES.get('pocket-master');
     if (normalized === 'nux-pro') return PRESET_FORMAT_PROFILES.get('nux-pro') || PRESET_FORMAT_PROFILES.get('nux');
+    if (normalized === 'zoom-g1-four') return PRESET_FORMAT_PROFILES.get('zoom-g1-four');
+    if (normalized === 'thr-ii') return PRESET_FORMAT_PROFILES.get('thr-ii') || PRESET_FORMAT_PROFILES.get('thr');
     return PRESET_FORMAT_PROFILES.get(normalized) || null;
 }
 
 function getPresetRangeForFamily(familyKey) {
     const profile = getPresetFormatProfile(familyKey);
     if (!profile) return { min: 1, max: null };
-    return { min: 1, max: Number.isFinite(profile.max) ? profile.max : null };
+    const min = Number.isFinite(profile.min) ? profile.min : 1;
+    const max = Number.isFinite(profile.max) ? profile.max : null;
+    return { min, max };
 }
 
 let markerFormattingNormalizationDepth = 0;
@@ -4361,8 +4397,9 @@ async function connectUsbOutput(output) {
     const name = output.name || 'USB Output';
     const lowerName = String(name).toLowerCase();
     const isThrii = /yamaha\s*thr|thr-?ii|\bthr\b/.test(lowerName);
+    const isZoom = /zoom\s*g1x?\s*four|g1x?\s*four/.test(lowerName);
     const isGt100 = /boss\s*gt-?100|\bgt-?100\b/.test(lowerName);
-    const profile = isThrii ? 'thrii' : isGt100 ? 'gt100' : 'midi';
+    const profile = isThrii ? 'thrii' : isZoom ? 'zoom' : isGt100 ? 'gt100' : 'midi';
     const connection = {
         id: buildConnectionId({ transport: 'usb', usbOutput: output }),
         name,
@@ -4411,8 +4448,9 @@ async function connectBleFlow() {
         const devName = (bleDevice.name || '').toLowerCase();
         const isThrii = /yamaha\s*thr|thr-?ii|\bthr\b/.test(devName);
         const isSpark = devName.startsWith('spark');
+        const isZoom = /zoom\s*g1x?\s*four|g1x?\s*four/.test(devName);
         const isGt100 = /boss\s*gt-?100|\bgt-?100\b/.test(devName);
-        const profile = isSpark ? 'spark' : isThrii ? 'thrii' : isGt100 ? 'gt100' : 'midi';
+        const profile = isSpark ? 'spark' : isThrii ? 'thrii' : isZoom ? 'zoom' : isGt100 ? 'gt100' : 'midi';
         let midiCharacteristic = null;
         let sparkWriteCharacteristic = null;
 
@@ -4535,7 +4573,7 @@ async function beginAddConnectionFlow() {
 }
 
 async function sendCcTo(conn, channel, ccNumber, ccValue) {
-    if (!conn || (conn.profile !== 'midi' && conn.profile !== 'gt100')) return false;
+    if (!conn || (conn.profile !== 'midi' && conn.profile !== 'gt100' && conn.profile !== 'zoom')) return false;
     const ch  = Math.min(16, Math.max(1, Number(channel)  || 1));
     const cc  = Math.min(127, Math.max(0, Number(ccNumber) || 0));
     const val = Math.min(127, Math.max(0, Number(ccValue)  || 0));
@@ -4555,7 +4593,7 @@ async function sendCcTo(conn, channel, ccNumber, ccValue) {
 }
 
 async function sendPcTo(conn, channel, program) {
-    if (!conn || (conn.profile !== 'midi' && conn.profile !== 'gt100')) return false;
+    if (!conn || (conn.profile !== 'midi' && conn.profile !== 'gt100' && conn.profile !== 'zoom')) return false;
     const ch  = Math.min(16, Math.max(1, Number(channel)  || 1));
     const pg  = Math.min(127, Math.max(0, Number(program) || 0));
     const status = 0xC0 + (ch - 1);
@@ -4597,16 +4635,29 @@ function shouldRoutePresetAsCc(deviceName) {
 // Map preset (1..100) → PC program (0..127)
 function presetToProgram(preset) { let p = parseInt(preset,10); if (isNaN(p)) p=1; return Math.max(0, Math.min(127, p-1)); }
 
-async function sendGt100PresetTo(conn, presetNumber) {
-    const slot = Math.max(1, Math.min(400, Number(presetNumber) || 1));
-    const bank = Math.floor((slot - 1) / 100);
-    const program = (slot - 1) % 100;
+async function sendBankedPcPresetTo(conn, presetNumber, routeProfile = null) {
+    const resolvedProfile = routeProfile || getBankedPcRouteProfile(resolveDeviceFamily(conn));
+    if (!resolvedProfile) return false;
 
-    const okBank = await sendCcTo(conn, 1, 0, bank);
+    const safePreset = Number(presetNumber);
+    const minimum = Number.isFinite(resolvedProfile.min) ? resolvedProfile.min : 1;
+    const maximum = Number.isFinite(resolvedProfile.max) ? resolvedProfile.max : Number.POSITIVE_INFINITY;
+    const clamped = Math.min(maximum, Math.max(minimum, Number.isFinite(safePreset) ? safePreset : minimum));
+
+    const bankValue = Math.min(127, Math.max(0, Number(resolvedProfile.bankValue(clamped)) || 0));
+    const programValue = Math.min(127, Math.max(0, Number(resolvedProfile.programValue(clamped)) || 0));
+    const ccNumber = Number(resolvedProfile.ccNumber ?? 0);
+    const channel = Math.min(16, Math.max(1, Number(resolvedProfile.channel ?? 1) || 1));
+
+    const okBank = await sendCcTo(conn, channel, ccNumber, bankValue);
     if (!okBank) return false;
 
     await new Promise((resolve) => setTimeout(resolve, 20));
-    return await sendPcTo(conn, 1, program);
+    return await sendPcTo(conn, channel, programValue);
+}
+
+async function sendGt100PresetTo(conn, presetNumber) {
+    return await sendBankedPcPresetTo(conn, presetNumber, getBankedPcRouteProfile('gt-100'));
 }
 
 // --- Public APIs (flash on both CC and PC) ---
@@ -6864,6 +6915,9 @@ function normalizeAssignedFamily(value) {
     if (trimmed === 'pm' || trimmed === 'pocket master') return 'pocket-master';
     if (trimmed === 'pocket amp') return 'pocket-amp';
     if (trimmed === 'smart box') return 'smart-box';
+    if (trimmed === 'zoom') return 'zoom-g1-four';
+    if (trimmed === 'zoom g1 four' || trimmed === 'g1 four') return 'zoom-g1-four';
+    if (trimmed === 'zoom g1x four' || trimmed === 'g1x four') return 'zoom-g1-four';
     if (trimmed === 'gt100' || trimmed === 'gt-100' || trimmed === 'boss gt-100') return 'gt-100';
     if (trimmed === 'spark') return 'spark-go';
     if (trimmed === 'spark go') return 'spark-go';
@@ -6971,6 +7025,9 @@ function resolveDeviceFamily(conn) {
         return /spark\s*40/.test(name) ? 'spark-40' : 'spark-go';
     }
     if (profile === 'thrii' || /yamaha\s*thr|\bthr\b|thr-?ii/.test(name)) return 'thr-ii';
+    if (profile === 'zoom' || /zoom\s*g1x?\s*four|g1x?\s*four/.test(name)) {
+        return 'zoom-g1-four';
+    }
     if (profile === 'gt100' || /boss\s*gt-?100|\bgt-?100\b/.test(name)) return 'gt-100';
     if (/smart\s*box/.test(name)) return 'smart-box';
     if (/pocket\s*amp/.test(name)) return 'pocket-amp';
@@ -7105,15 +7162,16 @@ function buildPrimarySetEntries(markerData) {
 
 async function sendPresetToConnection(conn, presetNumber) {
     try {
-        const profile = getSupportedDeviceProfile(resolveDeviceFamily(conn));
+        const resolvedFamily = resolveDeviceFamily(conn);
+        const profile = getSupportedDeviceProfile(resolvedFamily);
         if (profile?.routeMode === 'spark') {
             return await sendSparkPresetTo(conn, presetNumber);
         }
         if (profile?.routeMode === 'thrii') {
             return sendThriiPresetTo(conn, presetNumber);
         }
-        if (profile?.routeMode === 'gt100') {
-            return await sendGt100PresetTo(conn, presetNumber);
+        if (profile?.routeMode === 'cc-pc' || profile?.routeMode === 'gt100') {
+            return await sendBankedPcPresetTo(conn, presetNumber, getBankedPcRouteProfile(resolvedFamily));
         }
         if (profile?.routeMode === 'cc') {
             return await sendCcTo(conn, 1, 1, presetNumber);
