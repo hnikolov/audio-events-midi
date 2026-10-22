@@ -1747,7 +1747,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.4.5</p>
+            <p class="info-version" id="infoVersionLabel">v1.4.6</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -3752,8 +3752,8 @@ let midiPrimaryConnectionId = null;
 let connectInFlight = false;
 let connectStatusTimer = null;
 const SUPPORTED_DEVICE_OPTIONS = [
-    { key: 'nux-pro', label: 'NUX Mighty Plug Pro', family: 'nux', routeMode: 'pc' },
     { key: 'nux', label: 'NUX Mighty Plug', family: 'nux', routeMode: 'pc' },
+    { key: 'nux-pro', label: 'NUX Mighty Plug Pro', family: 'nux', routeMode: 'pc' },
     { key: 'pocket-master', label: 'Pocket Master', family: 'pm', routeMode: 'cc' },
     { key: 'pocket-amp', label: 'Pocket Amp', family: 'pocket-amp', routeMode: 'pc' },
     { key: 'smart-box', label: 'Smart Box', family: 'pm', routeMode: 'cc' },
@@ -3797,7 +3797,6 @@ const PRESET_FORMAT_PROFILES = new Map([
     ['zoom-g1-four', { min: 10, max: 59, format: (preset) => String(Math.max(10, Math.min(59, Number(preset) || 10))) }],
     ['thr-ii', { min: 1, max: 5, format: (preset) => String(Math.max(1, Math.min(5, Number(preset) || 1))).padStart(2, '0') }],
     ['nux', { max: 7, format: (preset) => String(Math.max(1, Math.min(7, Number(preset) || 1))).padStart(2, '0') }],
-    ['nux-pro', { max: 7, format: (preset) => String(Math.max(1, Math.min(7, Number(preset) || 1))).padStart(2, '0') }]
 ]);
 
 const BANKED_PC_ROUTE_PROFILES = new Map([
@@ -3831,7 +3830,6 @@ function getPresetFormatProfile(familyKey) {
     const normalized = normalizeAssignedFamily(familyKey);
     if (!normalized) return null;
     if (normalized === 'smart-box') return PRESET_FORMAT_PROFILES.get('smart-box') || PRESET_FORMAT_PROFILES.get('pocket-master');
-    if (normalized === 'nux-pro') return PRESET_FORMAT_PROFILES.get('nux-pro') || PRESET_FORMAT_PROFILES.get('nux');
     if (normalized === 'zoom-g1-four') return PRESET_FORMAT_PROFILES.get('zoom-g1-four');
     if (normalized === 'thr-ii') return PRESET_FORMAT_PROFILES.get('thr-ii') || PRESET_FORMAT_PROFILES.get('thr');
     return PRESET_FORMAT_PROFILES.get(normalized) || null;
@@ -6906,12 +6904,12 @@ function normalizeAssignedFamily(value) {
     const trimmed = value.trim().toLowerCase();
     if (!trimmed) return null;
 
+    if (trimmed === 'nux' || trimmed === 'nux-pro' || trimmed === 'mighty plug' || trimmed === 'mighty plug pro') return 'nux';
+
     if (SUPPORTED_DEVICE_BY_KEY.has(trimmed)) return trimmed;
 
     const directMatch = SUPPORTED_DEVICE_OPTIONS.find((opt) => opt.label.toLowerCase() === trimmed);
     if (directMatch) return directMatch.key;
-
-    if (trimmed === 'nux' || trimmed === 'mighty plug' || trimmed === 'mighty plug pro') return 'nux-pro';
     if (trimmed === 'pm' || trimmed === 'pocket master') return 'pocket-master';
     if (trimmed === 'pocket amp') return 'pocket-amp';
     if (trimmed === 'smart box') return 'smart-box';
@@ -7032,13 +7030,16 @@ function resolveDeviceFamily(conn) {
     if (/smart\s*box/.test(name)) return 'smart-box';
     if (/pocket\s*amp/.test(name)) return 'pocket-amp';
     if (/pocket\s*master/.test(name)) return 'pocket-master';
-    if (/mighty\s*plug\s*pro/.test(name)) return 'nux-pro';
+    if (/mighty\s*plug\s*pro/.test(name)) return 'nux';
     if (/\bnux\b|mighty\s*plug/.test(name)) return 'nux';
     return 'unknown';
 }
 
 function getFamilyLabel(familyKey) {
     if (!familyKey) return 'Any';
+    const rawValue = String(familyKey).trim().toLowerCase();
+    if (rawValue === 'nux-pro' || rawValue === 'mighty plug pro') return 'NUX Mighty Plug Pro';
+    if (rawValue === 'nux' || rawValue === 'mighty plug') return 'NUX Mighty Plug';
     const normalized = normalizeAssignedFamily(familyKey);
     const match = getSupportedDeviceProfile(normalized);
     if (match) return match.label;
