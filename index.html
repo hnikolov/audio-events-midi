@@ -1747,7 +1747,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.4.6</p>
+            <p class="info-version" id="infoVersionLabel">v1.4.7</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -3752,16 +3752,15 @@ let midiPrimaryConnectionId = null;
 let connectInFlight = false;
 let connectStatusTimer = null;
 const SUPPORTED_DEVICE_OPTIONS = [
-    { key: 'nux', label: 'NUX Mighty Plug', family: 'nux', routeMode: 'pc' },
-    { key: 'nux-pro', label: 'NUX Mighty Plug Pro', family: 'nux', routeMode: 'pc' },
-    { key: 'pocket-master', label: 'Pocket Master', family: 'pm', routeMode: 'cc' },
-    { key: 'pocket-amp', label: 'Pocket Amp', family: 'pocket-amp', routeMode: 'pc' },
-    { key: 'smart-box', label: 'Smart Box', family: 'pm', routeMode: 'cc' },
-    { key: 'zoom-g1-four', label: 'Zoom G1 / G1X Four', family: 'zoom', routeMode: 'cc-pc' },
+    { key: 'nux', label: 'NUX Mighty Plug / Plug Pro', family: 'nux', routeMode: 'pc' },
+    { key: 'thr-ii', label: 'Yamaha THR-II', family: 'thr', routeMode: 'thrii' },
+    { key: 'pocket-amp', label: 'M-VAVE Pocket Amp', family: 'pocket-amp', routeMode: 'pc' },
+    { key: 'pocket-master', label: 'Sonicake Pocket Master', family: 'pm', routeMode: 'cc' },
+    { key: 'smart-box', label: 'Sonicake Smart Box', family: 'pm', routeMode: 'cc' },
     { key: 'gt-100', label: 'Boss GT-100', family: 'gt100', routeMode: 'cc-pc' },
+    { key: 'zoom-g1-four', label: 'Zoom G1 / G1X Four', family: 'zoom', routeMode: 'cc-pc' },
     { key: 'spark-go', label: 'Spark Go', family: 'spark', routeMode: 'spark' },
-    { key: 'spark-40', label: 'Spark 40 (gen 1)', family: 'spark', routeMode: 'spark' },
-    { key: 'thr-ii', label: 'Yamaha THR-II', family: 'thr', routeMode: 'thrii' }
+    { key: 'spark-40', label: 'Spark 40 (gen 1)', family: 'spark', routeMode: 'spark' }
 ];
 const SUPPORTED_FAMILY_OPTIONS = SUPPORTED_DEVICE_OPTIONS;
 const SUPPORTED_DEVICE_BY_KEY = new Map(SUPPORTED_DEVICE_OPTIONS.map((opt) => [opt.key, opt]));
@@ -6904,7 +6903,7 @@ function normalizeAssignedFamily(value) {
     const trimmed = value.trim().toLowerCase();
     if (!trimmed) return null;
 
-    if (trimmed === 'nux' || trimmed === 'nux-pro' || trimmed === 'mighty plug' || trimmed === 'mighty plug pro') return 'nux';
+    if (trimmed === 'nux' || trimmed === 'nux-pro' || trimmed === 'nux mighty plug / plug pro' || trimmed === 'mighty plug' || trimmed === 'mighty plug pro') return 'nux';
 
     if (SUPPORTED_DEVICE_BY_KEY.has(trimmed)) return trimmed;
 
@@ -7037,9 +7036,6 @@ function resolveDeviceFamily(conn) {
 
 function getFamilyLabel(familyKey) {
     if (!familyKey) return 'Any';
-    const rawValue = String(familyKey).trim().toLowerCase();
-    if (rawValue === 'nux-pro' || rawValue === 'mighty plug pro') return 'NUX Mighty Plug Pro';
-    if (rawValue === 'nux' || rawValue === 'mighty plug') return 'NUX Mighty Plug';
     const normalized = normalizeAssignedFamily(familyKey);
     const match = getSupportedDeviceProfile(normalized);
     if (match) return match.label;
