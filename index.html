@@ -3795,7 +3795,7 @@ const PRESET_FORMAT_PROFILES = new Map([
         return `${prefix}${String(group).padStart(2, '0')}-${sub}`;
     } }],
     ['zoom-g1-four', { min: 10, max: 59, format: (preset) => String(Math.max(10, Math.min(59, Number(preset) || 10))) }],
-    ['thr-ii', { min: 1, max: 5, format: (preset) => String(Math.max(1, Math.min(5, Number(preset) || 1))).padStart(2, '0') }],
+    ['thr-ii', { min: 1, max: 5, format: (preset) => `M${String(Math.max(1, Math.min(5, Number(preset) || 1))).padStart(2, '0')}` }],
     ['nux', { max: 7, format: (preset) => String(Math.max(1, Math.min(7, Number(preset) || 1))).padStart(2, '0') }],
     ['nanocore', { min: 1, max: 64, format: (preset) => String(Math.max(1, Math.min(64, Number(preset) || 1))).padStart(2, '0') }],
 ]);
