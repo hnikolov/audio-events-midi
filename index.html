@@ -1248,13 +1248,22 @@
         .preset-browser-panel {
             display: none;
             position: relative;
-            margin: 10px 12px 0;
+            width: 100%;
+            margin: 0;
             background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-md);
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
             overflow: hidden;
             min-height: clamp(280px, 54vh, 660px);
+        }
+        body.preset-browser-open .mobile-tabs-container {
+            display: none;
+        }
+        body.preset-browser-open #presetBrowserPanel {
+            display: flex;
+            flex-direction: column;
+            margin-top: var(--mobile-topbar-height, 0px);
         }
         .preset-browser-panel.visible {
             display: flex;
@@ -1263,53 +1272,56 @@
         .preset-browser-header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-start;
             gap: 10px;
-            padding: 10px 12px;
+            min-height: 58px;
+            padding: 12px 16px;
             border-bottom: 1px solid var(--border);
-            background: rgba(255,255,255,0.02);
+            background: rgba(7, 10, 12, 0.85);
         }
         .preset-browser-title {
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            flex: 1;
             min-width: 0;
-            width: 100%;
-        }
-        .preset-browser-title strong {
-            font-size: 0.95rem;
-            color: var(--text-primary);
-            line-height: 1.2;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
         .preset-browser-meta {
             width: 100%;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             min-height: 42px;
+            font-size: 0.98rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .preset-browser-device-pill,
         .preset-browser-device-select {
             width: 100%;
             min-height: 42px;
-            padding: 10px 14px;
-            border: 1px solid rgba(29,185,84,0.35);
-            border-radius: var(--radius-md);
-            background: rgba(29,185,84,0.12);
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
             color: var(--text-primary);
-            font-size: clamp(0.94rem, 2vw, 1.15rem);
-            font-weight: 800;
-            letter-spacing: 0.06em;
+            font-size: 0.98rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
             text-transform: uppercase;
-            text-align: center;
+            text-align: left;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            box-shadow: none;
         }
         .preset-browser-device-select {
             appearance: none;
@@ -1327,6 +1339,7 @@
             gap: 10px;
             padding: 12px;
             min-height: 0;
+            background: rgba(255,255,255,0.01);
         }
         .preset-browser-device-toolbar {
             display: flex;
@@ -1382,12 +1395,13 @@
             grid-template-columns: repeat(4, minmax(0, 1fr));
         }
         .preset-browser-button {
-            min-height: 52px;
+            min-height: 64px;
             padding: 8px 6px;
-            font-size: 0.9rem;
-            font-weight: 700;
-            letter-spacing: 0.02em;
+            font-size: clamp(1.05rem, 3vw, 1.75rem);
+            font-weight: 800;
+            letter-spacing: 0.08em;
             cursor: pointer;
+            border-radius: 12px;
             transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
         }
         .preset-browser-button:hover { border-color: var(--accent); }
@@ -1396,20 +1410,21 @@
             color: var(--accent);
             background: var(--accent-dim);
             border-color: var(--accent);
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.18);
         }
         .preset-browser-grid.vertical-7 .preset-browser-button {
+            min-height: 70px;
             background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
             border-color: rgba(255,255,255,0.18);
-            font-weight: 800;
+            font-weight: 900;
         }
-        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(1) { background: rgba(47, 185, 89, 0.28); color: #0f5132; }
-        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(2) { background: rgba(240, 190, 54, 0.28); color: #6b4f00; }
-        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(3) { background: rgba(220, 53, 69, 0.24); color: #7a1f2a; }
-        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(4) { background: rgba(59, 130, 246, 0.22); color: #1d4ed8; }
-        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(5) { background: rgba(34, 211, 238, 0.22); color: #0f766e; }
-        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(6) { background: rgba(236, 72, 153, 0.2); color: #9d174d; }
-        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(7) { background: rgba(255,255,255,0.9); color: #111827; }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(1) { background: rgba(47, 185, 89, 0.28); color: var(--accent); }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(2) { background: rgba(240, 190, 54, 0.28); color: var(--accent); }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(3) { background: rgba(220, 53, 69, 0.24); color: var(--accent); }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(4) { background: rgba(59, 130, 246, 0.22); color: var(--accent); }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(5) { background: rgba(34, 211, 238, 0.22); color: var(--accent); }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(6) { background: rgba(236, 72, 153, 0.2); color: var(--accent); }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(7) { background: rgba(255,255,255,0.9); color: var(--accent); }
         .preset-browser-empty {
             display: flex;
             align-items: center;
@@ -1564,12 +1579,8 @@
 <div id="presetBrowserPanel" class="preset-browser-panel" aria-label="Preset browser" aria-live="polite">
   <div class="preset-browser-header">
     <div class="preset-browser-title">
-      <strong>Preset browser</strong>
       <span id="presetBrowserMeta" class="preset-browser-meta">No device selected</span>
     </div>
-    <button id="presetBrowserClose" class="menu-btn" type="button" aria-label="Close preset browser" title="Close">
-      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
   </div>
   <div id="presetBrowserBody" class="preset-browser-body"></div>
 </div>
@@ -4264,6 +4275,7 @@ function renderPresetBrowser() {
 function openPresetBrowser() {
     const devices = getPresetBrowserDeviceCandidates();
     if (!devices.length) {
+        document.body.classList.add('preset-browser-open');
         renderPresetBrowser();
         return;
     }
@@ -4272,12 +4284,14 @@ function openPresetBrowser() {
     presetBrowserState.page = 0;
     presetBrowserState.bank = 'P';
     presetBrowserState.selectedPreset = null;
+    document.body.classList.add('preset-browser-open');
     renderPresetBrowser();
 }
 
 function closePresetBrowser() {
     const panel = document.getElementById('presetBrowserPanel');
     if (panel) panel.classList.remove('visible');
+    document.body.classList.remove('preset-browser-open');
 }
 
 function handlePresetBrowserDeviceSelect(deviceId) {
@@ -4591,7 +4605,15 @@ function renderMidiDevicesSheet() {
                 </button>
                 <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
                 <button type="button" class="speed-chip marker-set-chip" data-midi-action="presets" aria-label="Preset browser" title="Presets"${devices.length ? '' : ' disabled'}>
-                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="overflow:visible">
+                        <rect x="3.25" y="4.25" width="17.5" height="4.75" rx="1.1"/>
+                        <rect x="3.25" y="9.75" width="5.2" height="4.4" rx="1.1"/>
+                        <rect x="9.25" y="9.75" width="5.2" height="4.4" rx="1.1"/>
+                        <rect x="15.25" y="9.75" width="5.2" height="4.4" rx="1.1"/>
+                        <rect x="3.25" y="15.25" width="5.2" height="4.5" rx="1.1"/>
+                        <rect x="9.25" y="15.25" width="5.2" height="4.5" rx="1.1"/>
+                        <rect x="15.25" y="15.25" width="5.2" height="4.5" rx="1.1"/>
+                    </svg>
                 </button>
                 <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
                 <button type="button" class="speed-chip marker-set-chip danger" data-midi-action="disconnect-all" aria-label="Disconnect all devices" title="Disconnect all"${devices.length ? '' : ' disabled'}>
