@@ -1470,7 +1470,7 @@
         .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(4) { background: rgba(59, 130, 246, 0.22); color: var(--accent); }
         .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(5) { background: rgba(34, 211, 238, 0.22); color: var(--accent); }
         .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(6) { background: rgba(236, 72, 153, 0.2); color: var(--accent); }
-        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(7) { background: rgba(255,255,255,0.9); color: var(--accent); }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(7) { background: rgba(220, 226, 234, 0.9); color: var(--accent); }
         .preset-browser-empty {
             display: flex;
             align-items: center;
@@ -4041,9 +4041,11 @@ const PRESET_FORMAT_PROFILES = new Map([
         return `${prefix}${String(group).padStart(2, '0')}-${sub}`;
     } }],
     ['zoom-g1-four', { min: 10, max: 59, format: (preset) => String(Math.max(10, Math.min(59, Number(preset) || 10))) }],
-    ['thr-ii', { min: 1, max: 5, format: (preset) => `M${String(Math.max(1, Math.min(5, Number(preset) || 1))).padStart(2, '0')}` }],
-    ['nux', { max: 7, format: (preset) => String(Math.max(1, Math.min(7, Number(preset) || 1))).padStart(2, '0') }],
+    ['thr-ii', { min: 1, max: 5, format: (preset) => `M${String(Math.max(1, Math.min(5, Number(preset) || 1)))}` }],
+    ['nux', { max: 7, format: (preset) => String(Math.max(1, Math.min(7, Number(preset) || 1))) }],
     ['nanocore', { min: 1, max: 64, format: (preset) => String(Math.max(1, Math.min(64, Number(preset) || 1))).padStart(2, '0') }],
+    ['spark-go', { min: 1, max: 4, format: (preset) => String(Math.max(1, Math.min(44, Number(preset) || 1))) }],
+    ['spark-40', { min: 1, max: 4, format: (preset) => String(Math.max(1, Math.min(44, Number(preset) || 1))) }],
 ]);
 
 const BANKED_PC_ROUTE_PROFILES = new Map([
