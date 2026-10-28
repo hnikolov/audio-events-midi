@@ -1340,11 +1340,8 @@
         }
         .preset-browser-device-select {
             appearance: none;
-            background-image: linear-gradient(45deg, transparent 50%, var(--text-primary) 50%), linear-gradient(135deg, var(--text-primary) 50%, transparent 50%);
-            background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
-            background-size: 6px 6px, 6px 6px;
-            background-repeat: no-repeat;
-            padding-right: 36px;
+            background: transparent;
+            padding-right: 0;
             cursor: pointer;
             color: var(--text-primary);
         }
@@ -4159,6 +4156,17 @@ function getPresetBrowserSelectableOptions() {
     connected.forEach((conn) => {
         const id = String(conn.id || '');
         if (!id) return;
+
+        const family = getPresetBrowserFamily(conn);
+        if (family && SUPPORTED_DEVICE_BY_KEY.has(family)) {
+            const familyOptionValue = `family:${family}`;
+            if (!seen.has(familyOptionValue)) {
+                seen.add(familyOptionValue);
+                options.push({ value: familyOptionValue, label: getSupportedDeviceProfile(family) ? getSupportedDeviceProfile(family).label : family, kind: 'family' });
+            }
+            return;
+        }
+
         if (!seen.has(id)) {
             seen.add(id);
             options.push({ value: id, label: conn.name || 'Device', kind: 'device' });
