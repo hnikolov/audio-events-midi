@@ -1244,6 +1244,186 @@
             accent-color: var(--accent);
         }
 
+        /* ===== PRESET BROWSER ===== */
+        .preset-browser-panel {
+            display: none;
+            position: relative;
+            margin: 10px 12px 0;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+            min-height: clamp(280px, 54vh, 660px);
+        }
+        .preset-browser-panel.visible {
+            display: flex;
+            flex-direction: column;
+        }
+        .preset-browser-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+        }
+        .preset-browser-title {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            width: 100%;
+        }
+        .preset-browser-title strong {
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .preset-browser-meta {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+        }
+        .preset-browser-device-pill,
+        .preset-browser-device-select {
+            width: 100%;
+            min-height: 42px;
+            padding: 10px 14px;
+            border: 1px solid rgba(29,185,84,0.35);
+            border-radius: var(--radius-md);
+            background: rgba(29,185,84,0.12);
+            color: var(--text-primary);
+            font-size: clamp(0.94rem, 2vw, 1.15rem);
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .preset-browser-device-select {
+            appearance: none;
+            background-image: linear-gradient(45deg, transparent 50%, var(--text-primary) 50%), linear-gradient(135deg, var(--text-primary) 50%, transparent 50%);
+            background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
+            background-size: 6px 6px, 6px 6px;
+            background-repeat: no-repeat;
+            padding-right: 36px;
+            cursor: pointer;
+        }
+        .preset-browser-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            min-height: 0;
+        }
+        .preset-browser-device-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .preset-browser-device-button,
+        .preset-browser-bank-button,
+        .preset-browser-page-button,
+        .preset-browser-button {
+            appearance: none;
+            border: 1px solid var(--border);
+            background: var(--bg-base);
+            color: var(--text-primary);
+            border-radius: var(--radius-md);
+            font: inherit;
+        }
+        .preset-browser-device-button,
+        .preset-browser-bank-button,
+        .preset-browser-page-button {
+            min-height: 34px;
+            padding: 7px 10px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        .preset-browser-device-button.active,
+        .preset-browser-bank-button.active,
+        .preset-browser-page-button.active {
+            color: var(--accent);
+            background: var(--accent-dim);
+            border-color: var(--border);
+        }
+        .preset-browser-grid {
+            display: grid;
+            gap: 8px;
+            flex: 1;
+            min-height: 0;
+        }
+        .preset-browser-grid.vertical-5,
+        .preset-browser-grid.vertical-4,
+        .preset-browser-grid.vertical-7 {
+            grid-template-columns: 1fr;
+        }
+        .preset-browser-grid.pocket-amp,
+        .preset-browser-grid.nanocore {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+        .preset-browser-grid.pocket-master,
+        .preset-browser-grid.zoom {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+        .preset-browser-grid.gt100 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+        .preset-browser-button {
+            min-height: 52px;
+            padding: 8px 6px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+        }
+        .preset-browser-button:hover { border-color: var(--accent); }
+        .preset-browser-button:active { transform: translateY(1px); }
+        .preset-browser-button.selected {
+            color: var(--accent);
+            background: var(--accent-dim);
+            border-color: var(--accent);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+        }
+        .preset-browser-grid.vertical-7 .preset-browser-button {
+            background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+            border-color: rgba(255,255,255,0.18);
+            font-weight: 800;
+        }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(1) { background: rgba(47, 185, 89, 0.28); color: #0f5132; }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(2) { background: rgba(240, 190, 54, 0.28); color: #6b4f00; }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(3) { background: rgba(220, 53, 69, 0.24); color: #7a1f2a; }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(4) { background: rgba(59, 130, 246, 0.22); color: #1d4ed8; }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(5) { background: rgba(34, 211, 238, 0.22); color: #0f766e; }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(6) { background: rgba(236, 72, 153, 0.2); color: #9d174d; }
+        .preset-browser-grid.vertical-7 .preset-browser-button:nth-child(7) { background: rgba(255,255,255,0.9); color: #111827; }
+        .preset-browser-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 120px;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 10px;
+            border: 1px dashed var(--border);
+            border-radius: var(--radius-lg);
+            background: rgba(255,255,255,0.02);
+            flex: 1;
+        }
+
         /* ===== TAB BAR ===== */
         .tab-bar {
             position: fixed;
@@ -1379,6 +1559,19 @@
       <svg class="icon icon-sm" id="themeIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
     </button>
   </div>
+</div>
+
+<div id="presetBrowserPanel" class="preset-browser-panel" aria-label="Preset browser" aria-live="polite">
+  <div class="preset-browser-header">
+    <div class="preset-browser-title">
+      <strong>Preset browser</strong>
+      <span id="presetBrowserMeta" class="preset-browser-meta">No device selected</span>
+    </div>
+    <button id="presetBrowserClose" class="menu-btn" type="button" aria-label="Close preset browser" title="Close">
+      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div id="presetBrowserBody" class="preset-browser-body"></div>
 </div>
 
 <!-- USB dialog -->
@@ -3888,7 +4081,244 @@ const midiSheetState = {
     anchorEl: null
 };
 
+const presetBrowserState = {
+    deviceId: null,
+    familyKey: null,
+    page: 0,
+    bank: 'P',
+    selectedPreset: null
+};
+
 const CONNECT_LABEL_HTML = '<svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h6v3a3 3 0 0 1-6 0v-3z"/><line x1="10.5" y1="8" x2="10.5" y2="10"/><line x1="13.5" y1="8" x2="13.5" y2="10"/><line x1="12" y1="16" x2="12" y2="18"/></svg>\n      Connect';
+
+function getPresetBrowserDeviceCandidates() {
+    return getConnectedDevices();
+}
+
+function getPresetBrowserDevice() {
+    const devices = getPresetBrowserDeviceCandidates();
+    if (!devices.length) return null;
+    if (presetBrowserState.deviceId && devices.some((conn) => conn.id === presetBrowserState.deviceId)) {
+        return devices.find((conn) => conn.id === presetBrowserState.deviceId) || devices[0];
+    }
+    const primary = getPrimaryConnection();
+    const selected = primary && devices.some((conn) => conn.id === primary.id) ? primary : devices[0];
+    presetBrowserState.deviceId = selected ? selected.id : null;
+    return selected || null;
+}
+
+function getPresetBrowserFamily(conn) {
+    if (!conn) return null;
+    const family = normalizeAssignedFamily(resolveDeviceFamily(conn));
+    if (!family || family === 'unknown') return null;
+    return family;
+}
+
+function getPresetBrowserButtonLabel(familyKey, presetValue) {
+    const profile = getPresetFormatProfile(familyKey);
+    if (profile && typeof profile.format === 'function') {
+        return profile.format(presetValue);
+    }
+    return String(presetValue);
+}
+
+function getPresetBrowserGridClass(familyKey) {
+    const normalized = normalizeAssignedFamily(familyKey);
+    if (!normalized) return 'vertical-5';
+    if (normalized === 'thr-ii') return 'vertical-5';
+    if (normalized === 'spark-go' || normalized === 'spark-40') return 'vertical-4';
+    if (normalized === 'nux') return 'vertical-7';
+    if (normalized === 'pocket-amp') return 'pocket-amp';
+    if (normalized === 'nanocore') return 'nanocore';
+    if (normalized === 'pocket-master' || normalized === 'smart-box') return 'pocket-master';
+    if (normalized === 'zoom-g1-four') return 'zoom';
+    if (normalized === 'gt-100') return 'gt100';
+    return 'vertical-5';
+}
+
+function getPresetBrowserNumberRange(familyKey, pageIndex = 0) {
+    const resolvedFamily = normalizeAssignedFamily(familyKey);
+    if (!resolvedFamily) return [];
+    const { min = 1, max = 1 } = getPresetRangeForFamily(resolvedFamily);
+    const values = [];
+    switch (resolvedFamily) {
+        case 'pocket-amp': {
+            const start = pageIndex * 40;
+            const end = Math.min(max, start + 40);
+            for (let i = start + 1; i <= end; i += 1) values.push(i);
+            break;
+        }
+        case 'nanocore': {
+            const start = pageIndex * 40;
+            const end = Math.min(max, start + 40);
+            for (let i = start + 1; i <= end; i += 1) values.push(i);
+            break;
+        }
+        case 'pocket-master':
+        case 'smart-box': {
+            const bankStart = presetBrowserState.bank === 'F' ? 51 : 1;
+            const bankEnd = presetBrowserState.bank === 'F' ? max : 50;
+            for (let i = bankStart; i <= bankEnd; i += 1) values.push(i);
+            break;
+        }
+        case 'zoom-g1-four': {
+            for (let i = min; i <= max; i += 1) values.push(i);
+            break;
+        }
+        case 'thr-ii':
+        case 'nux':
+        case 'spark-go':
+        case 'spark-40': {
+            for (let i = min; i <= max; i += 1) values.push(i);
+            break;
+        }
+        default: {
+            for (let i = min; i <= max; i += 1) values.push(i);
+            break;
+        }
+    }
+    return values;
+}
+
+function getPresetBrowserPageCount(familyKey) {
+    const resolvedFamily = normalizeAssignedFamily(familyKey);
+    if (!resolvedFamily) return 1;
+    if (resolvedFamily === 'pocket-amp' || resolvedFamily === 'nanocore') return 2;
+    return 1;
+}
+
+function renderPresetBrowser() {
+    const panel = document.getElementById('presetBrowserPanel');
+    const body = document.getElementById('presetBrowserBody');
+    const meta = document.getElementById('presetBrowserMeta');
+    if (!panel || !body || !meta) return;
+    const devices = getPresetBrowserDeviceCandidates();
+    const selectedDevice = getPresetBrowserDevice();
+    const familyKey = selectedDevice ? getPresetBrowserFamily(selectedDevice) : null;
+
+    if (!devices.length || !selectedDevice || !familyKey) {
+        meta.textContent = devices.length ? 'No supported device selected' : 'Connect a MIDI device';
+        body.innerHTML = `
+            <div class="preset-browser-empty">Connect a supported MIDI device to browse presets.</div>
+        `;
+        panel.classList.add('visible');
+        return;
+    }
+
+    const pageCount = getPresetBrowserPageCount(familyKey);
+    const pageButtons = pageCount > 1
+        ? Array.from({ length: pageCount }, (_, idx) => {
+            const active = presetBrowserState.page === idx ? ' active' : '';
+            return `<button type="button" class="preset-browser-page-button${active}" data-preset-page="${idx}">${idx + 1}</button>`;
+        }).join('')
+        : '';
+
+    const bankButtons = (familyKey === 'pocket-master' || familyKey === 'smart-box')
+        ? ['P', 'F'].map((bank) => {
+            const active = presetBrowserState.bank === bank ? ' active' : '';
+            return `<button type="button" class="preset-browser-bank-button${active}" data-preset-bank="${bank}">${bank}</button>`;
+        }).join('')
+        : '';
+
+    if (pageCount > 1 && presetBrowserState.page >= pageCount) {
+        presetBrowserState.page = pageCount - 1;
+    }
+
+    const presetRange = getPresetBrowserNumberRange(familyKey, presetBrowserState.page);
+
+    let presetButtonsHtml = '';
+    if (familyKey === 'gt-100') {
+        presetButtonsHtml = '<div class="preset-browser-empty">GT-100 preset browser is planned for a later pass. The generic model remains in place for future bank-grouped support.</div>';
+    } else if (presetRange.length) {
+        presetButtonsHtml = presetRange.map((presetValue) => {
+            const label = getPresetBrowserButtonLabel(familyKey, presetValue);
+            const selected = presetBrowserState.selectedPreset === presetValue ? ' selected' : '';
+            return `<button type="button" class="preset-browser-button${selected}" data-preset-value="${presetValue}" aria-label="Select preset ${label}">${escapeHtml(label)}</button>`;
+        }).join('');
+    } else {
+        presetButtonsHtml = '<div class="preset-browser-empty">No presets available for this device family.</div>';
+    }
+
+    const pageControls = pageButtons || bankButtons
+        ? `<div class="preset-browser-device-toolbar">${pageButtons || ''}${bankButtons || ''}</div>`
+        : '';
+
+    const gridClass = getPresetBrowserGridClass(familyKey);
+    if (devices.length > 1) {
+        const selectOptions = devices.map((conn) => {
+            const selected = conn.id === selectedDevice.id ? ' selected' : '';
+            return `<option value="${escapeHtml(conn.id)}"${selected}>${escapeHtml(conn.name || 'Device')}</option>`;
+        }).join('');
+        meta.innerHTML = `<div class="preset-browser-device-pill"><select class="preset-browser-device-select" aria-label="Select MIDI device" onchange="handlePresetBrowserDeviceSelect(this.value)">${selectOptions}</select></div>`;
+    } else {
+        meta.innerHTML = `<div class="preset-browser-device-pill">${escapeHtml(selectedDevice.name || 'Device')}</div>`;
+    }
+    body.innerHTML = `
+        ${pageControls}
+        <div class="preset-browser-grid ${gridClass}">${presetButtonsHtml}</div>
+    `;
+
+    panel.classList.add('visible');
+}
+
+function openPresetBrowser() {
+    const devices = getPresetBrowserDeviceCandidates();
+    if (!devices.length) {
+        renderPresetBrowser();
+        return;
+    }
+    const primary = getPrimaryConnection() || devices[0];
+    presetBrowserState.deviceId = primary ? primary.id : null;
+    presetBrowserState.page = 0;
+    presetBrowserState.bank = 'P';
+    presetBrowserState.selectedPreset = null;
+    renderPresetBrowser();
+}
+
+function closePresetBrowser() {
+    const panel = document.getElementById('presetBrowserPanel');
+    if (panel) panel.classList.remove('visible');
+}
+
+function handlePresetBrowserDeviceSelect(deviceId) {
+    const devices = getPresetBrowserDeviceCandidates();
+    const match = devices.find((conn) => conn.id === deviceId);
+    if (!match) return;
+    presetBrowserState.deviceId = match.id;
+    presetBrowserState.page = 0;
+    presetBrowserState.bank = 'P';
+    presetBrowserState.selectedPreset = null;
+    renderPresetBrowser();
+}
+
+function handlePresetBrowserClick(event) {
+    const pageBtn = event.target.closest('[data-preset-page]');
+    if (pageBtn) {
+        presetBrowserState.page = Number(pageBtn.dataset.presetPage) || 0;
+        renderPresetBrowser();
+        return;
+    }
+
+    const bankBtn = event.target.closest('[data-preset-bank]');
+    if (bankBtn) {
+        presetBrowserState.bank = bankBtn.dataset.presetBank || 'P';
+        renderPresetBrowser();
+        return;
+    }
+
+    const presetBtn = event.target.closest('[data-preset-value]');
+    if (presetBtn) {
+        const presetValue = Number(presetBtn.dataset.presetValue);
+        const selectedDevice = getPresetBrowserDevice();
+        if (selectedDevice && Number.isFinite(presetValue)) {
+            presetBrowserState.selectedPreset = presetValue;
+            sendPresetToConnection(selectedDevice, presetValue).finally(() => {
+                flashCcStatus();
+            });
+            renderPresetBrowser();
+        }
+    }
+}
 
 /* Single status setter: keep the Connect icon when resetting to idle */
 function setStatusText(text) {
@@ -4160,7 +4590,9 @@ function renderMidiDevicesSheet() {
                     <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
                 <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
-                <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
+                <button type="button" class="speed-chip marker-set-chip" data-midi-action="presets" aria-label="Preset browser" title="Presets"${devices.length ? '' : ' disabled'}>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+                </button>
                 <div class="speed-chip marker-set-chip marker-set-chip-spacer" aria-hidden="true"></div>
                 <button type="button" class="speed-chip marker-set-chip danger" data-midi-action="disconnect-all" aria-label="Disconnect all devices" title="Disconnect all"${devices.length ? '' : ' disabled'}>
                     <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
@@ -4197,6 +4629,11 @@ function renderMidiDevicesSheet() {
             if (action === 'connect') {
                 closeAllSheets();
                 await beginAddConnectionFlow();
+                return;
+            }
+            if (action === 'presets') {
+                closeAllSheets();
+                openPresetBrowser();
                 return;
             }
             if (action === 'disconnect-all') {
@@ -4724,6 +5161,7 @@ function closeAllSheets() {
     if (midiDevicesSheet) midiDevicesSheet.classList.remove('open');
     const infoSheet = document.getElementById('info-sheet');
     if (infoSheet) infoSheet.classList.remove('open');
+    closePresetBrowser();
     const overlay = document.getElementById('sheetOverlay');
     if (overlay) overlay.classList.remove('open');
     midiSheetState.mode = 'connections';
@@ -4737,8 +5175,25 @@ function closeAllSheets() {
     markerMenuContext.rowEl = null;
 }
 
+document.addEventListener('click', (event) => {
+    const presetPanel = document.getElementById('presetBrowserPanel');
+    if (presetPanel && presetPanel.contains(event.target)) {
+        handlePresetBrowserClick(event);
+    }
+    const tabTarget = event.target.closest('label[for^="tab-"]');
+    if (tabTarget) {
+        closePresetBrowser();
+    }
+});
+
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeAllSheets();
+});
+
+document.addEventListener('change', (event) => {
+    if (event.target && event.target.name === 'mobile-tab') {
+        closePresetBrowser();
+    }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
