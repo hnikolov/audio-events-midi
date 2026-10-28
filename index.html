@@ -61,6 +61,9 @@
             --mobile-tab-height: 56px;
             --mobile-playerbar-height: 160px;
             --mobile-topbar-height: 0px;
+            --preset-browser-track-card-height: 42px;
+            --preset-browser-grid-gap: 8px;
+            --preset-browser-grid-height: calc(var(--preset-browser-track-card-height) * 10);
             --playlist-header-min-height: 58px;
             --markers-header-min-height: 50px;
             --info-action-btn-width: 106px;
@@ -1303,7 +1306,7 @@
             align-items: center;
             justify-content: flex-start;
             min-height: 42px;
-            font-size: 0.98rem;
+            font-size: 0.9rem;
             font-weight: 600;
             letter-spacing: 0.02em;
             text-transform: uppercase;
@@ -1322,9 +1325,9 @@
             border-radius: 0;
             background: transparent;
             color: var(--text-primary);
-            font-size: 0.98rem;
+            font-size: 0.9rem;
             font-weight: 600;
-            letter-spacing: 0.02em;
+            letter-spacing: 0.01em;
             text-transform: uppercase;
             text-align: left;
             display: flex;
@@ -1404,14 +1407,30 @@
         }
         .preset-browser-grid {
             display: grid;
-            gap: 8px;
+            gap: var(--preset-browser-grid-gap);
             flex: 1;
             min-height: 0;
+            height: var(--preset-browser-grid-height);
         }
-        .preset-browser-grid.vertical-5,
         .preset-browser-grid.vertical-4,
+        .preset-browser-grid.vertical-5,
         .preset-browser-grid.vertical-7 {
+            --preset-browser-grid-rows: 0;
             grid-template-columns: 1fr;
+        }
+        .preset-browser-grid.vertical-4 {
+            --preset-browser-grid-rows: 4;
+        }
+        .preset-browser-grid.vertical-5 {
+            --preset-browser-grid-rows: 5;
+        }
+        .preset-browser-grid.vertical-7 {
+            --preset-browser-grid-rows: 7;
+        }
+        .preset-browser-grid.vertical-4 .preset-browser-button,
+        .preset-browser-grid.vertical-5 .preset-browser-button,
+        .preset-browser-grid.vertical-7 .preset-browser-button {
+            height: calc((var(--preset-browser-grid-height) - (var(--preset-browser-grid-gap) * (var(--preset-browser-grid-rows) - 1))) / var(--preset-browser-grid-rows));
         }
         .preset-browser-grid.pocket-amp,
         .preset-browser-grid.nanocore {
@@ -1425,10 +1444,11 @@
             grid-template-columns: repeat(4, minmax(0, 1fr));
         }
         .preset-browser-button {
-            min-height: 64px;
+            min-height: 0;
+            height: 40px;
             padding: 8px 6px;
             font-size: clamp(1.05rem, 3vw, 1.75rem);
-            font-weight: 800;
+            font-weight: 600;
             letter-spacing: 0.08em;
             cursor: pointer;
             border-radius: 12px;
@@ -1443,7 +1463,6 @@
             box-shadow: inset 0 0 0 2px rgba(255,255,255,0.18);
         }
         .preset-browser-grid.vertical-7 .preset-browser-button {
-            min-height: 70px;
             background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
             border-color: rgba(255,255,255,0.18);
             font-weight: 900;
