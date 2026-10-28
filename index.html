@@ -1260,29 +1260,41 @@
         body.preset-browser-open .mobile-tabs-container {
             display: none;
         }
+        body.preset-browser-open #mobilePlayerBar {
+            display: grid;
+            visibility: visible;
+            opacity: 1;
+            z-index: 1200;
+        }
         body.preset-browser-open #presetBrowserPanel {
             display: flex;
             flex-direction: column;
             margin-top: var(--mobile-topbar-height, 0px);
+            padding-bottom: calc(var(--mobile-playerbar-height, 160px) + 10px);
         }
         .preset-browser-panel.visible {
             display: flex;
             flex-direction: column;
         }
         .preset-browser-header {
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
             align-items: center;
-            justify-content: flex-start;
-            gap: 10px;
+            gap: 12px;
             min-height: 58px;
             padding: 12px 16px;
             border-bottom: 1px solid var(--border);
-            background: rgba(7, 10, 12, 0.85);
+            background: var(--bg-surface, var(--bg-elevated));
         }
         .preset-browser-title {
             display: flex;
             align-items: center;
-            flex: 1;
+            min-width: 0;
+        }
+        .preset-browser-header-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
             min-width: 0;
         }
         .preset-browser-meta {
@@ -1331,6 +1343,24 @@
             background-repeat: no-repeat;
             padding-right: 36px;
             cursor: pointer;
+            color: var(--text-primary);
+        }
+        .preset-browser-header-controls .preset-browser-device-toolbar {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: nowrap;
+        }
+        .preset-browser-header-controls .preset-browser-page-button,
+        .preset-browser-header-controls .preset-browser-bank-button {
+            flex-shrink: 0;
+            min-width: 44px;
+            min-height: 34px;
+            padding: 7px 10px;
+            font-size: 0.78rem;
+            font-weight: 600;
         }
         .preset-browser-body {
             flex: 1;
@@ -1581,6 +1611,7 @@
     <div class="preset-browser-title">
       <span id="presetBrowserMeta" class="preset-browser-meta">No device selected</span>
     </div>
+    <div id="presetBrowserHeaderControls" class="preset-browser-header-controls" aria-label="Preset browser controls"></div>
   </div>
   <div id="presetBrowserBody" class="preset-browser-body"></div>
 </div>
@@ -1665,9 +1696,9 @@
     </div>
 
     <!-- Fixed Bottom Player Bar -->
-    <div id="mobilePlayerBar" class="mobile-player-bar" role="region" aria-label="Mini player">
+    </div>
 
-        <!-- Progress bar with flanking time labels -->
+    <div id="mobilePlayerBar" class="mobile-player-bar" role="region" aria-label="Mini player">
         <div class="progress-container">
             <span id="time-current" class="time-label time-left">0:00.0</span>
             <div id="progress-bar" class="progress-track">
@@ -1683,7 +1714,6 @@
             <span id="time-duration" class="time-label time-right">0:00</span>
         </div>
 
-        <!-- A/B loop panel (collapsible) -->
         <div class="controls-container five-slot-row ab-panel collapsed" id="ab-panel" role="group" aria-label="A/B loop controls">
             <button id="abVisibleBtn" class="control-btn" onclick="toggleABVisibility()" aria-label="Show/hide loop overlay">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1693,12 +1723,11 @@
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
             </button>
             <button id="btnSetB" class="control-btn ab-btn ab-timestamp" onclick="setLoopB()" aria-label="Set loop end">B: — —</button>
-                        <button id="abClearBtn" class="control-btn" onclick="clearABLoop()" aria-label="Clear loop points">
-                            <svg id="abClearIcon" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
+            <button id="abClearBtn" class="control-btn" onclick="clearABLoop()" aria-label="Clear loop points">
+                <svg id="abClearIcon" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
             </button>
         </div>
 
-        <!-- Main controls: Prev, Seek-10, Play, Seek+10, Next -->
         <div class="controls-container five-slot-row" role="group" aria-label="Playback controls">
             <button class="control-btn" onclick="prevTrack()" aria-label="Previous track">
               <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
@@ -1717,7 +1746,6 @@
             </button>
         </div>
 
-        <!-- Aux controls: Speed, Loop, AB, Volume, Stop -->
         <div class="controls-container five-slot-row aux-controls" role="group" aria-label="Auxiliary controls">
             <div class="speed-wrapper">
                 <button id="speedBtn" class="control-btn speed-btn-label" onclick="toggleSpeedMenu()" aria-label="Playback speed">
@@ -1739,11 +1767,9 @@
               <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
             </button>
         </div>
-
     </div>
-</div>
 
-<!-- Shared Action Sheet Overlay -->
+    <!-- Shared Action Sheet Overlay -->
 <div id="sheetOverlay" class="sheet-overlay" onclick="closeAllSheets()"></div>
 <div id="song-menu-sheet" class="marker-top-sheet" aria-label="Song menu"></div>
 <div id="playset-sheet" class="marker-top-sheet" aria-label="Playsets menu"></div>
@@ -4106,9 +4132,47 @@ function getPresetBrowserDeviceCandidates() {
     return getConnectedDevices();
 }
 
+function getPresetBrowserSelectableOptions() {
+    const connected = getPresetBrowserDeviceCandidates();
+    const options = [];
+    const seen = new Set();
+
+    connected.forEach((conn) => {
+        const id = String(conn.id || '');
+        if (!id) return;
+        if (!seen.has(id)) {
+            seen.add(id);
+            options.push({ value: id, label: conn.name || 'Device', kind: 'device' });
+        }
+    });
+
+    SUPPORTED_DEVICE_OPTIONS.forEach((opt) => {
+        const value = `family:${opt.key}`;
+        if (seen.has(value)) return;
+        seen.add(value);
+        options.push({ value, label: opt.label, kind: 'family' });
+    });
+
+    return options;
+}
+
+function getPresetBrowserSelectedFamilyKey() {
+    const override = normalizeAssignedFamily(presetBrowserState.familyKey);
+    if (override) return override;
+    const selectedDevice = getPresetBrowserDevice();
+    return selectedDevice ? getPresetBrowserFamily(selectedDevice) : null;
+}
+
 function getPresetBrowserDevice() {
     const devices = getPresetBrowserDeviceCandidates();
     if (!devices.length) return null;
+    if (presetBrowserState.familyKey) {
+        const overrideFamily = normalizeAssignedFamily(presetBrowserState.familyKey);
+        if (overrideFamily) {
+            const sameFamilyMatch = devices.find((conn) => normalizeAssignedFamily(getPresetBrowserFamily(conn)) === overrideFamily);
+            if (sameFamilyMatch) return sameFamilyMatch;
+        }
+    }
     if (presetBrowserState.deviceId && devices.some((conn) => conn.id === presetBrowserState.deviceId)) {
         return devices.find((conn) => conn.id === presetBrowserState.deviceId) || devices[0];
     }
@@ -4205,9 +4269,19 @@ function renderPresetBrowser() {
     if (!panel || !body || !meta) return;
     const devices = getPresetBrowserDeviceCandidates();
     const selectedDevice = getPresetBrowserDevice();
-    const familyKey = selectedDevice ? getPresetBrowserFamily(selectedDevice) : null;
+    const familyKey = getPresetBrowserSelectedFamilyKey();
+    const hasFamilyOverride = Boolean(presetBrowserState.familyKey);
 
-    if (!devices.length || !selectedDevice || !familyKey) {
+    if (!devices.length && !hasFamilyOverride) {
+        meta.textContent = 'Connect a MIDI device';
+        body.innerHTML = `
+            <div class="preset-browser-empty">Connect a supported MIDI device to browse presets.</div>
+        `;
+        panel.classList.add('visible');
+        return;
+    }
+
+    if (!familyKey) {
         meta.textContent = devices.length ? 'No supported device selected' : 'Connect a MIDI device';
         body.innerHTML = `
             <div class="preset-browser-empty">Connect a supported MIDI device to browse presets.</div>
@@ -4250,22 +4324,30 @@ function renderPresetBrowser() {
         presetButtonsHtml = '<div class="preset-browser-empty">No presets available for this device family.</div>';
     }
 
+    const headerControls = document.getElementById('presetBrowserHeaderControls');
     const pageControls = pageButtons || bankButtons
         ? `<div class="preset-browser-device-toolbar">${pageButtons || ''}${bankButtons || ''}</div>`
-        : '';
+        : '<div class="preset-browser-device-toolbar" aria-hidden="true"></div>';
+
+    if (headerControls) {
+        headerControls.innerHTML = pageControls;
+    }
 
     const gridClass = getPresetBrowserGridClass(familyKey);
-    if (devices.length > 1) {
-        const selectOptions = devices.map((conn) => {
-            const selected = conn.id === selectedDevice.id ? ' selected' : '';
-            return `<option value="${escapeHtml(conn.id)}"${selected}>${escapeHtml(conn.name || 'Device')}</option>`;
-        }).join('');
+    const selectOptions = getPresetBrowserSelectableOptions().map((option) => {
+        const isSelected = option.kind === 'device'
+            ? selectedDevice && option.value === selectedDevice.id
+            : normalizeAssignedFamily(option.value.replace(/^family:/, '')) === familyKey;
+        return `<option value="${escapeHtml(option.value)}"${isSelected ? ' selected' : ''}>${escapeHtml(option.label)}</option>`;
+    }).join('');
+
+    const headerLabel = selectedDevice && selectedDevice.name ? selectedDevice.name : (getSupportedDeviceProfile(familyKey)?.label || 'Device');
+    if (selectOptions && selectOptions.length > 0) {
         meta.innerHTML = `<div class="preset-browser-device-pill"><select class="preset-browser-device-select" aria-label="Select MIDI device" onchange="handlePresetBrowserDeviceSelect(this.value)">${selectOptions}</select></div>`;
     } else {
-        meta.innerHTML = `<div class="preset-browser-device-pill">${escapeHtml(selectedDevice.name || 'Device')}</div>`;
+        meta.innerHTML = `<div class="preset-browser-device-pill">${escapeHtml(headerLabel)}</div>`;
     }
     body.innerHTML = `
-        ${pageControls}
         <div class="preset-browser-grid ${gridClass}">${presetButtonsHtml}</div>
     `;
 
@@ -4275,12 +4357,15 @@ function renderPresetBrowser() {
 function openPresetBrowser() {
     const devices = getPresetBrowserDeviceCandidates();
     if (!devices.length) {
+        presetBrowserState.deviceId = null;
+        presetBrowserState.familyKey = null;
         document.body.classList.add('preset-browser-open');
         renderPresetBrowser();
         return;
     }
     const primary = getPrimaryConnection() || devices[0];
     presetBrowserState.deviceId = primary ? primary.id : null;
+    presetBrowserState.familyKey = null;
     presetBrowserState.page = 0;
     presetBrowserState.bank = 'P';
     presetBrowserState.selectedPreset = null;
@@ -4294,11 +4379,23 @@ function closePresetBrowser() {
     document.body.classList.remove('preset-browser-open');
 }
 
-function handlePresetBrowserDeviceSelect(deviceId) {
+function handlePresetBrowserDeviceSelect(value) {
     const devices = getPresetBrowserDeviceCandidates();
-    const match = devices.find((conn) => conn.id === deviceId);
-    if (!match) return;
-    presetBrowserState.deviceId = match.id;
+    const match = devices.find((conn) => conn.id === value);
+    if (match) {
+        presetBrowserState.deviceId = match.id;
+        presetBrowserState.familyKey = null;
+        presetBrowserState.page = 0;
+        presetBrowserState.bank = 'P';
+        presetBrowserState.selectedPreset = null;
+        renderPresetBrowser();
+        return;
+    }
+
+    const familyKey = normalizeAssignedFamily(value.replace(/^family:/, ''));
+    if (!familyKey) return;
+    presetBrowserState.deviceId = null;
+    presetBrowserState.familyKey = familyKey;
     presetBrowserState.page = 0;
     presetBrowserState.bank = 'P';
     presetBrowserState.selectedPreset = null;
