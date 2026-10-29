@@ -1362,6 +1362,18 @@
             font-size: 0.78rem;
             font-weight: 600;
         }
+        .preset-browser-page-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .preset-browser-page-button svg {
+            display: block;
+            width: 16px;
+            height: 16px;
+            pointer-events: none;
+        }
         .preset-browser-body {
             flex: 1;
             display: flex;
@@ -4240,6 +4252,22 @@ function getPresetBrowserGridClass(familyKey) {
     return 'vertical-5';
 }
 
+function getGt100GroupInfo(pageIndex = 0) {
+    const safePageIndex = Number.isFinite(pageIndex) ? Math.max(0, Number(pageIndex)) : 0;
+    const groupIndex = safePageIndex < 5 ? safePageIndex : safePageIndex - 5;
+    return {
+        section: safePageIndex < 5 ? 'U' : 'P',
+        groupIndex,
+        startBank: groupIndex * 10 + 1
+    };
+}
+
+function getGt100PageStartSlot(pageIndex = 0) {
+    const info = getGt100GroupInfo(pageIndex);
+    const baseOffset = info.section === 'U' ? 0 : 200;
+    return baseOffset + (info.startBank - 1) * 4 + 1;
+}
+
 function getPresetBrowserNumberRange(familyKey, pageIndex = 0) {
     const resolvedFamily = normalizeAssignedFamily(familyKey);
     if (!resolvedFamily) return [];
@@ -4265,6 +4293,12 @@ function getPresetBrowserNumberRange(familyKey, pageIndex = 0) {
             for (let i = bankStart; i <= bankEnd; i += 1) values.push(i);
             break;
         }
+        case 'gt-100': {
+            const start = getGt100PageStartSlot(pageIndex);
+            const end = start + 39;
+            for (let i = start; i <= end; i += 1) values.push(i);
+            break;
+        }
         case 'zoom-g1-four': {
             for (let i = min; i <= max; i += 1) values.push(i);
             break;
@@ -4288,6 +4322,7 @@ function getPresetBrowserPageCount(familyKey) {
     const resolvedFamily = normalizeAssignedFamily(familyKey);
     if (!resolvedFamily) return 1;
     if (resolvedFamily === 'pocket-amp' || resolvedFamily === 'nanocore') return 2;
+    if (resolvedFamily === 'gt-100') return 10;
     return 1;
 }
 
@@ -4319,8 +4354,12 @@ function renderPresetBrowser() {
         return;
     }
 
+    if (familyKey === 'gt-100' && !['U', 'P'].includes(presetBrowserState.bank)) {
+        presetBrowserState.bank = 'U';
+    }
+
     const pageCount = getPresetBrowserPageCount(familyKey);
-    const pageButtons = pageCount > 1
+    const pageButtons = pageCount > 1 && familyKey !== 'gt-100'
         ? Array.from({ length: pageCount }, (_, idx) => {
             const active = presetBrowserState.page === idx ? ' active' : '';
             return `<button type="button" class="preset-browser-page-button${active}" data-preset-page="${idx}">${idx + 1}</button>`;
@@ -4334,6 +4373,19 @@ function renderPresetBrowser() {
         }).join('')
         : '';
 
+    const gt100Buttons = familyKey === 'gt-100'
+        ? [
+            { key: 'u', label: 'U', active: presetBrowserState.bank === 'U' },
+            { key: 'p', label: 'P', active: presetBrowserState.bank === 'P' },
+            { key: 'prev', label: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>', aria: 'Previous group' },
+            { key: 'next', label: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>', aria: 'Next group' }
+        ].map(({ key, label, active, aria }) => {
+            const cls = key === 'prev' || key === 'next' ? 'preset-browser-page-button' : 'preset-browser-bank-button';
+            const isActive = active ? ' active' : '';
+            return `<button type="button" class="${cls}${isActive}" data-preset-group="${key}" aria-label="${aria || `${label} group`}" title="${aria || `${label} group`}" >${label}</button>`;
+        }).join('')
+        : '';
+
     if (pageCount > 1 && presetBrowserState.page >= pageCount) {
         presetBrowserState.page = pageCount - 1;
     }
@@ -4341,9 +4393,7 @@ function renderPresetBrowser() {
     const presetRange = getPresetBrowserNumberRange(familyKey, presetBrowserState.page);
 
     let presetButtonsHtml = '';
-    if (familyKey === 'gt-100') {
-        presetButtonsHtml = '<div class="preset-browser-empty">GT-100 preset browser is planned for a later pass. The generic model remains in place for future bank-grouped support.</div>';
-    } else if (presetRange.length) {
+    if (presetRange.length) {
         presetButtonsHtml = presetRange.map((presetValue) => {
             const label = getPresetBrowserButtonLabel(familyKey, presetValue);
             const selected = presetBrowserState.selectedPreset === presetValue ? ' selected' : '';
@@ -4354,8 +4404,8 @@ function renderPresetBrowser() {
     }
 
     const headerControls = document.getElementById('presetBrowserHeaderControls');
-    const pageControls = pageButtons || bankButtons
-        ? `<div class="preset-browser-device-toolbar">${pageButtons || ''}${bankButtons || ''}</div>`
+    const pageControls = gt100Buttons || pageButtons || bankButtons
+        ? `<div class="preset-browser-device-toolbar">${gt100Buttons || ''}${pageButtons || ''}${bankButtons || ''}</div>`
         : '<div class="preset-browser-device-toolbar" aria-hidden="true"></div>';
 
     if (headerControls) {
@@ -4415,7 +4465,7 @@ function handlePresetBrowserDeviceSelect(value) {
         presetBrowserState.deviceId = match.id;
         presetBrowserState.familyKey = null;
         presetBrowserState.page = 0;
-        presetBrowserState.bank = 'P';
+        presetBrowserState.bank = 'U';
         presetBrowserState.selectedPreset = null;
         renderPresetBrowser();
         return;
@@ -4426,12 +4476,34 @@ function handlePresetBrowserDeviceSelect(value) {
     presetBrowserState.deviceId = null;
     presetBrowserState.familyKey = familyKey;
     presetBrowserState.page = 0;
-    presetBrowserState.bank = 'P';
+    presetBrowserState.bank = familyKey === 'gt-100' ? 'U' : 'P';
     presetBrowserState.selectedPreset = null;
     renderPresetBrowser();
 }
 
 function handlePresetBrowserClick(event) {
+    const groupBtn = event.target.closest('[data-preset-group]');
+    if (groupBtn) {
+        const action = groupBtn.dataset.presetGroup;
+        if (action === 'u') {
+            presetBrowserState.page = 0;
+            presetBrowserState.bank = 'U';
+        } else if (action === 'p') {
+            presetBrowserState.page = 5;
+            presetBrowserState.bank = 'P';
+        } else if (action === 'prev') {
+            const current = Number.isFinite(presetBrowserState.page) ? presetBrowserState.page : 0;
+            presetBrowserState.page = current <= 0 ? 9 : current - 1;
+            presetBrowserState.bank = presetBrowserState.page < 5 ? 'U' : 'P';
+        } else if (action === 'next') {
+            const current = Number.isFinite(presetBrowserState.page) ? presetBrowserState.page : 0;
+            presetBrowserState.page = current >= 9 ? 0 : current + 1;
+            presetBrowserState.bank = presetBrowserState.page < 5 ? 'U' : 'P';
+        }
+        renderPresetBrowser();
+        return;
+    }
+
     const pageBtn = event.target.closest('[data-preset-page]');
     if (pageBtn) {
         presetBrowserState.page = Number(pageBtn.dataset.presetPage) || 0;
