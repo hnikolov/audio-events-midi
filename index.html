@@ -1378,12 +1378,14 @@
             pointer-events: none;
         }
         .preset-browser-body {
-            flex: 1;
+            flex: 1 1 auto;
             display: flex;
             flex-direction: column;
             gap: 10px;
-            padding: 12px;
             min-height: 0;
+            height: 100%;
+            box-sizing: border-box;
+            padding: 12px;
             background: rgba(255,255,255,0.01);
         }
         .preset-browser-device-toolbar {
@@ -1428,12 +1430,6 @@
             overflow: hidden;
             grid-auto-rows: minmax(0, 1fr);
             align-content: stretch;
-        }
-        .preset-browser-body {
-            flex: 1 1 auto;
-            min-height: 0;
-            height: 100%;
-            box-sizing: border-box;
         }
         .preset-browser-panel.compact {
             --preset-browser-grid-gap: 6px;
@@ -5645,16 +5641,19 @@ async function nextTrack() {
 
 function toggleABPanel() {
     const panel = document.getElementById('ab-panel');
+    if (!panel) return;
+
     panel.classList.toggle('collapsed');
-    panel.addEventListener('transitionend', () => {
+    const afterToggle = () => {
         syncPresetBrowserMetrics();
         window.dispatchEvent(new Event('resize'));
-        // After player bar resizes, ensure active item is still visible
-        // Use double-rAF to let setHeights (also rAF) and layout settle first
         requestAnimationFrame(() => requestAnimationFrame(() => {
             scrollActiveItemIntoView();
         }));
-    }, { once: true });
+        panel.removeEventListener('transitionend', afterToggle);
+    };
+
+    panel.addEventListener('transitionend', afterToggle, { once: true });
 }
 
 function clearABLoop() {
@@ -9618,31 +9617,23 @@ function syncPresetBrowserMetrics() {
   const panel = document.getElementById('presetBrowserPanel');
   const body = panel ? panel.querySelector('.preset-browser-body') : null;
   const header = panel ? panel.querySelector('.preset-browser-header') : null;
-  const playerBar = document.getElementById('mobilePlayerBar');
-  const topBar = document.getElementById('mobileMidiBar');
-  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-  const topBarHeight = topBar ? topBar.offsetHeight || 0 : 0;
-  const playerBarHeight = playerBar ? playerBar.offsetHeight || 0 : 0;
-  const headerHeight = header ? header.offsetHeight || 0 : 0;
   const computedPanelStyle = panel ? getComputedStyle(panel) : null;
+  const computedBodyStyle = body ? getComputedStyle(body) : null;
   const panelPadding = computedPanelStyle
     ? (parseFloat(computedPanelStyle.paddingTop || '0') + parseFloat(computedPanelStyle.paddingBottom || '0'))
     : 0;
-  const computedBodyStyle = body ? getComputedStyle(body) : null;
   const bodyPadding = computedBodyStyle
     ? (parseFloat(computedBodyStyle.paddingTop || '0') + parseFloat(computedBodyStyle.paddingBottom || '0'))
     : 0;
 
-  const browserPanelHeight = panel ? panel.getBoundingClientRect().height || 0 : 0;
-  const spaceAbovePlayer = topBarHeight + 0;
-  const panelHeightFallback = viewportHeight - spaceAbovePlayer - playerBarHeight - 6;
+  const panelHeight = panel ? panel.getBoundingClientRect().height || 0 : 0;
   const bodyHeight = body ? body.getBoundingClientRect().height || 0 : 0;
+  const headerHeight = header ? header.getBoundingClientRect().height || 0 : 0;
+
   const availableContentHeight = bodyHeight > 0
     ? bodyHeight - bodyPadding - 2
-    : Math.max(220, browserPanelHeight > 0
-        ? browserPanelHeight - headerHeight - panelPadding - 2
-        : panelHeightFallback - headerHeight - panelPadding
-      );
+    : Math.max(0, panelHeight - headerHeight - panelPadding - 2);
+
   const availableHeight = Math.max(220, Math.round(availableContentHeight));
   const compact = availableHeight < 360;
   const gridGap = compact ? 6 : 8;
