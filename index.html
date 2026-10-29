@@ -1273,11 +1273,14 @@
             display: flex;
             flex-direction: column;
             margin-top: var(--mobile-topbar-height, 0px);
-            padding-bottom: calc(var(--mobile-playerbar-height, 160px) + 10px);
+            height: calc(100vh - var(--mobile-topbar-height, 0px) - var(--mobile-playerbar-height, 0px) - var(--mobile-tab-height, 56px));
+            box-sizing: border-box;
+            padding-bottom: 0;
         }
         .preset-browser-panel.visible {
             display: flex;
             flex-direction: column;
+            height: 100%;
         }
         .preset-browser-header {
             display: grid;
@@ -1417,9 +1420,20 @@
         .preset-browser-grid {
             display: grid;
             gap: var(--preset-browser-grid-gap, 8px);
-            flex: 1;
+            flex: 1 1 auto;
             min-height: 0;
-            height: var(--preset-browser-grid-height, 300px);
+            height: var(--preset-browser-grid-height, 100%);
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
+            grid-auto-rows: minmax(0, 1fr);
+            align-content: stretch;
+        }
+        .preset-browser-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            height: 100%;
+            box-sizing: border-box;
         }
         .preset-browser-panel.compact {
             --preset-browser-grid-gap: 6px;
@@ -1450,6 +1464,7 @@
         .preset-browser-grid.vertical-7 {
             --preset-browser-grid-rows: 0;
             grid-template-columns: 1fr;
+            grid-template-rows: repeat(var(--preset-browser-grid-rows), minmax(0, 1fr));
         }
         .preset-browser-grid.vertical-4 {
             --preset-browser-grid-rows: 4;
@@ -1463,7 +1478,12 @@
         .preset-browser-grid.vertical-4 .preset-browser-button,
         .preset-browser-grid.vertical-5 .preset-browser-button,
         .preset-browser-grid.vertical-7 .preset-browser-button {
-            height: calc((var(--preset-browser-grid-height) - (var(--preset-browser-grid-gap) * (var(--preset-browser-grid-rows) - 1))) / var(--preset-browser-grid-rows));
+            height: 100%;
+            min-height: 0;
+        }
+        .preset-browser-grid:not(.vertical-4):not(.vertical-5):not(.vertical-7) .preset-browser-button {
+            height: auto;
+            min-height: 0;
         }
         .preset-browser-grid.pocket-amp,
         .preset-browser-grid.nanocore {
@@ -9596,6 +9616,7 @@ importInput.onchange = async () => {
 function syncPresetBrowserMetrics() {
   const root = document.documentElement;
   const panel = document.getElementById('presetBrowserPanel');
+  const body = panel ? panel.querySelector('.preset-browser-body') : null;
   const header = panel ? panel.querySelector('.preset-browser-header') : null;
   const playerBar = document.getElementById('mobilePlayerBar');
   const topBar = document.getElementById('mobileMidiBar');
@@ -9607,8 +9628,22 @@ function syncPresetBrowserMetrics() {
   const panelPadding = computedPanelStyle
     ? (parseFloat(computedPanelStyle.paddingTop || '0') + parseFloat(computedPanelStyle.paddingBottom || '0'))
     : 0;
+  const computedBodyStyle = body ? getComputedStyle(body) : null;
+  const bodyPadding = computedBodyStyle
+    ? (parseFloat(computedBodyStyle.paddingTop || '0') + parseFloat(computedBodyStyle.paddingBottom || '0'))
+    : 0;
 
-  const availableHeight = Math.max(220, viewportHeight - topBarHeight - playerBarHeight - headerHeight - panelPadding - 12);
+  const browserPanelHeight = panel ? panel.getBoundingClientRect().height || 0 : 0;
+  const spaceAbovePlayer = topBarHeight + 0;
+  const panelHeightFallback = viewportHeight - spaceAbovePlayer - playerBarHeight - 6;
+  const bodyHeight = body ? body.getBoundingClientRect().height || 0 : 0;
+  const availableContentHeight = bodyHeight > 0
+    ? bodyHeight - bodyPadding - 2
+    : Math.max(220, browserPanelHeight > 0
+        ? browserPanelHeight - headerHeight - panelPadding - 2
+        : panelHeightFallback - headerHeight - panelPadding
+      );
+  const availableHeight = Math.max(220, Math.round(availableContentHeight));
   const compact = availableHeight < 360;
   const gridGap = compact ? 6 : 8;
   const trackCardHeight = compact ? 34 : 42;
