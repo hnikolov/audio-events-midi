@@ -2046,7 +2046,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.5.1</p>
+            <p class="info-version" id="infoVersionLabel">v1.5.2</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -9636,7 +9636,8 @@ function syncPresetBrowserMetrics() {
     : Math.max(0, panelHeight - headerHeight - panelPadding - 2);
 
   const availableHeight = Math.max(220, Math.round(availableContentHeight));
-  const compact = availableHeight < 360;
+  const currentCompact = panel ? panel.classList.contains('compact') : false;
+  const compact = currentCompact ? availableHeight < 420 : availableHeight < 360;
   const gridGap = compact ? 6 : 8;
   const trackCardHeight = compact ? 34 : 42;
 
