@@ -1326,7 +1326,8 @@
             padding: 0;
             border: 0;
             border-radius: 0;
-            background: transparent;
+            border-color: var(--border);
+            background: var(--bg-active);
             color: var(--text-primary);
             font-size: 0.9rem;
             font-weight: 600;
@@ -1343,7 +1344,7 @@
         }
         .preset-browser-device-select {
             appearance: none;
-            background: transparent;
+            background: var(--bg-surface);
             padding-right: 0;
             cursor: pointer;
             color: var(--text-primary);
@@ -1443,7 +1444,7 @@
             padding: 8px 10px;
         }
         .preset-browser-panel.compact .preset-browser-button {
-            font-size: clamp(0.82rem, 2.2vw, 1.1rem);
+            font-size: 0.95rem;
             letter-spacing: 0.04em;
             padding: 6px 6px;
             border-radius: 10px;
@@ -1496,7 +1497,7 @@
             min-height: 0;
             height: 40px;
             padding: 8px 6px;
-            font-size: clamp(1.05rem, 3vw, 1.75rem);
+            font-size: 1.05rem;
             font-weight: 600;
             letter-spacing: 0.08em;
             cursor: pointer;
@@ -2045,7 +2046,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.4.9</p>
+            <p class="info-version" id="infoVersionLabel">v1.5.0</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
