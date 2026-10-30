@@ -2051,7 +2051,7 @@ function renderInfoSheet() {
     sheet.innerHTML = `
         <div class="marker-set-sheet-list info-sheet-content">
             <p class="info-heading">Version</p>
-            <p class="info-version" id="infoVersionLabel">v1.5.2</p>
+            <p class="info-version" id="infoVersionLabel">v1.5.3</p>
             <p class="info-heading">Settings</p>
             <label class="info-setting-row" for="settingPlaysetOneClick">
                 <span class="info-setting-label">Playsets: one-click select</span>
@@ -4076,6 +4076,10 @@ SUPPORTED_DEVICE_OPTIONS.forEach((opt) => {
     }
 });
 
+// Toggle between only currently connected devices and the full supported-device debug list.
+// Set to 'all' when you want to debug all supported families without connecting them.
+const PRESET_BROWSER_DEVICE_LIST_MODE = 'connected';
+
 const PRESET_FORMAT_PROFILES = new Map([
     ['pocket-master', { max: 100, format: (preset) => {
         const n = Math.max(1, Math.min(100, Number(preset) || 1));
@@ -4205,7 +4209,34 @@ const presetBrowserState = {
 const CONNECT_LABEL_HTML = '<svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h6v3a3 3 0 0 1-6 0v-3z"/><line x1="10.5" y1="8" x2="10.5" y2="10"/><line x1="13.5" y1="8" x2="13.5" y2="10"/><line x1="12" y1="16" x2="12" y2="18"/></svg>\n      Connect';
 
 function getPresetBrowserDeviceCandidates() {
-    return getConnectedDevices();
+    const connected = getConnectedDevices();
+    if (PRESET_BROWSER_DEVICE_LIST_MODE !== 'all') {
+        return connected;
+    }
+
+    const candidates = [...connected];
+    const seen = new Set(candidates.map((conn) => String(conn.id || '')));
+
+    SUPPORTED_DEVICE_OPTIONS.forEach((opt) => {
+        const supportedFamily = normalizeAssignedFamily(opt.key);
+        const alreadyConnected = connected.some((conn) => normalizeAssignedFamily(getPresetBrowserFamily(conn)) === supportedFamily);
+        if (alreadyConnected) return;
+
+        const pseudoId = `supported:${opt.key}`;
+        if (seen.has(pseudoId)) return;
+        seen.add(pseudoId);
+        candidates.push({
+            id: pseudoId,
+            name: opt.label,
+            profile: opt.key,
+            deviceKey: opt.key,
+            transport: 'usb',
+            connectedAt: Number.MAX_SAFE_INTEGER,
+            isSupportedDebugOption: true
+        });
+    });
+
+    return candidates;
 }
 
 function getPresetBrowserSelectableOptions() {
@@ -4233,12 +4264,14 @@ function getPresetBrowserSelectableOptions() {
         }
     });
 
-    SUPPORTED_DEVICE_OPTIONS.forEach((opt) => {
-        const value = `family:${opt.key}`;
-        if (seen.has(value)) return;
-        seen.add(value);
-        options.push({ value, label: opt.label, kind: 'family' });
-    });
+    if (PRESET_BROWSER_DEVICE_LIST_MODE === 'all') {
+        SUPPORTED_DEVICE_OPTIONS.forEach((opt) => {
+            const value = `family:${opt.key}`;
+            if (seen.has(value)) return;
+            seen.add(value);
+            options.push({ value, label: opt.label, kind: 'family' });
+        });
+    }
 
     return options;
 }
@@ -4246,8 +4279,24 @@ function getPresetBrowserSelectableOptions() {
 function getPresetBrowserSelectedFamilyKey() {
     const override = normalizeAssignedFamily(presetBrowserState.familyKey);
     if (override) return override;
+
     const selectedDevice = getPresetBrowserDevice();
-    return selectedDevice ? getPresetBrowserFamily(selectedDevice) : null;
+    if (selectedDevice) {
+        const selectedFamily = normalizeAssignedFamily(getPresetBrowserFamily(selectedDevice));
+        if (selectedFamily) return selectedFamily;
+    }
+
+    const connected = getConnectedDevices();
+    const hasSupportedConnectedFamily = connected.some((conn) => {
+        const family = normalizeAssignedFamily(getPresetBrowserFamily(conn));
+        return Boolean(family);
+    });
+
+    if (connected.length && !hasSupportedConnectedFamily) {
+        return 'pocket-amp';
+    }
+
+    return null;
 }
 
 function getPresetBrowserDevice() {
