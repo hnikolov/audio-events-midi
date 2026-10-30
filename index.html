@@ -1324,9 +1324,9 @@
             width: 100%;
             min-height: 42px;
             padding: 0;
-            border: 0;
+            border: none;
             border-radius: 0;
-            border-color: var(--border);
+            border-color: transparent;
             background: var(--bg-active);
             color: var(--text-primary);
             font-size: 0.9rem;
@@ -1341,13 +1341,18 @@
             text-overflow: ellipsis;
             white-space: nowrap;
             box-shadow: none;
+            outline: none;
         }
         .preset-browser-device-select {
             appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
             background: var(--bg-surface);
             padding-right: 0;
             cursor: pointer;
             color: var(--text-primary);
+            border: none;
+            box-shadow: none;
         }
         .preset-browser-header-controls .preset-browser-device-toolbar {
             width: 100%;
